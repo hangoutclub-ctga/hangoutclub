@@ -1,0 +1,36 @@
+
+### DADOS DOS ALUNOS ###,,,,,,,,,,,,,,,
+ID do Aluno (Deixar em branco),"Nome Completo do Aluno","Data de Nascimento (dd/mm/aaaa)","Nome do Responsável (se menor)","CPF do Responsável (se menor)","Endereço Completo","CEP","Telefone de Contato","E-mail de Contato","Ficha Médica (Alergias, etc.)","Status (Ativo ou Inativo)","Condição (Integral, Bolsa ou Desconto)","Valor da Mensalidade","Dia do Vencimento","Status Pagamento Livro (Pago, Parcial ou Nao_pago)"
+,"Ana Silva","11/04/1998","Maria Silva","111.222.333-44","Rua das Flores, 123, São Paulo, SP","01001-000","(11) 98765-4321","ana.silva@example.com","Alergia a amendoim","Ativo","Integral","350","5","Pago"
+,"Bruno Costa","25/08/2003","João Costa","222.333.444-55","Av. Principal, 456, Rio de Janeiro, RJ","20040-003","(21) 91234-5678","bruno.costa@example.com","","Ativo","Integral","500","10","Nao_pago"
+,,,,,,,,,,,,,,,
+### DADOS DOS FUNCIONÁRIOS / USUÁRIOS ###,,,,,,,,,,,,,,,
+ID do Usuário (Deixar em branco),"Nome de Usuário","E-mail","Cargo (Admin, Professor ou Secretaria)","Senha Inicial","Data de Nascimento (dd/mm/aaaa)"
+,"Sidney Xisto","sidney@hangout.com","Professor","senha123","20/05/1985"
+,"Celia Xisto","celia@hangout.com","Secretaria","senha456","25/03/1988"
+,,,,,,,,,,,,,,,
+### DADOS DAS TURMAS ###,,,,,,,,,,,,,,,
+ID da Turma (Deixar em branco),"Nome da Turma","Professor Responsável","Modalidade (Regular, VIP ou Acompanhamento)","Dias da Semana e Horário (ex: seg, qua - 14:00)","Status (Ativa ou Inativa)"
+,"Turma A - Manhã","Sidney Xisto","Regular","seg, qua, sex - 08:00","Ativa"
+,"Turma VIP - Sábados","Maisa Gabrielle","VIP","sab - 09:00","Ativa"
+,,,,,,,,,,,,,,,
+### ITENS DO INVENTÁRIO ###,,,,,,,,,,,,,,,
+ID do Item (Deixar em branco),"Nome do Item","Categoria","Estoque Atual","Estoque Mínimo","Estoque Máximo"
+,"Livro Didático - Nível 1","Material Didático","20","10","50"
+,"Café em pó 500g","Copa","5","5","10"
+,,,,,,,,,,,,,,,
+### CADASTRO DE DESPESAS FIXAS ###,,,,,,,,,,,,,,,
+ID da Despesa (Deixar em branco),"Descrição da Despesa","Valor Mensal","Dia do Vencimento"
+,"Aluguel","2500","5"
+,"Conta de Internet","150","15"
+,,,,,,,,,,,,,,,
+### HISTÓRICO DE TRANSAÇÕES (EXEMPLOS) ###,,,,,,,,,,,,,,,
+ID da Transação (Deixar em branco),"Tipo (Entrada ou Saída)","Descrição","Origem/Destino (Nome do Aluno ou Fornecedor)","Data (dd/mm/aaaa)","Valor"
+,"Entrada","Mensalidade - Julho","Ana Silva","05/07/2024","350"
+,"Saída","Material de escritório","Papelaria Central","03/07/2024","120.50"
+,,,,,,,,,,,,,,,
+### EVENTOS DA AGENDA (EXEMPLOS) ###,,,,,,,,,,,,,,,
+ID do Evento (Deixar em branco),"Título do Evento","Tipo (Tarefa, Reunião, etc.)","Data (dd/mm/aaaa)","Hora (hh:mm)","Responsável (Nome do Funcionário)","Detalhes Adicionais"
+,"Reunião de Planejamento","Reunião","30/07/2024","16:00","Sidney Xisto","Discutir progresso e próximos passos"
+,"Ligar para interessados","Tarefa","31/07/2024","10:00","Celia Xisto","Follow-up da lista de espera"
+,,,,,,,,,,,,,,,

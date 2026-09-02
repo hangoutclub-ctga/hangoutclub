@@ -1,0 +1,144 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    /* Ajustado para 100% para evitar zoom automático em inputs no mobile (mínimo 16px) */
+    @apply text-[100%];
+  }
+  
+  :root {
+    --background: 240 5% 96.1%;
+    --foreground: 240 6% 10%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 240 6% 10%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 240 6% 10%;
+
+    --primary: 215 30% 35%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+
+    --accent: 215 50% 45%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 215 50% 45%;
+
+    --radius: 0.5rem;
+
+    --chart-1: 215 30% 35%;
+    --chart-2: 215 50% 45%;
+    --chart-3: 215 30% 55%;
+    --chart-4: 215 50% 65%;
+    --chart-5: 215 30% 75%;
+  }
+
+  .dark {
+    --background: 240 6% 10%;
+    --foreground: 0 0% 98%;
+
+    --card: 240 6% 12%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 240 6% 12%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 215 30% 65%;
+    --primary-foreground: 0 0% 98%;
+
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 240 3.7% 15.9%;
+    --muted-foreground: 240 5% 64.9%;
+
+    --accent: 215 50% 55%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 215 50% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Previne zoom automático em dispositivos iOS ao focar em inputs */
+@media screen and (max-width: 768px) {
+  input, select, textarea {
+    font-size: 16px !important;
+  }
+}
+
+@media print {
+  body {
+    background: #fff;
+    color: #000;
+  }
+
+  /* Hide sidebar, header, and other non-essential elements */
+  aside, header, .no-print {
+    display: none !important;
+  }
+
+  /* Expand main content */
+  main {
+    margin-left: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+  
+  .printable-content {
+      padding: 0 !important;
+  }
+  
+  /* Make sure the content to print takes full width */
+  .printable-area {
+    width: 100%;
+    padding: 0;
+  }
+
+  /* Style cards for printing */
+  .card-print {
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+    background: #fff !important;
+  }
+  
+  .card-print-no-border {
+      border: none !important;
+      box-shadow: none !important;
+  }
+
+  h1, h2, h3, h4, h5, p, span, div {
+    color: #000 !important;
+  }
+  
+  /* Make grid layouts stack vertically for printing */
+  .print-stack-grid {
+      grid-template-columns: 1fr !important;
+  }
+}

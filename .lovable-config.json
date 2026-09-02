@@ -1,0 +1,24 @@
+{
+  "projectType": "vite-react-ts",
+  "framework": "react",
+  "buildTool": "vite",
+  "language": "typescript",
+  "packageManager": "npm",
+  "styling": {
+    "framework": "tailwind",
+    "cssFile": "src/index.css"
+  },
+  "router": "react-router-dom",
+  "entryPoint": "src/main.tsx",
+  "rootComponent": "src/App.tsx",
+  "publicDir": "public",
+  "port": 8080,
+  "envPrefix": "VITE_",
+  "compatibility": {
+    "nextToVite": {
+      "routing": "react-router-dom",
+      "imageComponent": "standard-img-tag",
+      "navigation": "useNavigate-useLocation"
+    }
+  }
+}

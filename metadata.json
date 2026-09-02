@@ -1,0 +1,8 @@
+{
+  "name": "Hangout Club",
+  "description": "Sistema de gestão completo para o Hangout Club.",
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
+
