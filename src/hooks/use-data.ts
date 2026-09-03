@@ -45,6 +45,8 @@ export interface DataContextType {
     addEvent: (e: Partial<ManualEvent>) => Promise<ManualEvent>;
     updateEvent: (id: string, e: Partial<ManualEvent>) => Promise<ManualEvent>;
     deleteEvent: (id: string) => Promise<void>;
+
+    deleteUser: (id: string) => Promise<void>;
 }
 
 export const DataContext = createContext<DataContextType | undefined>(undefined);

@@ -170,7 +170,7 @@ const PermissionsManager = () => {
 
 const SystemManagementPanel = () => {
     const isMobile = useIsMobile();
-    const { users, refetchData } = useData();
+    const { users, refetchData, deleteUser } = useData();
     const [employees, setEmployees] = useState<User[]>(users);
     const [editingEmployee, setEditingEmployee] = useState<User | undefined>(undefined);
     const [isFormOpen, setIsFormOpen] = useState(false);
@@ -192,6 +192,16 @@ const SystemManagementPanel = () => {
             setIsFormOpen(false);
         } catch (err: any) {
             toast({ variant: 'destructive', title: "Erro ao salvar", description: err.message });
+        }
+    };
+
+    const handleDeleteEmployee = async (userToDelete: User) => {
+        if (!confirm(`Deseja realmente excluir o colaborador ${userToDelete.nickname}?`)) return;
+        try {
+            await deleteUser(userToDelete.id);
+            toast({ title: "Funcionário Removido!", description: "Removido com sucesso do sistema." });
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: "Erro ao remover", description: err.message });
         }
     };
 
@@ -235,7 +245,7 @@ const SystemManagementPanel = () => {
                             <TableCell className="text-right p-2 sm:p-4">
                                 <div className="flex justify-end gap-0.5 sm:gap-1">
                                     <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 text-primary" onClick={() => { setEditingEmployee(user); setIsFormOpen(true); }}><Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4"/></Button>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 text-destructive" onClick={() => setEmployees(prev => prev.filter(e => e.id !== user.id))}><Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4"/></Button>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 text-destructive" onClick={() => handleDeleteEmployee(user)}><Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4"/></Button>
                                 </div>
                             </TableCell>
                         </TableRow>

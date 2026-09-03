@@ -211,6 +211,11 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     setManualEvents(prev => prev.filter(item => item.id !== id));
   };
 
+  const deleteUser = async (id: string): Promise<void> => {
+    setUsers(prev => prev.filter(item => item.id !== id));
+    await services.deleteUser(id);
+  };
+
   return (
     <DataContext.Provider
       value={{
@@ -242,6 +247,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
         addEvent,
         updateEvent,
         deleteEvent,
+        deleteUser,
       }}
     >
       {children}

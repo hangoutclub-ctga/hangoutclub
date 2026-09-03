@@ -84,3 +84,20 @@ export async function updateUser(id: string, user: Partial<User>): Promise<User>
 
   return toUser(data);
 }
+
+export async function deleteUser(id: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await (supabase.rpc as any)('delete_user_by_id', {
+    target_user_id: id
+  });
+
+  if (error) {
+    console.error(`Error deleting user ${id} via rpc:`, error);
+    // Fallback: direct delete from profiles
+    const { error: pErr } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', id);
+    if (pErr) throw pErr;
+  }
+}
