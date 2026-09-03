@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import { toUser, toUserInsert } from '@/lib/supabase/mappers';
+import { toUser, toUserInsert, toUserUpdate } from '@/lib/supabase/mappers';
 import { User } from '@/types';
 
 export async function fetchUsers(): Promise<User[]> {
@@ -58,8 +58,7 @@ export async function createUser(user: Partial<User>): Promise<User> {
 
 export async function updateUser(id: string, user: Partial<User>): Promise<User> {
   const supabase = createClient();
-  const row = toUserInsert(user);
-  delete (row as any).id;
+  const row = toUserUpdate(user);
 
   const { data, error } = await supabase
     .from('profiles')

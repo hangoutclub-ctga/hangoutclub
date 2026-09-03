@@ -58,7 +58,7 @@ type PasswordFormValues = z.infer<typeof passwordSchema>;
 
 const PermissionsManager = () => {
     const isMobile = useIsMobile();
-    const { users } = useData();
+    const { users, refetchData } = useData();
     const [selectedUserId, setSelectedUserId] = useState<string>('');
     const [localUsers, setLocalUsers] = useState<User[]>(users);
     const [isSaving, setIsSaving] = useState(false);
@@ -102,6 +102,7 @@ const PermissionsManager = () => {
         setIsSaving(true);
         try {
             await updateUser(selectedUser.id, { permissions: selectedUser.permissions });
+            await refetchData();
             toast({ title: "Permissões Salvas!", description: "Atualizadas com sucesso no Supabase." });
         } catch (err: any) {
             toast({ variant: 'destructive', title: "Erro ao salvar", description: err.message });

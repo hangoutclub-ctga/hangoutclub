@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import { toTransaction, toTransactionInsert, toFixedExpense, toFixedExpenseInsert } from '@/lib/supabase/mappers';
+import { toTransaction, toTransactionInsert, toFixedExpense, toFixedExpenseInsert, toFixedExpenseUpdate } from '@/lib/supabase/mappers';
 import { Transaction, FixedExpense } from '@/types';
 
 export async function fetchTransactions(): Promise<Transaction[]> {
@@ -83,8 +83,7 @@ export async function createFixedExpense(fe: Partial<FixedExpense>): Promise<Fix
 
 export async function updateFixedExpense(id: string, fe: Partial<FixedExpense>): Promise<FixedExpense> {
   const supabase = createClient();
-  const row = toFixedExpenseInsert(fe);
-  delete (row as any).id;
+  const row = toFixedExpenseUpdate(fe);
 
   const { data, error } = await supabase
     .from('fixed_expenses')

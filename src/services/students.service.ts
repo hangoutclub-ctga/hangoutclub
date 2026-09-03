@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import { toStudent, toStudentInsert } from '@/lib/supabase/mappers';
+import { toStudent, toStudentInsert, toStudentUpdate } from '@/lib/supabase/mappers';
 import { Student } from '@/types';
 
 export async function fetchStudents(): Promise<Student[]> {
@@ -37,8 +37,7 @@ export async function createStudent(student: Partial<Student>): Promise<Student>
 
 export async function updateStudent(id: string, student: Partial<Student>): Promise<Student> {
   const supabase = createClient();
-  const row = toStudentInsert(student);
-  delete (row as any).id; // don't overwrite id
+  const row = toStudentUpdate(student);
 
   const { data, error } = await supabase
     .from('students')

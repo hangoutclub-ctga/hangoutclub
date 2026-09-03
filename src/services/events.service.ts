@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import { toEvent, toEventInsert } from '@/lib/supabase/mappers';
+import { toEvent, toEventInsert, toEventUpdate } from '@/lib/supabase/mappers';
 import { ManualEvent } from '@/types';
 
 export async function fetchEvents(): Promise<ManualEvent[]> {
@@ -37,8 +37,7 @@ export async function createEvent(event: Partial<ManualEvent>): Promise<ManualEv
 
 export async function updateEvent(id: string, event: Partial<ManualEvent>): Promise<ManualEvent> {
   const supabase = createClient();
-  const row = toEventInsert(event);
-  delete (row as any).id;
+  const row = toEventUpdate(event);
 
   const { data, error } = await supabase
     .from('events')

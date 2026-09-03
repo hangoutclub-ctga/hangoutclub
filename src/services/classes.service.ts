@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import { toClass, toClassInsert } from '@/lib/supabase/mappers';
+import { toClass, toClassInsert, toClassUpdate } from '@/lib/supabase/mappers';
 import { Class } from '@/types';
 
 export async function fetchClasses(): Promise<Class[]> {
@@ -37,8 +37,7 @@ export async function createClass(c: Partial<Class>): Promise<Class> {
 
 export async function updateClass(id: string, c: Partial<Class>): Promise<Class> {
   const supabase = createClient();
-  const row = toClassInsert(c);
-  delete (row as any).id;
+  const row = toClassUpdate(c);
 
   const { data, error } = await supabase
     .from('classes')

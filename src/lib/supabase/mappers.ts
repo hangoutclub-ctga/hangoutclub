@@ -36,6 +36,20 @@ export function toUserInsert(user: Partial<User>): Tables['profiles']['Insert'] 
   };
 }
 
+export function toUserUpdate(user: Partial<User>): Tables['profiles']['Update'] {
+  const update: Tables['profiles']['Update'] = {};
+  if (user.nickname !== undefined) update.nickname = user.nickname;
+  if (user.email !== undefined) update.email = user.email;
+  if (user.avatar !== undefined) update.avatar = user.avatar || null;
+  if (user.role !== undefined) update.role = user.role;
+  if (user.permissions !== undefined) update.permissions = user.permissions;
+  if (user.dob !== undefined) update.dob = user.dob || null;
+  if (user.phone !== undefined) update.phone = user.phone || null;
+  if (user.cellphone !== undefined) update.cellphone = user.cellphone || null;
+  if (user.isProvider !== undefined) update.is_provider = user.isProvider === 'Sim';
+  return update;
+}
+
 // ========================
 // STUDENTS
 // ========================
@@ -99,6 +113,35 @@ export function toStudentInsert(student: Partial<Student>): Tables['students']['
   };
 }
 
+export function toStudentUpdate(student: Partial<Student>): Tables['students']['Update'] {
+  const update: Tables['students']['Update'] = {};
+  if (student.name !== undefined) update.name = student.name;
+  if (student.avatarUrl !== undefined) update.avatar_url = student.avatarUrl || null;
+  if (student.dob !== undefined) update.dob = student.dob;
+  if (student.guardianName !== undefined) update.guardian_name = student.guardianName;
+  if (student.guardianCpf !== undefined) update.guardian_cpf = student.guardianCpf;
+  if (student.email !== undefined) update.email = student.email || null;
+  if (student.phone !== undefined) update.phone = student.phone || null;
+  if (student.cep !== undefined) update.cep = student.cep || null;
+  if (student.address !== undefined) update.address = student.address;
+  if (student.addressNumber !== undefined) update.address_number = student.addressNumber;
+  if (student.addressComplement !== undefined) update.address_complement = student.addressComplement || null;
+  if (student.medicalInfo !== undefined) update.medical_info = student.medicalInfo || null;
+  if (student.studentCondition !== undefined) update.student_condition = student.studentCondition;
+  if (student.class !== undefined) update.class_name = student.class;
+  if (student.paymentHistory !== undefined) update.payment_history = student.paymentHistory as any;
+  if (student.grades !== undefined) update.grades = student.grades as any;
+  if (student.attendance !== undefined) update.attendance = student.attendance as any;
+  if (student.documents !== undefined) update.documents = student.documents as any;
+  if (student.status !== undefined) update.status = student.status;
+  if (student.monthlyFee !== undefined) update.monthly_fee = student.monthlyFee;
+  if (student.dueDate !== undefined) update.due_date = student.dueDate;
+  if (student.paymentStatus !== undefined) update.payment_status = student.paymentStatus;
+  if (student.partialAmount !== undefined) update.partial_amount = student.partialAmount ?? null;
+  if (student.partialDate !== undefined) update.partial_date = student.partialDate ?? null;
+  return update;
+}
+
 // ========================
 // CLASSES
 // ========================
@@ -126,6 +169,18 @@ export function toClassInsert(c: Partial<Class>): Tables['classes']['Insert'] {
     student_ids: c.studentIds || [],
     status: c.status || 'Ativa',
   };
+}
+
+export function toClassUpdate(c: Partial<Class>): Tables['classes']['Update'] {
+  const update: Tables['classes']['Update'] = {};
+  if (c.name !== undefined) update.name = c.name;
+  if (c.teacherId !== undefined) update.teacher_id = c.teacherId || null;
+  if (c.teacher !== undefined) update.teacher = c.teacher || null;
+  if (c.modality !== undefined) update.modality = c.modality || null;
+  if (c.schedule !== undefined) update.schedule = c.schedule || null;
+  if (c.studentIds !== undefined) update.student_ids = c.studentIds;
+  if (c.status !== undefined) update.status = c.status;
+  return update;
 }
 
 // ========================
@@ -190,6 +245,19 @@ export function toFixedExpenseInsert(fe: Partial<FixedExpense>): Tables['fixed_e
   };
 }
 
+export function toFixedExpenseUpdate(fe: Partial<FixedExpense>): Tables['fixed_expenses']['Update'] {
+  const update: Tables['fixed_expenses']['Update'] = {};
+  if (fe.description !== undefined) update.description = fe.description;
+  if (fe.value !== undefined) update.value = fe.value;
+  if (fe.status !== undefined) update.status = fe.status;
+  if (fe.month !== undefined) update.month = fe.month;
+  if (fe.year !== undefined) update.year = fe.year;
+  if (fe.dueDate !== undefined) update.due_date = fe.dueDate;
+  if (fe.receiptUrl !== undefined) update.receipt_url = fe.receiptUrl || null;
+  if (fe.paymentMethod !== undefined) update.payment_method = fe.paymentMethod || null;
+  return update;
+}
+
 // ========================
 // INVENTORY
 // ========================
@@ -221,6 +289,20 @@ export function toInventoryItemInsert(item: Partial<InventoryItem>): Tables['inv
     movements: (item.movements as any) || [],
     status: item.status || 'Ativo',
   };
+}
+
+export function toInventoryItemUpdate(item: Partial<InventoryItem>): Tables['inventory_items']['Update'] {
+  const update: Tables['inventory_items']['Update'] = {};
+  if (item.name !== undefined) update.name = item.name;
+  if (item.category !== undefined) update.category = item.category;
+  if (item.stock !== undefined) update.stock = item.stock;
+  if (item.minStock !== undefined) update.min_stock = item.minStock;
+  if (item.maxStock !== undefined) update.max_stock = item.maxStock;
+  if (item.imageUrl !== undefined) update.image_url = item.imageUrl || null;
+  if (item.recentMovements !== undefined) update.recent_movements = item.recentMovements;
+  if (item.movements !== undefined) update.movements = item.movements as any;
+  if (item.status !== undefined) update.status = item.status;
+  return update;
 }
 
 // ========================
@@ -258,6 +340,22 @@ export function toEventInsert(e: Partial<ManualEvent>): Tables['events']['Insert
     recurrence_days: e.recurrenceDays || null,
     completed: e.completed ?? false,
   };
+}
+
+export function toEventUpdate(e: Partial<ManualEvent>): Tables['events']['Update'] {
+  const update: Tables['events']['Update'] = {};
+  if (e.title !== undefined) update.title = e.title;
+  if (e.date !== undefined) {
+    update.date = e.date instanceof Date ? e.date.toISOString() : new Date(e.date as any).toISOString();
+  }
+  if (e.time !== undefined) update.time = e.time;
+  if (e.details !== undefined) update.details = e.details;
+  if (e.type !== undefined) update.type = e.type;
+  if (e.owners !== undefined) update.owners = e.owners;
+  if (e.recurrent !== undefined) update.recurrent = e.recurrent;
+  if (e.recurrenceDays !== undefined) update.recurrence_days = e.recurrenceDays || null;
+  if (e.completed !== undefined) update.completed = e.completed;
+  return update;
 }
 
 // ========================

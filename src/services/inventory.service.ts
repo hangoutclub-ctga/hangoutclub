@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import { toInventoryItem, toInventoryItemInsert } from '@/lib/supabase/mappers';
+import { toInventoryItem, toInventoryItemInsert, toInventoryItemUpdate } from '@/lib/supabase/mappers';
 import { InventoryItem, StockMovement } from '@/types';
 
 export async function fetchInventory(): Promise<InventoryItem[]> {
@@ -37,8 +37,7 @@ export async function createInventoryItem(item: Partial<InventoryItem>): Promise
 
 export async function updateInventoryItem(id: string, item: Partial<InventoryItem>): Promise<InventoryItem> {
   const supabase = createClient();
-  const row = toInventoryItemInsert(item);
-  delete (row as any).id;
+  const row = toInventoryItemUpdate(item);
 
   const { data, error } = await supabase
     .from('inventory_items')
