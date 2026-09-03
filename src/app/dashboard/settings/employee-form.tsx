@@ -30,7 +30,7 @@ const employeeFormSchema = z.object({
 });
 type EmployeeFormValues = z.infer<typeof employeeFormSchema>;
 
-export const EmployeeForm = ({ employee, onSave, onCancel }: { employee?: User, onSave: () => void, onCancel: () => void }) => {
+export const EmployeeForm = ({ employee, onSave, onCancel }: { employee?: User, onSave: (data: EmployeeFormValues) => Promise<void> | void, onCancel: () => void }) => {
     const { categories, isLoading } = useData();
     const [manualDate, setManualDate] = useState<string>(employee?.dob ? format(new Date(employee.dob), 'dd/MM/yyyy') : '');
     const [isSaving, setIsSaving] = useState(false);
@@ -49,10 +49,11 @@ export const EmployeeForm = ({ employee, onSave, onCancel }: { employee?: User, 
 
     const handleSubmit = async (data: EmployeeFormValues) => {
         setIsSaving(true);
-        await new Promise(resolve => setTimeout(resolve, 800));
-        toast({ title: employee ? "Funcionário Atualizado!" : "Funcionário Adicionado!", description: "Operação simulada no protótipo." });
-        onSave();
-        setIsSaving(false);
+        try {
+            await onSave(data);
+        } finally {
+            setIsSaving(false);
+        }
     }
     
     const handleManualDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {

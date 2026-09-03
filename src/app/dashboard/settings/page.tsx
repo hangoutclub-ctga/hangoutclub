@@ -1,7 +1,8 @@
 
 "use client";
 
-import { useState } from "react";
+import * as React from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -245,7 +246,7 @@ const SystemManagementPanel = () => {
         <Dialog open={isFormOpen} onOpenChange={setIsFormOpen}>
             <DialogContent className="sm:max-w-[500px]">
                 <DialogHeader><DialogTitle>{editingEmployee ? 'Editar Funcionário' : 'Novo Funcionário'}</DialogTitle></DialogHeader>
-                <EmployeeForm employee={editingEmployee} onSave={() => setIsFormOpen(false)} onCancel={() => setIsFormOpen(false)} />
+                <EmployeeForm employee={editingEmployee} onSave={handleSaveEmployee} onCancel={() => setIsFormOpen(false)} />
             </DialogContent>
         </Dialog>
       </CardContent>
