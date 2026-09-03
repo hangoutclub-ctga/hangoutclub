@@ -14,7 +14,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { EventForm } from "@/components/event-form";
 import { useAuth } from "@/hooks/use-auth";
 import { useAgenda } from "@/hooks/use-agenda";
-import { mockUsers } from "@/lib/mock-data";
+import { useData } from "@/hooks/use-data";
 import { ManualEvent, DisplayEvent } from "@/types";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -25,6 +25,7 @@ export default function AgendaPage() {
   const { user } = useAuth();
   const router = useRouter();
   const { handleLinkClick } = useLoading();
+  const { users, addEvent, updateEvent, deleteEvent } = useData();
   const [confirmedDate, setConfirmedDate] = useState<Date>(new Date());
   const [tempDate, setTempDate] = useState<Date>(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -96,7 +97,7 @@ export default function AgendaPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="todos">Todos</SelectItem>
-                {mockUsers.map(u => <SelectItem key={u.id} value={u.nickname}>{u.nickname}</SelectItem>)}
+                {users.map(u => <SelectItem key={u.id} value={u.nickname}>{u.nickname}</SelectItem>)}
               </SelectContent>
             </Select>
           )}
@@ -139,9 +140,22 @@ export default function AgendaPage() {
                     <DialogTitle>{editingEvent?.id ? 'Editar Evento' : 'Novo Evento'}</DialogTitle>
                 </DialogHeader>
                 <EventForm 
-                    allUsers={mockUsers}
+                    allUsers={users}
                     eventData={editingEvent}
-                    onSave={() => { toast({ title: "Evento Salvo!" }); setIsFormOpen(false); }}
+                    onSave={async (eventData) => {
+                        try {
+                            if (editingEvent?.id) {
+                                await updateEvent(editingEvent.id, eventData);
+                                toast({ title: "Evento Atualizado!", description: "Salvo no Supabase." });
+                            } else {
+                                await addEvent(eventData);
+                                toast({ title: "Evento Criado!", description: "Salvo no Supabase." });
+                            }
+                            setIsFormOpen(false);
+                        } catch (err: any) {
+                            toast({ variant: "destructive", title: "Erro ao salvar", description: err.message });
+                        }
+                    }}
                     onCancel={() => setIsFormOpen(false)}
                     isAllUsersView={isAdmin}
                     existingEvents={events}

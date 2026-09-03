@@ -14,7 +14,7 @@ import { Grade, Attendance, Student, StudentDocument } from "@/types";
 import { cn, getDisplayAvatarUrl, formatCurrency } from "@/lib/utils";
 import React from "react";
 import { differenceInYears } from "date-fns";
-import { mockStudents } from "@/lib/mock-data";
+import { useData } from "@/hooks/use-data";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogClose } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
@@ -32,10 +32,10 @@ const getAttendanceIcon = (status: string) => {
 export function StudentProfile({ student: initialStudent }: { student: Student }) {
   const { handleLinkClick } = useLoading();
   const { hasPermission } = useAuth();
+  const { students, updateStudent } = useData();
   const canViewFinance = hasPermission('finance:view');
 
-  // No protótipo, garantimos que temos os dados completos do aluno do mock
-  const student = mockStudents.find(s => s.id === initialStudent.id) || initialStudent;
+  const student = students.find(s => s.id === initialStudent.id) || initialStudent;
   
   const [localDocuments, setLocalDocuments] = React.useState<StudentDocument[]>(student.documents || []);
   const [isAddingDoc, setIsAddingDoc] = React.useState(false);
@@ -85,21 +85,26 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
     }
 
     setIsSavingDoc(true);
-    await new Promise(resolve => setTimeout(resolve, 800));
+    try {
+      const newDoc: StudentDocument = {
+        name: newDocName,
+        type: newDocType,
+        url: newDocUrl,
+        category: "Geral"
+      };
 
-    const newDoc: StudentDocument = {
-      name: newDocName,
-      type: newDocType,
-      url: newDocUrl,
-      category: "Geral"
-    };
-
-    setLocalDocuments(prev => [...prev, newDoc]);
-    setNewDocName("");
-    setNewDocUrl("");
-    setIsAddingDoc(false);
-    setIsSavingDoc(false);
-    toast({ title: "Documento anexado!", description: "O arquivo foi salvo na ficha do aluno." });
+      const updatedDocs = [...localDocuments, newDoc];
+      await updateStudent(student.id, { documents: updatedDocs });
+      setLocalDocuments(updatedDocs);
+      setNewDocName("");
+      setNewDocUrl("");
+      setIsAddingDoc(false);
+      toast({ title: "Documento anexado!", description: "O arquivo foi salvo no banco de dados." });
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: "Erro ao anexar", description: err.message || "Falha ao salvar documento." });
+    } finally {
+      setIsSavingDoc(false);
+    }
   };
 
   return (

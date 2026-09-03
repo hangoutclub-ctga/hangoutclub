@@ -42,19 +42,26 @@ import { InventoryItem } from "@/types";
 import { toast } from "@/hooks/use-toast";
 import { getDisplayAvatarUrl, cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { mockInventoryItems } from "@/lib/mock-data";
+import { useData } from "@/hooks/use-data";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useRouter } from "next/navigation";
 import { useLoading } from "@/app/dashboard/layout";
 
 export default function InventoryPage() {
-    const { hasPermission } = useAuth();
+    const { user, hasPermission } = useAuth();
     const isMobile = useIsMobile();
     const router = useRouter();
     const { handleLinkClick } = useLoading();
     const canEdit = hasPermission('inventory:edit');
     
-    const [items, setItems] = React.useState<InventoryItem[]>(mockInventoryItems);
+    const { 
+        inventoryItems, 
+        addInventoryItem, 
+        updateInventoryItem, 
+        addStockMovement, 
+        deleteInventoryItem 
+    } = useData();
+
     const [search, setSearch] = React.useState("");
     const [isSearchExpanded, setIsSearchExpanded] = React.useState(false);
     const [isFormOpen, setIsFormOpen] = React.useState(false);
@@ -62,54 +69,66 @@ export default function InventoryPage() {
     const [selectedItemForProfile, setSelectedItemForProfile] = React.useState<InventoryItem | null>(null);
     const [activeMovement, setActiveMovement] = React.useState<{ item: InventoryItem, type: 'entrada' | 'saida' } | null>(null);
 
-    const displayedItems = React.useMemo(() => {
-        return items
-            .filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
-    }, [items, search]);
+    const activeItems = React.useMemo(() => {
+        return inventoryItems.filter(i => i.status !== 'Apagado');
+    }, [inventoryItems]);
 
-    const handleSaveItem = (data: any) => {
-        if (editingItem) {
-            setItems(prev => prev.map(i => i.id === editingItem.id ? { ...i, ...data } : i));
-            toast({ title: "Item Atualizado!" });
-        } else {
-            const newItem: InventoryItem = {
-                id: `INV-${Math.floor(Math.random() * 1000)}`,
-                ...data,
-                movements: [],
-                status: 'Ativo'
-            };
-            setItems(prev => [newItem, ...prev]);
-            toast({ title: "Item Cadastrado!" });
+    const displayedItems = React.useMemo(() => {
+        return activeItems
+            .filter(i => i.name.toLowerCase().includes(search.toLowerCase()));
+    }, [activeItems, search]);
+
+    const handleSaveItem = async (data: any) => {
+        try {
+            if (editingItem) {
+                await updateInventoryItem(editingItem.id, data);
+                toast({ title: "Item Atualizado!", description: "Salvo com sucesso no Supabase." });
+            } else {
+                await addInventoryItem({
+                    ...data,
+                    movements: [],
+                    status: 'Ativo'
+                });
+                toast({ title: "Item Cadastrado!", description: "Salvo com sucesso no Supabase." });
+            }
+            setIsFormOpen(false);
+            setEditingItem(undefined);
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: "Erro ao salvar item", description: err.message });
         }
-        setIsFormOpen(false);
-        setEditingItem(undefined);
     };
 
-    const handleDelete = (id: string) => {
-        setItems(prev => prev.filter(i => i.id !== id));
-        toast({ title: "Item Removido" });
-    }
+    const handleDelete = async (id: string) => {
+        try {
+            await deleteInventoryItem(id, true);
+            toast({ title: "Item Removido", description: "Item desativado com sucesso." });
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: "Erro ao remover item", description: err.message });
+        }
+    };
 
-    const handleStockMovement = (itemId: string, data: any) => {
-        setItems(prev => prev.map(item => {
-            if (item.id === itemId) {
-                const newStock = data.type === 'entrada' ? item.stock + data.quantity : item.stock - data.quantity;
-                const newMovement = {
-                    date: new Date().toISOString(),
-                    type: data.type,
-                    quantity: data.quantity,
-                    user: "Usuário Atual",
-                    notes: data.notes
-                };
-                return { 
-                    ...item, 
-                    stock: newStock,
-                    movements: [newMovement, ...(item.movements || [])]
-                };
-            }
-            return item;
-        }));
-        toast({ title: "Movimentação Realizada!" });
+    const handleStockMovement = async (itemId: string, data: any) => {
+        const item = inventoryItems.find(i => i.id === itemId);
+        if (!item) return;
+
+        try {
+            const newStock = data.type === 'entrada' 
+                ? item.stock + Number(data.quantity) 
+                : Math.max(0, item.stock - Number(data.quantity));
+
+            const newMovement = {
+                date: new Date().toISOString(),
+                type: data.type,
+                quantity: Number(data.quantity),
+                user: user?.nickname || "Usuário Atual",
+                notes: data.notes
+            };
+
+            await addStockMovement(itemId, newMovement, newStock);
+            toast({ title: "Movimentação Realizada!", description: "Estoque atualizado no Supabase." });
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: "Erro na movimentação", description: err.message });
+        }
     };
 
     const handleBack = () => {

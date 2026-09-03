@@ -7,17 +7,16 @@ import { Button } from "@/components/ui/button";
 import { CommunicationForm } from "@/components/communication-form";
 import { useData } from "@/hooks/use-data";
 import { Loader2, ChevronLeft, Home } from "lucide-react";
-import { mockClasses, mockStudents } from "@/lib/mock-data";
 import { useRouter } from "next/navigation";
 import { useLoading } from "@/app/dashboard/layout";
 
 export default function CommunicationPage() {
-  const { categories, isLoading: isCategoriesLoading } = useData();
+  const { categories, classes: allLiveClasses, students: allLiveStudents, isLoading: isCategoriesLoading } = useData();
   const router = useRouter();
   const { handleLinkClick } = useLoading();
   
-  const [classes] = React.useState(mockClasses.filter(c => c.status === 'Ativa'));
-  const [students] = React.useState(mockStudents.filter(s => s.status === 'Ativo'));
+  const classes = React.useMemo(() => allLiveClasses.filter(c => c.status === 'Ativa'), [allLiveClasses]);
+  const students = React.useMemo(() => allLiveStudents.filter(s => s.status === 'Ativo'), [allLiveStudents]);
 
   const handleBack = () => {
     handleLinkClick();

@@ -1,18 +1,16 @@
-
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useMemo } from 'react';
 import { format, getDay, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import type { User, DisplayEvent } from '@/types';
-import { mockEvents, mockClasses, mockStudents } from '@/lib/mock-data';
+import { useData } from '@/hooks/use-data';
 
 const dayOfWeekMap: { [key: string]: number } = {
     'seg': 1, 'ter': 2, 'qua': 3, 'qui': 4, 'sex': 5, 'sab': 6, 'dom': 0,
 };
 
 export const useAgenda = (date: Date | undefined, user: User | null, viewType: 'day' | 'week' = 'day', selectedOwner: string = "todos") => {
-    const [localEvents] = useState(mockEvents);
+    const { manualEvents, classes, students } = useData();
 
     const agendaEvents: DisplayEvent[] = useMemo(() => {
         if (!date || !user) return [];
@@ -27,7 +25,7 @@ export const useAgenda = (date: Date | undefined, user: User | null, viewType: '
             const dateKey = format(day, 'yyyy-MM-dd');
             const dayIdx = getDay(day);
 
-            const manual = localEvents
+            const manual = manualEvents
                 .filter(e => {
                     const eventDate = e.date instanceof Date ? e.date : (typeof (e.date as any)?.toDate === 'function' ? (e.date as any).toDate() : new Date(e.date as any));
                     return isSameDay(eventDate, day);
@@ -44,8 +42,9 @@ export const useAgenda = (date: Date | undefined, user: User | null, viewType: '
                     completed: e.completed
                 }));
 
-            const classes = mockClasses
+            const classEvents = classes
                 .filter(c => {
+                    if (c.status === 'Apagado') return false;
                     const days = c.schedule.toLowerCase().split(' - ')[0].split(', ');
                     return days.some(d => dayOfWeekMap[d] === dayIdx) && c.status === 'Ativa';
                 })
@@ -62,8 +61,9 @@ export const useAgenda = (date: Date | undefined, user: User | null, viewType: '
                     classId: c.id
                 }));
 
-            const birthdays = mockStudents
+            const birthdays = students
                 .filter(s => {
+                    if (s.status === 'Apagado' || !s.dob) return false;
                     const bday = new Date(s.dob);
                     return bday.getUTCDate() === day.getDate() && bday.getUTCMonth() === day.getMonth();
                 })
@@ -79,7 +79,7 @@ export const useAgenda = (date: Date | undefined, user: User | null, viewType: '
                     completed: false
                 }));
 
-            allGeneratedEvents = [...allGeneratedEvents, ...manual, ...classes, ...birthdays];
+            allGeneratedEvents = [...allGeneratedEvents, ...manual, ...classEvents, ...birthdays];
         });
 
         let filtered = allGeneratedEvents;
@@ -96,7 +96,7 @@ export const useAgenda = (date: Date | undefined, user: User | null, viewType: '
             if (dateCompare !== 0) return dateCompare;
             return a.time.localeCompare(b.time);
         });
-    }, [date, user, viewType, selectedOwner, localEvents]);
+    }, [date, user, viewType, selectedOwner, manualEvents, classes, students]);
 
     return {
         events: agendaEvents,

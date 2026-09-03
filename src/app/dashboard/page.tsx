@@ -12,7 +12,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/hooks/use-auth";
 import { useAgenda } from "@/hooks/use-agenda";
-import { mockStudents, mockClasses, mockTransactions, mockUsers, mockInventoryItems } from "@/lib/mock-data";
+import { useData } from "@/hooks/use-data";
 import { useRouter } from "next/navigation";
 import {
   Dialog,
@@ -30,6 +30,17 @@ import { ClassProfile } from "@/components/class-profile";
 export default function DashboardPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const { 
+    students, 
+    classes, 
+    transactions, 
+    users, 
+    inventoryItems, 
+    addTransaction, 
+    addEvent, 
+    updateEvent 
+  } = useData();
+
   const [confirmedDate, setConfirmedDate] = useState<Date>(new Date());
   const [tempDate, setTempDate] = useState<Date>(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -47,25 +58,28 @@ export default function DashboardPage() {
   const isAdmin = user?.role === 'Admin';
   const isSecretaria = user?.role === 'Secretaria';
 
+  const activeStudents = useMemo(() => students.filter(s => s.status !== 'Apagado'), [students]);
+  const activeClasses = useMemo(() => classes.filter(c => c.status !== 'Apagado'), [classes]);
+
   const stats = useMemo(() => {
     if (isAdmin) {
       return {
-        students: mockStudents.length,
-        classes: mockClasses.length,
-        profit: mockTransactions.reduce((acc, t) => t.type === 'Entrada' ? acc + t.value : acc - t.value, 0)
+        students: activeStudents.length,
+        classes: activeClasses.length,
+        profit: transactions.reduce((acc, t) => t.type === 'Entrada' ? acc + t.value : acc - t.value, 0)
       };
     } else {
-      const teacherClasses = mockClasses.filter(c => c.teacher === user?.nickname);
-      const teacherStudentsCount = mockStudents.filter(s => teacherClasses.some(c => c.name === s.class)).length;
+      const teacherClasses = activeClasses.filter(c => c.teacher === user?.nickname);
+      const teacherStudentsCount = activeStudents.filter(s => teacherClasses.some(c => c.name === s.class)).length;
       return {
         students: teacherStudentsCount,
         classes: teacherClasses.length,
         profit: 0
       };
     }
-  }, [isAdmin, user]);
+  }, [isAdmin, user, activeStudents, activeClasses, transactions]);
 
-  const lowStockCount = mockInventoryItems.filter(item => item.stock <= item.minStock).length;
+  const lowStockCount = inventoryItems.filter(item => item.status !== 'Apagado' && item.stock <= item.minStock).length;
 
   const handleToggleComplete = (id: string) => {
     setCompletedEventIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -127,9 +141,26 @@ export default function DashboardPage() {
               </DialogHeader>
               <div className="flex-1 overflow-y-auto p-6">
                 <TransactionForm 
-                  onSave={async () => { toast({ title: "Transação Registrada!" }); setIsTransactionOpen(false); }} 
+                  onSave={async (data) => { 
+                    try {
+                      await addTransaction({
+                        type: data.type.includes('Entrada') ? 'Entrada' : 'Saída',
+                        category: data.type === 'Entrada (Aluno)' ? 'Aluno' : 'Outros',
+                        name: data.name,
+                        description: data.description,
+                        value: data.value,
+                        date: data.date.toISOString(),
+                        receiptUrl: data.receiptUrl,
+                        paymentMethod: data.paymentMethod
+                      });
+                      toast({ title: "Transação Registrada!", description: "Salva no Supabase." }); 
+                      setIsTransactionOpen(false); 
+                    } catch (err: any) {
+                      toast({ variant: 'destructive', title: "Erro ao salvar", description: err.message });
+                    }
+                  }} 
                   onCancel={() => setIsTransactionOpen(false)} 
-                  students={mockStudents} 
+                  students={activeStudents} 
                 />
               </div>
             </DialogContent>
@@ -187,9 +218,22 @@ export default function DashboardPage() {
                   </DialogHeader>
                   <div className="flex-1 overflow-y-auto p-6">
                     <EventForm 
-                      allUsers={mockUsers}
+                      allUsers={users}
                       eventData={editingEvent || undefined}
-                      onSave={() => { toast({ title: "Evento Salvo!" }); setIsEventOpen(false); }}
+                      onSave={async (data) => { 
+                        try {
+                          if (editingEvent?.id) {
+                            await updateEvent(editingEvent.id, data);
+                            toast({ title: "Evento Atualizado!", description: "Salvo no Supabase." });
+                          } else {
+                            await addEvent(data);
+                            toast({ title: "Evento Criado!", description: "Salvo no Supabase." });
+                          }
+                          setIsEventOpen(false); 
+                        } catch (err: any) {
+                          toast({ variant: 'destructive', title: "Erro ao salvar", description: err.message });
+                        }
+                      }}
                       onCancel={() => setIsEventOpen(false)}
                       isAllUsersView={isAdmin}
                       existingEvents={events}

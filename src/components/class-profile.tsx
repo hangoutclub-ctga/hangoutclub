@@ -15,24 +15,46 @@ import { cn, getDisplayAvatarUrl } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Class, Student } from "@/types";
-import { mockClasses, mockStudents } from "@/lib/mock-data";
+import { Class, Student, Attendance } from "@/types";
+import { useData } from "@/hooks/use-data";
 
 type AttendanceStatus = 'present' | 'absent' | 'justified';
 
 const AttendanceTaker = ({ students, onAttendanceSaved, minimal = false }: { students: Student[], onAttendanceSaved: () => void, minimal?: boolean }) => {
+    const { updateStudent } = useData();
     const [attendance, setAttendance] = React.useState<Record<string, AttendanceStatus>>({});
+    const [isSaving, setIsSaving] = React.useState(false);
 
     const handleSetAttendance = (studentId: string, status: AttendanceStatus) => {
         setAttendance(prev => ({ ...prev, [studentId]: status }));
     }
 
-    const handleSaveAttendance = () => {
+    const handleSaveAttendance = async () => {
         if (Object.keys(attendance).length === 0) {
             toast({ variant: 'destructive', title: "Nenhuma alteração", description: "Marque a presença de pelo menos um aluno." });
             return;
         }
-        onAttendanceSaved();
+
+        setIsSaving(true);
+        try {
+            const todayIso = new Date().toISOString().split('T')[0];
+            for (const [studentId, status] of Object.entries(attendance)) {
+                const targetStudent = students.find(s => s.id === studentId);
+                if (!targetStudent) continue;
+
+                const existingAttendance = targetStudent.attendance || [];
+                // replace or prepend today
+                const filtered = existingAttendance.filter(a => a.date !== todayIso);
+                const updatedList: Attendance[] = [{ date: todayIso, status }, ...filtered];
+                await updateStudent(studentId, { attendance: updatedList });
+            }
+            toast({ title: "Chamada Salva!", description: "A frequência foi registrada com sucesso." });
+            onAttendanceSaved();
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: "Erro ao salvar", description: err.message || "Falha ao salvar chamada." });
+        } finally {
+            setIsSaving(false);
+        }
     }
     
     const today = format(new Date(), "dd 'de' MMMM 'de' yyyy", { locale: ptBR });
@@ -108,8 +130,9 @@ interface ClassProfileProps {
 }
 
 export function ClassProfile({ classId, defaultTab = "students", onAttendanceSaved, minimal = false }: ClassProfileProps) {
-  const classDetails = mockClasses.find(c => c.id === classId);
-  const students = mockStudents.filter(s => classDetails?.studentIds.includes(s.id));
+  const { classes, students: allStudents } = useData();
+  const classDetails = classes.find(c => c.id === classId);
+  const students = allStudents.filter(s => classDetails?.studentIds.includes(s.id));
 
   if (!classDetails) {
     return <div className="flex items-center justify-center p-10"><p>Turma não encontrada.</p></div>

@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback, ReactNode, createContext } from 'react';
 import { User } from '@/types';
-import { mockUsers } from '@/lib/mock-data';
+import { fetchUsers } from '@/services/users.service';
 import { SessionProvider } from 'next-auth/react';
 
 export interface AuthContextType {
@@ -34,11 +34,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   const login = useCallback(async (userId: string, pass: string): Promise<boolean> => {
-    const foundUser = mockUsers.find(u => u.id === userId);
-    if (foundUser) {
-      setUser(foundUser);
-      localStorage.setItem('user', JSON.stringify(foundUser));
-      return true;
+    try {
+      const users = await fetchUsers();
+      const foundUser = users.find(u => u.id === userId);
+      if (foundUser) {
+        setUser(foundUser);
+        localStorage.setItem('user', JSON.stringify(foundUser));
+        return true;
+      }
+    } catch (err) {
+      console.error("Error during login:", err);
     }
     return false;
   }, []);

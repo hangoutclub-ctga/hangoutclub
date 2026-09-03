@@ -21,7 +21,7 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { mockInventoryItems } from "@/lib/mock-data";
+import { useData } from "@/hooks/use-data";
 import { GlobalSearch } from "@/components/global-search";
 
 const LoadingContext = createContext<{ handleLinkClick: (href?: string) => void } | undefined>(undefined);
@@ -43,8 +43,9 @@ const LoadingOverlay = () => (
 
 const LowStockAlert = () => {
   const { user } = useAuth();
+  const { inventoryItems } = useData();
   const [isOpen, setIsOpen] = useState(false);
-  const lowStockItems = mockInventoryItems.filter(item => item.stock <= item.minStock);
+  const lowStockItems = inventoryItems.filter(item => item.status !== 'Apagado' && item.stock <= item.minStock);
   
   useEffect(() => {
     const hasSeenAlert = sessionStorage.getItem('low_stock_alert_seen');

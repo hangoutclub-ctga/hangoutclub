@@ -34,7 +34,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "@/hooks/use-toast";
 import { cn, formatCurrency, getDisplayAvatarUrl } from "@/lib/utils";
-import { mockStudents, mockTransactions } from "@/lib/mock-data";
+import { useData } from "@/hooks/use-data";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useLoading } from "@/app/dashboard/layout";
@@ -43,12 +43,16 @@ export default function FinancePage() {
     const { hasPermission } = useAuth();
     const router = useRouter();
     const { handleLinkClick } = useLoading();
-    const [transactions, setTransactions] = useState<Transaction[]>(mockTransactions);
-    const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([
-        { id: 'FX-001', description: 'Aluguel Sede', value: 1500, status: 'Pendente', month: new Date().getMonth() + 1, year: 2024, dueDate: 10 },
-        { id: 'FX-002', description: 'Energia Elétrica', value: 350, status: 'Pendente', month: new Date().getMonth() + 1, year: 2024, dueDate: 15 },
-        { id: 'FX-003', description: 'Internet', value: 120, status: 'Pago', month: new Date().getMonth() + 1, year: 2024, dueDate: 5, receiptUrl: 'https://picsum.photos/seed/receipt/400/600', paymentMethod: 'PIX' },
-    ]);
+    const { 
+        transactions, 
+        fixedExpenses, 
+        students, 
+        addTransaction, 
+        deleteTransaction, 
+        addFixedExpense, 
+        updateFixedExpense 
+    } = useData();
+
     const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
     const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
     const [filter, setFilter] = useState<string>("Todos");
@@ -69,7 +73,7 @@ export default function FinancePage() {
         { value: 10, label: 'Outubro' }, { value: 11, label: 'Novembro' }, { value: 12, label: 'Dezembro' }
     ];
 
-    const years = [2023, 2024, 2025];
+    const years = [2023, 2024, 2025, 2026];
 
     const filteredByDate = useMemo(() => {
         return transactions.filter(t => {
@@ -93,72 +97,81 @@ export default function FinancePage() {
     }, [filteredByDate, filter]);
 
     const handleSaveTransaction = async (data: any) => {
-        const newTrx: Transaction = {
-            id: `TRX-${Math.floor(Math.random() * 10000)}`,
-            type: data.type.includes('Entrada') ? 'Entrada' : 'Saída',
-            category: data.type === 'Entrada (Aluno)' ? 'Aluno' : 'Outros',
-            name: data.name,
-            description: data.description,
-            value: data.value,
-            date: data.date.toISOString(),
-            receiptUrl: data.receiptUrl,
-            paymentMethod: data.paymentMethod
-        };
-        setTransactions(prev => [newTrx, ...prev]);
-        toast({ title: "Transação Registrada!" });
-        setIsFormOpen(false);
-        setPrefilledData(undefined);
+        try {
+            await addTransaction({
+                type: data.type.includes('Entrada') ? 'Entrada' : 'Saída',
+                category: data.type === 'Entrada (Aluno)' ? 'Aluno' : 'Outros',
+                name: data.name,
+                description: data.description,
+                value: data.value,
+                date: data.date.toISOString(),
+                receiptUrl: data.receiptUrl,
+                paymentMethod: data.paymentMethod
+            });
+            toast({ title: "Transação Registrada!", description: "Salva com sucesso no Supabase." });
+            setIsFormOpen(false);
+            setPrefilledData(undefined);
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: "Erro ao salvar transação", description: err.message });
+        }
     };
 
     const handleConfirmFixedPayment = async (data: any) => {
         if (!payingExpense) return;
 
-        setFixedExpenses(prev => prev.map(f => f.id === payingExpense.id ? {
-            ...f,
-            status: 'Pago',
-            receiptUrl: data.receiptUrl,
-            paymentMethod: data.paymentMethod
-        } : f));
+        try {
+            await updateFixedExpense(payingExpense.id, {
+                status: 'Pago',
+                receiptUrl: data.receiptUrl,
+                paymentMethod: data.paymentMethod
+            });
 
-        const autoTrx: Transaction = {
-            id: `TRX-FIX-${payingExpense.id}-${Date.now()}`,
-            type: 'Saída',
-            category: 'Despesa Fixa',
-            name: 'Pagamento de Despesa Fixa',
-            description: `Pgto: ${payingExpense.description}`,
-            value: data.value,
-            date: data.date.toISOString(),
-            receiptUrl: data.receiptUrl,
-            paymentMethod: data.paymentMethod
-        };
-        setTransactions(prev => [autoTrx, ...prev]);
+            await addTransaction({
+                type: 'Saída',
+                category: 'Despesa Fixa',
+                name: 'Pagamento de Despesa Fixa',
+                description: `Pgto: ${payingExpense.description}`,
+                value: data.value,
+                date: data.date.toISOString(),
+                receiptUrl: data.receiptUrl,
+                paymentMethod: data.paymentMethod
+            });
 
-        toast({ title: "Pagamento Confirmado!", description: "Despesa fixa registrada como saída." });
-        setIsPayFormOpen(false);
-        setPayingExpense(null);
+            toast({ title: "Pagamento Confirmado!", description: "Despesa fixa registrada como saída no Supabase." });
+            setIsPayFormOpen(false);
+            setPayingExpense(null);
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: "Erro ao registrar pagamento", description: err.message });
+        }
     };
 
     const handleSaveFixedExpense = async (data: any) => {
-        const newFixed: FixedExpense = {
-            id: `FX-${Math.floor(Math.random() * 1000)}`,
-            description: data.description,
-            value: data.value,
-            status: 'Pendente',
-            month: currentMonth,
-            year: currentYear,
-            dueDate: data.dueDate
-        };
-        setFixedExpenses(prev => [...prev, newFixed]);
-        toast({ title: "Despesa Fixa Adicionada!" });
-        setIsFixedFormOpen(false);
+        try {
+            await addFixedExpense({
+                description: data.description,
+                value: data.value,
+                status: 'Pendente',
+                month: currentMonth,
+                year: currentYear,
+                dueDate: data.dueDate
+            });
+            toast({ title: "Despesa Fixa Adicionada!", description: "Salva com sucesso no Supabase." });
+            setIsFixedFormOpen(false);
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: "Erro ao criar despesa fixa", description: err.message });
+        }
     };
 
-    const handleDelete = (id: string) => {
-        setTransactions(prev => prev.filter(t => t.id !== id));
-        toast({ title: "Removido" });
-    }
+    const handleDelete = async (id: string) => {
+        try {
+            await deleteTransaction(id);
+            toast({ title: "Removido", description: "Transação removida do Supabase." });
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: "Erro ao remover", description: err.message });
+        }
+    };
 
-    const pendingStudents = mockStudents.filter(s => s.status === 'Ativo' && s.studentCondition !== 'Bolsa');
+    const pendingStudents = students.filter(s => s.status === 'Ativo' && s.studentCondition !== 'Bolsa');
 
     const handleOpenForm = (student?: Student) => {
         if (student) {

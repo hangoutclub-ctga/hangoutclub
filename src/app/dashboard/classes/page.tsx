@@ -1,32 +1,32 @@
+"use client";
 
-"use client"
-
-import * as React from "react"
-import { Button } from "@/components/ui/button"
+import * as React from "react";
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
-} from "@/components/ui/dialog"
-import { ClassForm } from "@/components/class-form"
-import { BookPlus, ChevronLeft, Home } from 'lucide-react'
-import { columns } from "./columns"
-import { DataTable } from "./data-table"
-import { ClassProfile } from "@/components/class-profile"
-import { useAuth } from "@/hooks/use-auth"
-import { Class } from "@/types"
-import { toast } from "@/hooks/use-toast"
-import { mockClasses, mockStudents, mockUsers } from "@/lib/mock-data"
+} from "@/components/ui/dialog";
+import { ClassForm } from "@/components/class-form";
+import { BookPlus, ChevronLeft, Home } from 'lucide-react';
+import { columns } from "./columns";
+import { DataTable } from "./data-table";
+import { ClassProfile } from "@/components/class-profile";
+import { useAuth } from "@/hooks/use-auth";
+import { useData } from "@/hooks/use-data";
+import { Class } from "@/types";
+import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { useLoading } from "@/app/dashboard/layout";
 
 export default function ClassesPage() {
   const { user, hasPermission } = useAuth();
+  const { classes, students, users, addClass, updateClass, deleteClass, isLoading } = useData();
   const router = useRouter();
   const { handleLinkClick } = useLoading();
-  const [classes, setClasses] = React.useState<Class[]>(mockClasses);
+  
   const [editingClass, setEditingClass] = React.useState<Class | undefined>(undefined);
   const [viewingClass, setViewingClass] = React.useState<Class | null>(null);
   const [isFormOpen, setIsFormOpen] = React.useState(false);
@@ -34,61 +34,93 @@ export default function ClassesPage() {
   const isAdmin = user?.role === 'Admin';
   const canCreate = hasPermission('classes:create');
 
+  const activeClasses = React.useMemo(() => {
+    return classes.filter(c => c.status !== 'Apagado');
+  }, [classes]);
+
   const studentsWithoutClass = React.useMemo(() => {
-    return mockStudents.filter(s => !s.class || s.class.trim() === "");
-  }, []);
+    return students.filter(s => (!s.class || s.class.trim() === "") && s.status !== 'Apagado');
+  }, [students]);
 
   const filteredClasses = React.useMemo(() => {
-    if (isAdmin) return classes;
-    return classes.filter(c => c.teacher === user?.nickname);
-  }, [classes, isAdmin, user]);
+    if (isAdmin) return activeClasses;
+    return activeClasses.filter(c => c.teacher === user?.nickname);
+  }, [activeClasses, isAdmin, user]);
 
   const handleOpenForm = (c?: Class) => {
     setEditingClass(c);
     setIsFormOpen(true);
-  }
+  };
 
-  const handleSaveClass = (data: any) => {
-    if (editingClass) {
-      setClasses(prev => prev.map(c => c.id === editingClass.id ? { 
-        ...c, 
-        ...data,
-        teacher: mockUsers.find(u => u.id === data.teacherId)?.nickname || 'Desconhecido',
-        schedule: `${data.weekDays.join(', ')} - ${data.time}`
-      } : c));
-      toast({ title: "Turma Atualizada!" });
-    } else {
-      const newClass: Class = {
-        id: `CLS-${Math.floor(Math.random() * 1000)}`,
-        name: data.name,
-        teacherId: data.teacherId,
-        teacher: mockUsers.find(u => u.id === data.teacherId)?.nickname || 'Desconhecido',
-        modality: data.modality,
-        schedule: `${data.weekDays.join(', ')} - ${data.time}`,
-        studentIds: data.studentIds || [],
-        status: 'Ativa'
-      };
-      setClasses(prev => [newClass, ...prev]);
-      toast({ title: "Sucesso!" });
+  const handleSaveClass = async (data: any) => {
+    try {
+      const teacherName = users.find(u => u.id === data.teacherId)?.nickname || 'Desconhecido';
+      const scheduleStr = `${data.weekDays ? data.weekDays.join(', ') : ''} - ${data.time || ''}`;
+
+      if (editingClass) {
+        await updateClass(editingClass.id, { 
+          ...data,
+          teacher: teacherName,
+          schedule: scheduleStr
+        });
+        toast({ title: "Turma Atualizada!", description: "As alterações foram salvas no Supabase." });
+      } else {
+        await addClass({
+          name: data.name,
+          teacherId: data.teacherId,
+          teacher: teacherName,
+          modality: data.modality,
+          schedule: scheduleStr,
+          studentIds: data.studentIds || [],
+          status: 'Ativa'
+        });
+        toast({ title: "Sucesso!", description: "Nova turma cadastrada no Supabase." });
+      }
+      setIsFormOpen(false);
+      setEditingClass(undefined);
+    } catch (err: any) {
+      toast({ 
+        title: "Erro ao salvar turma", 
+        description: err.message || "Não foi possível salvar a turma.",
+        variant: "destructive"
+      });
     }
-    setIsFormOpen(false);
-    setEditingClass(undefined);
-  }
+  };
 
-  const handleDeleteClass = (id: string) => {
-    setClasses(prev => prev.filter(c => c.id !== id));
-    toast({ title: "Turma Removida" });
-  }
+  const handleDeleteClass = async (id: string) => {
+    try {
+      await deleteClass(id, true);
+      toast({ title: "Turma Removida", description: "Turma desativada com sucesso." });
+    } catch (err: any) {
+      toast({ 
+        title: "Erro ao excluir", 
+        description: err.message || "Não foi possível remover a turma.",
+        variant: "destructive"
+      });
+    }
+  };
 
-  const handleBulkUpdate = (selectedIds: string[], updates: any) => {
-    setClasses(prev => prev.map(c => selectedIds.includes(c.id) ? { ...c, ...updates } : c));
-    toast({ title: "Ação em Massa", description: `${selectedIds.length} turmas atualizadas.` });
-  }
+  const handleBulkUpdate = async (selectedIds: string[], updates: any) => {
+    try {
+      for (const id of selectedIds) {
+        await updateClass(id, updates);
+      }
+      toast({ title: "Ação em Massa", description: `${selectedIds.length} turmas atualizadas.` });
+    } catch (err: any) {
+      toast({ title: "Erro na atualização em massa", variant: "destructive" });
+    }
+  };
 
-  const handleBulkDelete = (selectedIds: string[]) => {
-    setClasses(prev => prev.filter(c => !selectedIds.includes(c.id)));
-    toast({ title: "Ação em Massa", description: `${selectedIds.length} turmas removidas.` });
-  }
+  const handleBulkDelete = async (selectedIds: string[]) => {
+    try {
+      for (const id of selectedIds) {
+        await deleteClass(id, true);
+      }
+      toast({ title: "Ação em Massa", description: `${selectedIds.length} turmas removidas.` });
+    } catch (err: any) {
+      toast({ title: "Erro na exclusão em massa", variant: "destructive" });
+    }
+  };
 
   const handleBack = () => {
     handleLinkClick();
@@ -136,8 +168,8 @@ export default function ClassesPage() {
               </DialogHeader>
               <ClassForm 
                   classData={editingClass}
-                  availableStudents={editingClass ? mockStudents : studentsWithoutClass}
-                  allUsers={mockUsers}
+                  availableStudents={editingClass ? students : studentsWithoutClass}
+                  allUsers={users}
                   onSave={handleSaveClass}
                   onCancel={() => setIsFormOpen(false)}
                   classModalities={['Regular', 'VIP', 'Acompanhamento']}
@@ -150,7 +182,7 @@ export default function ClassesPage() {
       <DataTable 
           columns={columns} 
           data={filteredClasses}
-          users={mockUsers}
+          users={users}
           classModalities={['Regular', 'VIP', 'Acompanhamento']}
           onEdit={handleOpenForm}
           onView={(c) => setViewingClass(c)}
@@ -174,5 +206,5 @@ export default function ClassesPage() {
           </DialogContent>
       </Dialog>
     </div>
-  )
+  );
 }

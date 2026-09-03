@@ -21,7 +21,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog"
 import { EmployeeForm } from "./employee-form";
-import { mockUsers } from "@/lib/mock-data";
+import { useData } from "@/hooks/use-data";
+import { updateUser, createUser } from "@/services/users.service";
 import { ImagePicker } from "@/components/image-picker";
 import { format, parse, isValid } from "date-fns";
 import { ptBR } from 'date-fns/locale';
@@ -56,10 +57,15 @@ type PasswordFormValues = z.infer<typeof passwordSchema>;
 
 const PermissionsManager = () => {
     const isMobile = useIsMobile();
+    const { users } = useData();
     const [selectedUserId, setSelectedUserId] = useState<string>('');
-    const [localUsers, setLocalUsers] = useState<User[]>(mockUsers);
+    const [localUsers, setLocalUsers] = useState<User[]>(users);
     const [isSaving, setIsSaving] = useState(false);
     
+    React.useEffect(() => {
+        setLocalUsers(users);
+    }, [users]);
+
     const selectedUser = localUsers.find(u => u.id === selectedUserId);
 
     const handlePermissionChange = (permission: string, value: boolean) => {
@@ -91,10 +97,16 @@ const PermissionsManager = () => {
     ];
 
     const onSavePermissions = async () => {
+        if (!selectedUser) return;
         setIsSaving(true);
-        await new Promise(resolve => setTimeout(resolve, 800));
-        toast({ title: "Salvo localmente!" });
-        setIsSaving(false);
+        try {
+            await updateUser(selectedUser.id, { permissions: selectedUser.permissions });
+            toast({ title: "Permissões Salvas!", description: "Atualizadas com sucesso no Supabase." });
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: "Erro ao salvar", description: err.message });
+        } finally {
+            setIsSaving(false);
+        }
     }
 
     return (
@@ -157,20 +169,29 @@ const PermissionsManager = () => {
 
 const SystemManagementPanel = () => {
     const isMobile = useIsMobile();
-    const [employees, setEmployees] = useState<User[]>(mockUsers);
+    const { users, refetchData } = useData();
+    const [employees, setEmployees] = useState<User[]>(users);
     const [editingEmployee, setEditingEmployee] = useState<User | undefined>(undefined);
     const [isFormOpen, setIsFormOpen] = useState(false);
 
-    const handleSaveEmployee = (data: any) => {
-        if (editingEmployee) {
-            setEmployees(prev => prev.map(e => e.id === editingEmployee.id ? { ...e, ...data } : e));
-            toast({ title: "Funcionário Atualizado!" });
-        } else {
-            const newEmp = { id: `USR-${Date.now()}`, ...data };
-            setEmployees(prev => [...prev, newEmp]);
-            toast({ title: "Funcionário Cadastrado!" });
+    React.useEffect(() => {
+        setEmployees(users);
+    }, [users]);
+
+    const handleSaveEmployee = async (data: any) => {
+        try {
+            if (editingEmployee) {
+                await updateUser(editingEmployee.id, data);
+                toast({ title: "Funcionário Atualizado!", description: "Salvo no Supabase." });
+            } else {
+                await createUser(data);
+                toast({ title: "Funcionário Cadastrado!", description: "Salvo no Supabase." });
+            }
+            await refetchData();
+            setIsFormOpen(false);
+        } catch (err: any) {
+            toast({ variant: 'destructive', title: "Erro ao salvar", description: err.message });
         }
-        setIsFormOpen(false);
     };
 
     return (

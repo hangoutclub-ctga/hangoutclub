@@ -12,7 +12,7 @@ import {
   CommandGroup,
   CommandItem,
 } from "@/components/ui/command";
-import { mockUsers, mockStudents, mockClasses } from "@/lib/mock-data";
+import { useData } from "@/hooks/use-data";
 import { Users, BookOpen, UserCircle, Loader2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import { getDisplayAvatarUrl } from "@/lib/utils";
@@ -28,6 +28,7 @@ interface SearchResult {
 
 export const GlobalSearch = ({ open, onOpenChange }: { open: boolean, onOpenChange: (open: boolean) => void}) => {
     const router = useRouter();
+    const { users, students, classes } = useData();
     const [queryValue, setQueryValue] = useState("");
     const debouncedQuery = useDebounce(queryValue, 300);
     const [results, setResults] = useState<SearchResult[]>([]);
@@ -44,23 +45,29 @@ export const GlobalSearch = ({ open, onOpenChange }: { open: boolean, onOpenChan
         const lowerCaseQuery = searchQuery.toLowerCase();
         
         // Students Search
-        mockStudents.filter(s => s.name.toLowerCase().includes(lowerCaseQuery)).forEach(s => {
-            searchResults.push({ type: 'student', id: s.id, name: s.name, details: `Resp: ${s.guardianName}`, avatarUrl: s.avatarUrl, path: '/dashboard/students' });
-        });
+        students
+            .filter(s => s.status !== 'Apagado' && s.name.toLowerCase().includes(lowerCaseQuery))
+            .forEach(s => {
+                searchResults.push({ type: 'student', id: s.id, name: s.name, details: `Resp: ${s.guardianName}`, avatarUrl: s.avatarUrl, path: '/dashboard/students' });
+            });
 
         // Classes Search
-        mockClasses.filter(c => c.name.toLowerCase().includes(lowerCaseQuery)).forEach(c => {
-            searchResults.push({ type: 'class', id: c.id, name: c.name, details: `Prof: ${c.teacher}`, path: '/dashboard/classes' });
-        });
+        classes
+            .filter(c => c.status !== 'Apagado' && c.name.toLowerCase().includes(lowerCaseQuery))
+            .forEach(c => {
+                searchResults.push({ type: 'class', id: c.id, name: c.name, details: `Prof: ${c.teacher}`, path: '/dashboard/classes' });
+            });
 
         // Users Search
-        mockUsers.filter(u => u.nickname.toLowerCase().includes(lowerCaseQuery)).forEach(u => {
-            searchResults.push({ type: 'user', id: u.id, name: u.nickname, details: u.role, avatarUrl: u.avatar, path: '/dashboard/settings' });
-        });
+        users
+            .filter(u => u.nickname.toLowerCase().includes(lowerCaseQuery))
+            .forEach(u => {
+                searchResults.push({ type: 'user', id: u.id, name: u.nickname, details: u.role, avatarUrl: u.avatar, path: '/dashboard/settings' });
+            });
 
         setResults(searchResults.slice(0, 10));
         setIsLoading(false);
-    }, []);
+    }, [users, students, classes]);
 
     useEffect(() => {
         performSearch(debouncedQuery);

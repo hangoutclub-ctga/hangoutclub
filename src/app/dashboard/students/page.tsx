@@ -1,4 +1,3 @@
-
 "use client";
 
 import * as React from "react";
@@ -6,7 +5,7 @@ import { Student } from "@/types";
 import { columns } from "./columns";
 import { DataTable } from "./data-table";
 import { Button } from "@/components/ui/button";
-import { UserPlus, Loader2, ChevronLeft, Home, Printer } from "lucide-react";
+import { UserPlus, ChevronLeft, Home, Printer } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -17,56 +16,82 @@ import {
 import { StudentForm } from "@/components/student-form";
 import { StudentProfile } from "@/components/student-profile";
 import { useAuth } from "@/hooks/use-auth";
+import { useData } from "@/hooks/use-data";
 import { toast } from "@/hooks/use-toast";
-import { mockStudents, mockClasses } from "@/lib/mock-data";
 import { useRouter } from "next/navigation";
 import { useLoading } from "@/app/dashboard/layout";
 
 export default function StudentsPage() {
     const { user, hasPermission } = useAuth();
+    const { 
+        students, 
+        classes, 
+        addStudent, 
+        updateStudent, 
+        deleteStudent, 
+        isLoading 
+    } = useData();
     const router = useRouter();
     const { handleLinkClick } = useLoading();
-    const [students, setStudents] = React.useState<Student[]>(mockStudents);
+    
     const [isFormOpen, setIsFormOpen] = React.useState(false);
     const [editingStudent, setEditingStudent] = React.useState<Student | undefined>(undefined);
     const [viewingStudent, setViewingStudent] = React.useState<Student | null>(null);
 
     const isAdmin = user?.role === 'Admin';
 
+    const activeStudents = React.useMemo(() => {
+        return students.filter(s => s.status !== 'Apagado');
+    }, [students]);
+
     const filteredStudents = React.useMemo(() => {
-        if (isAdmin) return students;
-        const myClasses = mockClasses.filter(c => c.teacher === user?.nickname).map(c => c.name);
-        return students.filter(s => myClasses.includes(s.class));
-    }, [students, isAdmin, user]);
+        if (isAdmin) return activeStudents;
+        const myClasses = classes.filter(c => c.teacher === user?.nickname).map(c => c.name);
+        return activeStudents.filter(s => myClasses.includes(s.class));
+    }, [activeStudents, classes, isAdmin, user]);
 
     const handleOpenForm = (student?: Student) => {
         setEditingStudent(student);
         setIsFormOpen(true);
     };
 
-    const handleSaveStudent = (data: any) => {
-        if (editingStudent) {
-            setStudents(prev => prev.map(s => s.id === editingStudent.id ? { ...s, ...data } : s));
-            toast({ title: "Aluno Atualizado!", description: "As alterações foram salvas localmente." });
-        } else {
-            const newStudent: Student = {
-                id: `STU-${Math.floor(Math.random() * 1000)}`,
-                ...data,
-                grades: [],
-                paymentHistory: [],
-                attendance: [],
-                status: 'Ativo'
-            };
-            setStudents(prev => [newStudent, ...prev]);
-            toast({ title: "Sucesso!", description: "Novo aluno cadastrado no protótipo." });
+    const handleSaveStudent = async (data: any) => {
+        try {
+            if (editingStudent) {
+                await updateStudent(editingStudent.id, data);
+                toast({ title: "Aluno Atualizado!", description: "As alterações foram salvas no Supabase." });
+            } else {
+                await addStudent({
+                    ...data,
+                    grades: [],
+                    paymentHistory: [],
+                    attendance: [],
+                    status: 'Ativo'
+                });
+                toast({ title: "Sucesso!", description: "Novo aluno cadastrado no Supabase." });
+            }
+            setIsFormOpen(false);
+            setEditingStudent(undefined);
+        } catch (err: any) {
+            toast({ 
+                title: "Erro ao salvar", 
+                description: err.message || "Não foi possível salvar o aluno.",
+                variant: "destructive"
+            });
         }
-        setIsFormOpen(false);
-        setEditingStudent(undefined);
     };
 
-    const handleDeleteStudent = (id: string) => {
-        setStudents(prev => prev.filter(s => s.id !== id));
-        toast({ title: "Removido", description: "Aluno removido localmente." });
+    const handleDeleteStudent = async (id: string) => {
+        try {
+            await deleteStudent(id, true);
+            toast({ title: "Removido", description: "Aluno removido com sucesso." });
+        } catch (err: any) {
+            toast({ 
+                title: "Erro ao excluir", 
+                description: err.message || "Não foi possível excluir o aluno.",
+                variant: "destructive"
+            });
+        }
     };
 
     const handleBack = () => {
@@ -108,10 +133,10 @@ export default function StudentsPage() {
                     <DialogTrigger asChild>
                       <Button size="sm" className="bg-accent hover:bg-accent/90 h-10 w-9 sm:w-auto px-0 sm:px-4" disabled={!hasPermission('students:create')}>
                         <UserPlus className="h-4 w-4 sm:mr-2" />
-                        <span className="hidden sm:inline">Novo Aluno</span>
+                        <span className="hidden sm:inline">Adicionar Aluno</span>
                       </Button>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-[600px]">
+                    <DialogContent className="sm:max-w-2xl max-h-[90vh] overflow-y-auto">
                       <DialogHeader>
                         <DialogTitle>{editingStudent ? 'Editar Aluno' : 'Cadastrar Novo Aluno'}</DialogTitle>
                       </DialogHeader>
@@ -119,7 +144,7 @@ export default function StudentsPage() {
                           student={editingStudent} 
                           onSave={handleSaveStudent} 
                           onCancel={() => setIsFormOpen(false)}
-                          availableClasses={mockClasses}
+                          availableClasses={classes}
                           studentConditions={['Integral', 'Bolsa', 'Desconto']}
                       />
                     </DialogContent>
@@ -130,13 +155,21 @@ export default function StudentsPage() {
             <DataTable 
                 columns={columns} 
                 data={filteredStudents}
-                classes={mockClasses}
+                classes={classes}
                 studentConditions={['Integral', 'Bolsa', 'Desconto']}
                 onEdit={handleOpenForm}
                 onView={(student) => setViewingStudent(student)}
                 onDelete={handleDeleteStudent}
-                onBulkUpdate={(ids, updates) => setStudents(prev => prev.map(s => ids.includes(s.id) ? { ...s, ...updates } : s))}
-                onBulkDelete={(ids) => setStudents(prev => prev.filter(s => !ids.includes(s.id)))}
+                onBulkUpdate={async (ids, updates) => {
+                    for (const id of ids) {
+                        await updateStudent(id, updates);
+                    }
+                }}
+                onBulkDelete={async (ids) => {
+                    for (const id of ids) {
+                        await deleteStudent(id, true);
+                    }
+                }}
                 onNextPage={() => {}}
                 onPreviousPage={() => {}}
                 canGoNext={false}

@@ -44,9 +44,9 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Grade, Student, Class } from "@/types";
 import { useAuth } from "@/hooks/use-auth";
+import { useData } from "@/hooks/use-data";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getDisplayAvatarUrl } from "@/lib/utils";
-import { mockClasses, mockStudents } from "@/lib/mock-data";
 import { useRouter } from "next/navigation";
 import { useLoading } from "@/app/dashboard/layout";
 
@@ -66,13 +66,13 @@ export default function GradesPage() {
   const { user } = useAuth();
   const router = useRouter();
   const { handleLinkClick } = useLoading();
+  const { classes: allClasses, students: allStudents, updateStudent } = useData();
+  
   const [selectedClass, setSelectedClass] = React.useState<Class | null>(null);
   const [selectedStudentId, setSelectedStudentId] = React.useState("");
   const [selectedPeriod, setSelectedPeriod] = React.useState("");
   const [grades, setGrades] = React.useState<{ [key: string]: string }>({});
 
-  const [allClasses] = React.useState<Class[]>(mockClasses);
-  const [allStudents] = React.useState<Student[]>(mockStudents);
   const [latestGrades, setLatestGrades] = React.useState<GradeWithStudentInfo[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isStudentSelectorOpen, setIsStudentSelectorOpen] = React.useState(false);
@@ -88,18 +88,34 @@ export default function GradesPage() {
       accessibleStudentIds = Array.from(new Set(teacherClasses.flatMap(c => c.studentIds || [])));
     }
 
-    const accessibleStudents = allStudents.filter(s => accessibleStudentIds.includes(s.id));
-
-    const allGrades: GradeWithStudentInfo[] = accessibleStudents.flatMap(student => 
-        (student.grades || []).map(grade => ({
+    const compiledGrades: GradeWithStudentInfo[] = [];
+    allStudents
+      .filter(s => accessibleStudentIds.includes(s.id))
+      .forEach(student => {
+        student.grades?.forEach(grade => {
+          compiledGrades.push({
             ...grade,
             studentName: student.name,
-            studentId: student.id
-        }))
-    );
-    allGrades.sort((a, b) => (b.evaluationDate || '').localeCompare(a.evaluationDate || ''));
-    setLatestGrades(allGrades.slice(0, 5));
-  }, [allStudents, allClasses, user]);
+            studentId: student.id,
+          });
+        });
+      });
+
+    compiledGrades.sort((a, b) => {
+      const dateA = a.evaluationDate ? new Date(a.evaluationDate).getTime() : 0;
+      const dateB = b.evaluationDate ? new Date(b.evaluationDate).getTime() : 0;
+      return dateB - dateA;
+    });
+
+    setLatestGrades(compiledGrades.slice(0, 10));
+  }, [user, allClasses, allStudents]);
+
+  const availableClasses = React.useMemo(() => {
+    if (user?.role === 'Professor') {
+      return allClasses.filter(c => c.teacher === user.nickname && c.status === 'Ativa');
+    }
+    return allClasses.filter(c => c.status === 'Ativa');
+  }, [user, allClasses]);
 
   const selectedStudent = React.useMemo(() => {
     return allStudents.find(s => s.id === selectedStudentId);
@@ -113,13 +129,6 @@ export default function GradesPage() {
     if (!selectedPeriod) return [];
     return evaluations[selectedPeriod as keyof typeof evaluations] || [];
   }, [selectedPeriod]);
-
-  const classesForSelect = React.useMemo(() => {
-    if (user?.role === 'Professor') {
-      return allClasses.filter(c => c.teacher === user.nickname && c.status === 'Ativa');
-    }
-    return allClasses.filter(c => c.status === 'Ativa');
-  }, [user, allClasses]);
 
   const studentsInSelectedClass = React.useMemo(() => {
     if (!selectedClass) return [];
@@ -150,22 +159,44 @@ export default function GradesPage() {
   }
 
   const handleSaveGrades = async () => {
+    const targetStudent = allStudents.find(s => s.id === selectedStudentId);
+    if (!targetStudent) return;
+
     setIsLoading(true);
-    await new Promise(resolve => setTimeout(resolve, 800));
-    toast({ title: "Notas Salvas!", description: "Operação simulada no protótipo." });
-    setSelectedPeriod("");
-    setGrades({});
-    setIsLoading(false);
+    try {
+      const newGrades: Grade[] = Object.entries(grades).map(([subject, val]) => ({
+        subject,
+        periodType: 'Semestre',
+        periodNumber: selectedPeriod === 'sem-1' ? 1 : 2,
+        grade: parseFloat(val) || 0,
+        evaluationDate: new Date().toISOString().split('T')[0]
+      }));
+
+      const existingGrades = targetStudent.grades || [];
+      const updatedGrades = [
+        ...existingGrades.filter(g => !(g.periodNumber === (selectedPeriod === 'sem-1' ? 1 : 2) && Object.keys(grades).includes(g.subject))),
+        ...newGrades
+      ];
+
+      await updateStudent(targetStudent.id, { grades: updatedGrades });
+      toast({ title: "Notas Salvas!", description: "As notas foram salvas com sucesso no Supabase." });
+      setSelectedPeriod("");
+      setGrades({});
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: "Erro ao salvar notas", description: err.message });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const calculateAverage = () => {
     const numericGrades = Object.values(grades).map(g => parseFloat(g)).filter(g => !isNaN(g));
     if (numericGrades.length === 0) return 0;
     const sum = numericGrades.reduce((acc, curr) => acc + curr, 0);
-    return (sum / numericGrades.length).toFixed(2);
+    return parseFloat((sum / numericGrades.length).toFixed(2));
   };
   
-  const average = parseFloat(calculateAverage());
+  const average = calculateAverage();
   const isApproved = average >= 60;
 
   const handleBack = () => {
