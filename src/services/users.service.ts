@@ -20,33 +20,24 @@ export async function fetchUsers(): Promise<User[]> {
 export async function createUser(user: Partial<User>): Promise<User> {
   const supabase = createClient();
 
-  // Try creating in Supabase Auth first so they have login credentials
+  // Call PostgreSQL RPC to create user in auth.users and profiles atomically
   if (user.email) {
-    try {
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: user.email,
-        password: (user as any).password || 'Hangout@123',
-        options: {
-          data: {
-            nickname: user.nickname || '',
-            role: user.role || 'Professor',
-            avatar: user.avatar || '',
-            permissions: user.permissions || []
-          }
-        }
-      });
+    const { data, error } = await (supabase.rpc as any)('create_new_user', {
+      user_email: user.email,
+      user_password: (user as any).password || 'Hangout@123',
+      user_nickname: user.nickname || '',
+      user_role: user.role || 'Professor',
+      user_avatar: user.avatar || '',
+      user_dob: user.dob || null,
+    });
 
-      if (!authError && authData.user) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', authData.user.id)
-          .single();
+    if (error) {
+      console.error('Error in create_new_user RPC:', error);
+      throw new Error(error.message || 'Erro ao cadastrar usuário.');
+    }
 
-        if (profile) return toUser(profile);
-      }
-    } catch (e) {
-      console.warn('Auth signUp skipped or failed, falling back to direct profiles insert:', e);
+    if (data) {
+      return toUser(data);
     }
   }
 

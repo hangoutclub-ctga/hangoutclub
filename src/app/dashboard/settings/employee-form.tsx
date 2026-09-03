@@ -8,7 +8,7 @@ import { useState } from "react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { CalendarIcon, User as UserIcon, Loader2 } from "lucide-react";
+import { CalendarIcon, User as UserIcon, Loader2, Eye, EyeOff, Lock } from "lucide-react";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -34,6 +34,7 @@ export const EmployeeForm = ({ employee, onSave, onCancel }: { employee?: User, 
     const { categories, isLoading } = useData();
     const [manualDate, setManualDate] = useState<string>(employee?.dob ? format(new Date(employee.dob), 'dd/MM/yyyy') : '');
     const [isSaving, setIsSaving] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
     
     const form = useForm<EmployeeFormValues>({
         resolver: zodResolver(employeeFormSchema),
@@ -96,6 +97,37 @@ export const EmployeeForm = ({ employee, onSave, onCancel }: { employee?: User, 
                  <FormField control={form.control} name="role" render={({ field }) => (
                     <FormItem><FormLabel className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cargo</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-11"><SelectValue placeholder="Selecione um cargo..." /></SelectTrigger></FormControl>
                     <SelectContent>{categories.userRoles.map(role => (<SelectItem key={role} value={role}>{role}</SelectItem>))}</SelectContent></Select><FormMessage /></FormItem>
+                )} />
+
+                <FormField control={form.control} name="password" render={({ field }) => (
+                    <FormItem>
+                        <div className="flex justify-between items-center">
+                            <FormLabel className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                {employee ? "Nova Senha (opcional)" : "Senha de Acesso"}
+                            </FormLabel>
+                            <span className="text-[10px] text-muted-foreground">Padrão: Hangout@123</span>
+                        </div>
+                        <div className="relative">
+                            <FormControl>
+                                <Input
+                                    type={showPassword ? "text" : "password"}
+                                    placeholder={employee ? "Deixe em branco para manter a atual" : "Hangout@123"}
+                                    {...field}
+                                    className="h-11 pr-10"
+                                />
+                            </FormControl>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                className="absolute right-1 top-1 h-9 w-9 text-muted-foreground hover:bg-transparent"
+                                onClick={() => setShowPassword(!showPassword)}
+                            >
+                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
+                        </div>
+                        <FormMessage />
+                    </FormItem>
                 )} />
                 
                 <div className="flex justify-end gap-2 pt-4 border-t">
