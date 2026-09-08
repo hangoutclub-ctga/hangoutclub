@@ -12,6 +12,7 @@ export interface AuthContextType {
   login: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   hasPermission: (permission: string) => boolean;
+  refreshUser: () => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -121,8 +122,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return user.permissions?.includes(permission) ?? false;
   }, [user]);
 
+  const refreshUser = useCallback(async () => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        if (profile) {
+          setUser(toUser(profile));
+        }
+      }
+    } catch (err) {
+      console.error("Error refreshing user:", err);
+    }
+  }, [supabase]);
+
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, hasPermission }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, hasPermission, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );

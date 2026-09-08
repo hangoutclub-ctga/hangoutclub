@@ -33,14 +33,15 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useRouter } from "next/navigation";
 import { useLoading } from "@/app/dashboard/layout";
+import { createClient } from "@/lib/supabase/client";
 
 const profileSchema = z.object({
   nickname: z.string().min(2, "Nome obrigatório."),
   email: z.string().email("E-mail inválido."),
-  dob: z.date({ required_error: "Data de nascimento obrigatória." }),
+  dob: z.date().optional().nullable(),
   phone: z.string().optional(),
   cellphone: z.string().optional(),
-  isProvider: z.string().default("Professor(a)"),
+  isProvider: z.string().optional().default("Professor(a)"),
   avatar: z.string().optional(),
 });
 
@@ -266,7 +267,8 @@ const SystemManagementPanel = () => {
 }
 
 export default function SettingsPage() {
-  const { user, hasPermission } = useAuth();
+  const { user, hasPermission, refreshUser } = useAuth();
+  const { refetchData } = useData();
   const isMobile = useIsMobile();
   const router = useRouter();
   const { handleLinkClick } = useLoading();
@@ -287,6 +289,23 @@ export default function SettingsPage() {
         isProvider: user?.isProvider || "Professor(a)"
     }, 
   });
+
+  useEffect(() => {
+    if (user) {
+      profileForm.reset({
+        nickname: user.nickname || "",
+        avatar: user.avatar || "",
+        email: user.email || "",
+        dob: user.dob ? new Date(user.dob) : undefined,
+        phone: user.phone || "",
+        cellphone: user.cellphone || "",
+        isProvider: user.isProvider || "Professor(a)"
+      });
+      if (user.dob) {
+        setManualDate(format(new Date(user.dob), 'dd/MM/yyyy'));
+      }
+    }
+  }, [user, profileForm]);
 
   const passwordForm = useForm<PasswordFormValues>({
     resolver: zodResolver(passwordSchema),
@@ -309,19 +328,49 @@ export default function SettingsPage() {
   };
 
   const onProfileSubmit = async (data: ProfileFormValues) => {
+      if (!user?.id) {
+        toast({ variant: 'destructive', title: "Erro", description: "Usuário não autenticado." });
+        return;
+      }
       setIsSavingProfile(true);
-      await new Promise(resolve => setTimeout(resolve, 800));
-      toast({ title: "Perfil Salvo!", description: "Seus dados foram atualizados com sucesso." });
-      setIsSavingProfile(false);
+      try {
+        await updateUser(user.id, {
+          nickname: data.nickname,
+          avatar: data.avatar,
+          dob: data.dob ? format(data.dob, 'yyyy-MM-dd') : undefined,
+          phone: data.phone,
+          cellphone: data.cellphone,
+          isProvider: data.isProvider,
+        });
+        await refreshUser();
+        await refetchData();
+        toast({ title: "Perfil Salvo!", description: "Seus dados foram atualizados com sucesso." });
+      } catch (err: any) {
+        console.error("Erro ao salvar perfil:", err);
+        toast({ variant: 'destructive', title: "Erro ao salvar perfil", description: err.message });
+      } finally {
+        setIsSavingProfile(false);
+      }
   };
 
   const onPasswordSubmit = async (data: PasswordFormValues) => {
       setIsSavingPassword(true);
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      toast({ title: "Senha Alterada!", description: "Sua senha foi atualizada localmente." });
-      setIsPasswordModalOpen(false);
-      passwordForm.reset();
-      setIsSavingPassword(false);
+      try {
+        const supabase = createClient();
+        const { error } = await supabase.auth.updateUser({
+          password: data.newPassword,
+        });
+        if (error) {
+          throw error;
+        }
+        toast({ title: "Senha Alterada!", description: "Sua senha foi atualizada com sucesso." });
+        setIsPasswordModalOpen(false);
+        passwordForm.reset();
+      } catch (err: any) {
+        toast({ variant: 'destructive', title: "Erro ao alterar senha", description: err.message });
+      } finally {
+        setIsSavingPassword(false);
+      }
   };
 
   const handleBack = () => {
@@ -389,7 +438,25 @@ export default function SettingsPage() {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormControl>
-                                                <ImagePicker value={field.value} onChange={field.onChange} label="Minha Foto" folder="avatars" />
+                                                <ImagePicker 
+                                                    value={field.value} 
+                                                    onChange={async (newAvatarUrl) => {
+                                                        field.onChange(newAvatarUrl);
+                                                        if (user?.id && newAvatarUrl) {
+                                                            try {
+                                                                await updateUser(user.id, { avatar: newAvatarUrl });
+                                                                await refreshUser();
+                                                                await refetchData();
+                                                                toast({ title: "Foto Atualizada!", description: "Sua foto de perfil foi salva com sucesso." });
+                                                            } catch (err: any) {
+                                                                console.error("Erro ao salvar foto de perfil:", err);
+                                                                toast({ variant: 'destructive', title: "Erro ao salvar foto", description: err.message });
+                                                            }
+                                                        }
+                                                    }} 
+                                                    label="Minha Foto" 
+                                                    folder="avatars" 
+                                                />
                                             </FormControl>
                                         </FormItem>
                                     )}
