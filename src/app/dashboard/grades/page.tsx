@@ -84,7 +84,7 @@ export default function GradesPage() {
     if (isAdmin) {
       accessibleStudentIds = allStudents.map(s => s.id);
     } else if (user?.role === 'Professor') {
-      const teacherClasses = allClasses.filter(c => c.teacher === user.nickname);
+      const teacherClasses = allClasses.filter(c => c.teacherId === user.id || c.teacher === user.nickname);
       accessibleStudentIds = Array.from(new Set(teacherClasses.flatMap(c => c.studentIds || [])));
     }
 
@@ -112,7 +112,7 @@ export default function GradesPage() {
 
   const availableClasses = React.useMemo(() => {
     if (user?.role === 'Professor') {
-      return allClasses.filter(c => c.teacher === user.nickname && c.status === 'Ativa');
+      return allClasses.filter(c => (c.teacherId === user.id || c.teacher === user.nickname) && c.status === 'Ativa');
     }
     return allClasses.filter(c => c.status === 'Ativa');
   }, [user, allClasses]);
@@ -236,7 +236,7 @@ export default function GradesPage() {
                         <SelectValue placeholder="Selecione uma turma" />
                     </SelectTrigger>
                     <SelectContent>
-                        {classesForSelect.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                        {availableClasses.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                     </SelectContent>
                 </Select>
                  <Dialog open={isStudentSelectorOpen} onOpenChange={setIsStudentSelectorOpen}>
