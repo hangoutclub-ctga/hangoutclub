@@ -246,7 +246,7 @@ export default function FinancePage() {
                             key={prefilledData ? JSON.stringify(prefilledData) : 'new'}
                             onSave={handleSaveTransaction} 
                             onCancel={() => setIsFormOpen(false)} 
-                            students={mockStudents} 
+                            students={students} 
                             defaultValues={prefilledData}
                         />
                     </DialogContent>
