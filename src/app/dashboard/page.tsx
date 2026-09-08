@@ -52,34 +52,86 @@ export default function DashboardPage() {
   const [editingEvent, setEditingEvent] = useState<Partial<ManualEvent> | null>(null);
   const [completedEventIds, setCompletedEventIds] = useState<string[]>([]);
 
-  // Dashboard focado apenas nos compromissos do próprio usuário
-  const { events } = useAgenda(confirmedDate, user, 'day', user?.nickname || "");
-
+  // Dashboard focado nos compromissos do usuário ou geral se admin/secretaria
   const isAdmin = user?.role === 'Admin';
   const isSecretaria = user?.role === 'Secretaria';
+  const { events } = useAgenda(confirmedDate, user, 'day', (isAdmin || isSecretaria) ? 'todos' : (user?.nickname || ""));
 
+  // Dados filtrados em tempo real
   const activeStudents = useMemo(() => students.filter(s => s.status !== 'Apagado'), [students]);
-  const activeClasses = useMemo(() => classes.filter(c => c.status !== 'Apagado'), [classes]);
+  const enrolledActiveStudentsCount = useMemo(() => students.filter(s => s.status === 'Ativo').length, [students]);
+  const activeClasses = useMemo(() => classes.filter(c => c.status === 'Ativa'), [classes]);
+
+  // Balanço financeiro dinâmico (mês atual ou acumulado)
+  const financialSummary = useMemo(() => {
+    const now = new Date();
+    const curMonth = now.getMonth();
+    const curYear = now.getFullYear();
+
+    const curMonthTrx = transactions.filter(t => {
+      const d = new Date(t.date);
+      return d.getMonth() === curMonth && d.getFullYear() === curYear;
+    });
+
+    const monthProfit = curMonthTrx.reduce((acc, t) => t.type === 'Entrada' ? acc + t.value : acc - t.value, 0);
+    const totalProfit = transactions.reduce((acc, t) => t.type === 'Entrada' ? acc + t.value : acc - t.value, 0);
+
+    return {
+      hasCurrentMonth: curMonthTrx.length > 0,
+      monthProfit,
+      totalProfit,
+      displayProfit: curMonthTrx.length > 0 ? monthProfit : totalProfit,
+      label: curMonthTrx.length > 0 ? "Balanço deste mês" : "Saldo total"
+    };
+  }, [transactions]);
 
   const stats = useMemo(() => {
-    if (isAdmin) {
+    if (isAdmin || isSecretaria) {
       return {
-        students: activeStudents.length,
+        students: enrolledActiveStudentsCount,
         classes: activeClasses.length,
-        profit: transactions.reduce((acc, t) => t.type === 'Entrada' ? acc + t.value : acc - t.value, 0)
+        profit: financialSummary.displayProfit,
+        profitLabel: financialSummary.label
       };
     } else {
-      const teacherClasses = activeClasses.filter(c => c.teacher === user?.nickname);
-      const teacherStudentsCount = activeStudents.filter(s => teacherClasses.some(c => c.name === s.class)).length;
+      const teacherClasses = activeClasses.filter(c => 
+        (c.teacherId && c.teacherId === user?.id) || 
+        (c.teacher && c.teacher === user?.nickname)
+      );
+      const teacherStudentsCount = activeStudents.filter(s => 
+        teacherClasses.some(c => 
+          c.name === s.class || 
+          (c.studentIds && c.studentIds.includes(s.id))
+        )
+      ).length;
       return {
         students: teacherStudentsCount,
         classes: teacherClasses.length,
-        profit: 0
+        profit: 0,
+        profitLabel: "Agenda"
       };
     }
-  }, [isAdmin, user, activeStudents, activeClasses, transactions]);
+  }, [isAdmin, isSecretaria, user, enrolledActiveStudentsCount, activeClasses, activeStudents, financialSummary]);
 
-  const lowStockCount = inventoryItems.filter(item => item.status !== 'Apagado' && item.stock <= item.minStock).length;
+  const lowStockCount = useMemo(() => 
+    inventoryItems.filter(item => item.status !== 'Apagado' && item.stock <= item.minStock).length
+  , [inventoryItems]);
+
+  const popularItem = useMemo(() => {
+    const active = inventoryItems.filter(i => i.status !== 'Apagado');
+    if (active.length === 0) return null;
+    return [...active].sort((a, b) => (b.recentMovements || 0) - (a.recentMovements || 0))[0];
+  }, [inventoryItems]);
+
+  const categoriesStats = useMemo(() => {
+    const active = inventoryItems.filter(i => i.status !== 'Apagado');
+    const unique = Array.from(new Set(active.map(i => i.category).filter(Boolean)));
+    const critical = active.filter(i => i.stock <= i.minStock).length;
+    return {
+      total: unique.length,
+      critical
+    };
+  }, [inventoryItems]);
 
   const handleToggleComplete = (id: string) => {
     setCompletedEventIds(prev => prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]);
@@ -366,7 +418,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="px-2 pb-2 pt-0 sm:p-3 sm:pt-0">
               <div className="text-xl sm:text-3xl font-black">{stats.students}</div>
-              <p className="text-[9px] sm:text-xs text-muted-foreground mt-0">{isAdmin ? "Membros ativos" : "Seus alunos"}</p>
+              <p className="text-[9px] sm:text-xs text-muted-foreground mt-0">{(isAdmin || isSecretaria) ? "Alunos ativos" : "Seus alunos"}</p>
             </CardContent>
             <CardFooter className="p-2 pt-1 sm:p-3 border-t bg-muted/5">
               <Button variant="ghost" size="sm" className="h-5 sm:h-6 w-full justify-between text-[9px] sm:text-[10px] hover:bg-transparent p-0" onClick={() => router.push('/dashboard/students')}>
@@ -382,7 +434,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent className="px-2 pb-2 pt-0 sm:p-3 sm:pt-0">
               <div className="text-xl sm:text-3xl font-black">{stats.classes}</div>
-              <p className="text-[9px] sm:text-xs text-muted-foreground mt-0">{isAdmin ? "Em andamento" : "Titularidade"}</p>
+              <p className="text-[9px] sm:text-xs text-muted-foreground mt-0">{(isAdmin || isSecretaria) ? "Em andamento" : "Titularidade"}</p>
             </CardContent>
             <CardFooter className="p-2 pt-1 sm:p-3 border-t bg-muted/5">
               <Button variant="ghost" size="sm" className="h-5 sm:h-6 w-full justify-between text-[9px] sm:text-[10px] hover:bg-transparent p-0" onClick={() => router.push('/dashboard/classes')}>
@@ -393,17 +445,17 @@ export default function DashboardPage() {
 
           <Card className="hover:shadow-md transition-all border-l-4 border-l-primary/40">
             <CardHeader className="flex flex-row items-center justify-between p-2 pb-0.5 sm:p-3 sm:pb-2">
-              <CardTitle className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground">{isAdmin ? "Faturamento" : "Agenda"}</CardTitle>
-              {isAdmin ? <Wallet className="h-3.5 w-3.5 text-primary/60" /> : <CalendarIcon className="h-3.5 w-3.5 text-primary/60" />}
+              <CardTitle className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground">{(isAdmin || isSecretaria) ? "Faturamento" : "Agenda"}</CardTitle>
+              {(isAdmin || isSecretaria) ? <Wallet className="h-3.5 w-3.5 text-primary/60" /> : <CalendarIcon className="h-3.5 w-3.5 text-primary/60" />}
             </CardHeader>
             <CardContent className="px-2 pb-2 pt-0 sm:p-3 sm:pt-0">
-              <div className={cn("text-lg sm:text-3xl font-black truncate", isAdmin && "text-green-600")}>
-                {isAdmin ? formatCurrency(stats.profit) : events.length}
+              <div className={cn("text-lg sm:text-3xl font-black truncate", (isAdmin || isSecretaria) && (stats.profit >= 0 ? "text-green-600" : "text-red-500"))}>
+                {(isAdmin || isSecretaria) ? formatCurrency(stats.profit) : events.length}
               </div>
-              <p className="text-[9px] sm:text-xs text-muted-foreground mt-0">{isAdmin ? "Balanço mensal" : "Agendamentos"}</p>
+              <p className="text-[9px] sm:text-xs text-muted-foreground mt-0">{(isAdmin || isSecretaria) ? stats.profitLabel : "Agendamentos hoje"}</p>
             </CardContent>
             <CardFooter className="p-2 pt-1 sm:p-3 border-t bg-muted/5">
-              <Button variant="ghost" size="sm" className="h-5 sm:h-6 w-full justify-between text-[9px] sm:text-[10px] hover:bg-transparent p-0" onClick={() => router.push(isAdmin ? '/dashboard/finance' : '/dashboard/agenda')}>
+              <Button variant="ghost" size="sm" className="h-5 sm:h-6 w-full justify-between text-[9px] sm:text-[10px] hover:bg-transparent p-0" onClick={() => router.push((isAdmin || isSecretaria) ? '/dashboard/finance' : '/dashboard/agenda')}>
                 Detalhes <ArrowUpRight className="h-2.5 w-2.5 sm:h-3 w-3 text-accent" />
               </Button>
             </CardFooter>
@@ -450,8 +502,10 @@ export default function DashboardPage() {
               <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
             </CardHeader>
             <CardContent className="px-2 sm:px-3 pb-1.5 pt-0">
-              <div className="text-xs sm:text-sm font-bold truncate">Livro Nível 1</div>
-              <p className="text-[9px] sm:[10px] text-muted-foreground mt-0.5">6 saídas/mês.</p>
+              <div className="text-xs sm:text-sm font-bold truncate">{popularItem ? popularItem.name : "Nenhum item"}</div>
+              <p className="text-[9px] sm:[10px] text-muted-foreground mt-0.5">
+                {popularItem ? `${popularItem.recentMovements || 0} movimentações` : "Sem movimentações"}
+              </p>
             </CardContent>
             <CardFooter className="px-2 sm:px-3 pb-3">
               <Button variant="ghost" size="sm" className="h-6 text-[9px] sm:text-[10px] p-0 hover:bg-transparent" onClick={() => router.push('/dashboard/inventory')}>
@@ -466,8 +520,12 @@ export default function DashboardPage() {
               <Layers className="h-3.5 w-3.5 text-muted-foreground" />
             </CardHeader>
             <CardContent className="px-2 sm:px-3 pb-1.5 pt-0">
-              <div className="text-xs sm:text-sm font-bold truncate">Material Didático</div>
-              <p className="text-[9px] sm:[10px] text-muted-foreground mt-0.5">1 item crítico.</p>
+              <div className="text-xs sm:text-sm font-bold truncate">
+                {categoriesStats.total} {categoriesStats.total === 1 ? 'Categoria ativa' : 'Categorias ativas'}
+              </div>
+              <p className="text-[9px] sm:[10px] text-muted-foreground mt-0.5">
+                {categoriesStats.critical} {categoriesStats.critical === 1 ? 'item crítico' : 'itens críticos'}.
+              </p>
             </CardContent>
             <CardFooter className="px-2 sm:px-3 pb-3">
               <Button variant="ghost" size="sm" className="h-6 text-[9px] sm:text-[10px] p-0 hover:bg-transparent" onClick={() => router.push('/dashboard/inventory')}>

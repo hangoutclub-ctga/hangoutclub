@@ -46,8 +46,13 @@ export default function StudentsPage() {
 
     const filteredStudents = React.useMemo(() => {
         if (isAdmin) return activeStudents;
-        const myClasses = classes.filter(c => c.teacher === user?.nickname).map(c => c.name);
-        return activeStudents.filter(s => myClasses.includes(s.class));
+        const myClasses = classes.filter(c => 
+            (c.teacherId && c.teacherId === user?.id) || 
+            (c.teacher && c.teacher === user?.nickname)
+        );
+        const myClassNames = myClasses.map(c => c.name);
+        const myStudentIds = myClasses.flatMap(c => c.studentIds || []);
+        return activeStudents.filter(s => myClassNames.includes(s.class) || myStudentIds.includes(s.id));
     }, [activeStudents, classes, isAdmin, user]);
 
     const handleOpenForm = (student?: Student) => {
