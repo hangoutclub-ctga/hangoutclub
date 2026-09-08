@@ -28,6 +28,7 @@ import { FixedExpense } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogClose } from "./ui/dialog";
 import { toast } from "@/hooks/use-toast";
+import { uploadFileToStorage, uploadDataUrlToStorage } from "@/lib/supabase/storage";
 
 const formSchema = z.object({
   description: z.string().min(3, "Descrição muito curta."),
@@ -50,6 +51,7 @@ const paymentMethods = ["Dinheiro", "PIX", "Cartão de Crédito", "Cartão de D�
 export function PayFixedExpenseForm({ expense, onSave, onCancel }: PayFixedExpenseFormProps) {
   const [isSaving, setIsSaving] = React.useState(false);
   const [isAddingAttachment, setIsAddingAttachment] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [attachmentMode, setAttachmentMode] = useState<'options' | 'camera' | 'link'>('options');
   const [tempLink, setLinkValue] = useState("");
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -95,24 +97,50 @@ export function PayFixedExpenseForm({ expense, onSave, onCancel }: PayFixedExpen
     });
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const result = event.target?.result as string;
+    setIsUploading(true);
+    try {
       if (file.type.startsWith('image/')) {
-        const compressed = await compressImage(result);
-        form.setValue("receiptUrl", compressed);
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          try {
+            const result = event.target?.result as string;
+            const compressed = await compressImage(result);
+            const { url, error } = await uploadDataUrlToStorage(compressed, 'receipts', file.name);
+            if (error) {
+              toast({ variant: 'destructive', title: "Erro no envio", description: error });
+            } else if (url) {
+              form.setValue("receiptUrl", url);
+              setIsAddingAttachment(false);
+              setAttachmentMode('options');
+              toast({ title: "Comprovante anexado!", description: "Upload concluído com sucesso." });
+            }
+          } catch (err: any) {
+            toast({ variant: 'destructive', title: "Erro ao processar", description: err.message });
+          } finally {
+            setIsUploading(false);
+          }
+        };
+        reader.readAsDataURL(file);
       } else {
-        form.setValue("receiptUrl", result);
+        const { url, error } = await uploadFileToStorage(file, 'receipts', file.name);
+        if (error) {
+          toast({ variant: 'destructive', title: "Erro no envio", description: error });
+        } else if (url) {
+          form.setValue("receiptUrl", url);
+          setIsAddingAttachment(false);
+          setAttachmentMode('options');
+          toast({ title: "Comprovante anexado!", description: "Upload concluído com sucesso." });
+        }
+        setIsUploading(false);
       }
-      setIsAddingAttachment(false);
-      setAttachmentMode('options');
-      toast({ title: "Arquivo anexado!" });
-    };
-    reader.readAsDataURL(file);
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: "Erro no envio", description: err.message });
+      setIsUploading(false);
+    }
   };
 
   const startCamera = async () => {
@@ -138,12 +166,25 @@ export function PayFixedExpenseForm({ expense, onSave, onCancel }: PayFixedExpen
     const dataUri = canvas.toDataURL('image/jpeg');
     
     const stream = videoRef.current.srcObject as MediaStream;
-    stream.getTracks().forEach(track => track.stop());
+    stream?.getTracks().forEach(track => track.stop());
     
-    const compressed = await compressImage(dataUri);
-    form.setValue("receiptUrl", compressed);
-    setIsAddingAttachment(false);
-    setAttachmentMode('options');
+    setIsUploading(true);
+    try {
+      const compressed = await compressImage(dataUri);
+      const { url, error } = await uploadDataUrlToStorage(compressed, 'receipts', `recibo-${Date.now()}.jpg`);
+      if (error) {
+        toast({ variant: 'destructive', title: "Erro no envio", description: error });
+      } else if (url) {
+        form.setValue("receiptUrl", url);
+        setIsAddingAttachment(false);
+        setAttachmentMode('options');
+        toast({ title: "Foto capturada!", description: "Upload concluído com sucesso." });
+      }
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: "Erro ao salvar", description: err.message });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleLinkSave = () => {
@@ -315,7 +356,16 @@ export function PayFixedExpenseForm({ expense, onSave, onCancel }: PayFixedExpen
                             <DialogTitle>Anexar Comprovante</DialogTitle>
                         </DialogHeader>
                         
-                        {attachmentMode === 'options' && (
+                        {isUploading ? (
+                            <div className="flex flex-col items-center justify-center py-10 gap-3">
+                                <Loader2 className="h-8 w-8 animate-spin text-accent" />
+                                <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground animate-pulse">
+                                    Enviando para o storage...
+                                </p>
+                            </div>
+                        ) : (
+                            <>
+                                {attachmentMode === 'options' && (
                             <div className="grid gap-3 py-4">
                                 <div className="grid grid-cols-2 gap-2">
                                     <Button variant="outline" className="h-20 flex-col gap-2 rounded-xl text-[10px] font-bold uppercase" onClick={() => startCamera()}>
@@ -348,17 +398,19 @@ export function PayFixedExpenseForm({ expense, onSave, onCancel }: PayFixedExpen
                             </div>
                         )}
 
-                        {attachmentMode === 'link' && (
-                            <div className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                    <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">URL da Imagem</FormLabel>
-                                    <Input placeholder="https://..." value={tempLink} onChange={e => setLinkValue(e.target.value)} autoFocus className="h-11" />
-                                </div>
-                                <div className="flex gap-2">
-                                    <Button variant="ghost" className="flex-1 h-11" onClick={() => setAttachmentMode('options')}>Voltar</Button>
-                                    <Button className="flex-1 bg-accent h-11" onClick={handleLinkSave}>Salvar Link</Button>
-                                </div>
-                            </div>
+                                {attachmentMode === 'link' && (
+                                    <div className="space-y-4 py-4">
+                                        <div className="space-y-2">
+                                            <FormLabel className="text-[10px] font-bold uppercase text-muted-foreground">URL da Imagem</FormLabel>
+                                            <Input placeholder="https://..." value={tempLink} onChange={e => setLinkValue(e.target.value)} autoFocus className="h-11" />
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <Button variant="ghost" className="flex-1 h-11" onClick={() => setAttachmentMode('options')}>Voltar</Button>
+                                            <Button className="flex-1 bg-accent h-11" onClick={handleLinkSave}>Salvar Link</Button>
+                                        </div>
+                                    </div>
+                                )}
+                            </>
                         )}
                     </DialogContent>
                 </Dialog>

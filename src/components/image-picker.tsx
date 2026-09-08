@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getDisplayAvatarUrl, cn } from "@/lib/utils";
 import { toast } from "@/hooks/use-toast";
+import { uploadFileToStorage, uploadDataUrlToStorage } from "@/lib/supabase/storage";
 
 interface ImagePickerProps {
   value?: string;
@@ -15,13 +16,15 @@ interface ImagePickerProps {
   className?: string;
   label?: string;
   aspect?: "circle" | "square" | "video";
+  folder?: string;
 }
 
-export function ImagePicker({ value, onChange, className, label, aspect = "circle" }: ImagePickerProps) {
+export function ImagePicker({ value, onChange, className, label, aspect = "circle", folder = "general" }: ImagePickerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [mode, setMode] = useState<'options' | 'link' | 'camera'>('options');
   const [linkValue, setLinkValue] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
+  const [processingStatus, setProcessingStatus] = useState("Processando...");
   const videoRef = useRef<HTMLVideoElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -35,7 +38,7 @@ export function ImagePicker({ value, onChange, className, label, aspect = "circl
         const canvas = document.createElement('canvas');
         let width = img.width;
         let height = img.height;
-        const max = 800;
+        const max = 1200;
         if (width > height && width > max) {
           height *= max / width;
           width = max;
@@ -47,8 +50,9 @@ export function ImagePicker({ value, onChange, className, label, aspect = "circl
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         ctx?.drawImage(img, 0, 0, width, height);
-        resolve(canvas.toDataURL('image/jpeg', 0.8));
+        resolve(canvas.toDataURL('image/jpeg', 0.85));
       };
+      img.onerror = () => resolve(dataUri);
       img.src = dataUri;
     });
   };
@@ -58,19 +62,47 @@ export function ImagePicker({ value, onChange, className, label, aspect = "circl
     if (!file) return;
 
     setIsProcessing(true);
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      const result = event.target?.result as string;
+    setProcessingStatus("Otimizando e enviando...");
+    try {
       if (file.type.startsWith('image/')) {
-        const compressed = await compressImage(result);
-        onChange(compressed);
+        const reader = new FileReader();
+        reader.onload = async (event) => {
+          try {
+            const rawDataUrl = event.target?.result as string;
+            const compressed = await compressImage(rawDataUrl);
+            setProcessingStatus("Salvando no storage...");
+            const { url, error } = await uploadDataUrlToStorage(compressed, folder, file.name);
+            if (error) {
+              toast({ variant: "destructive", title: "Erro no envio", description: error });
+            } else if (url) {
+              onChange(url);
+              toast({ title: "Arquivo anexado!", description: "Upload concluído com sucesso." });
+              setIsOpen(false);
+            }
+          } catch (err: any) {
+            toast({ variant: "destructive", title: "Erro ao processar", description: err.message });
+          } finally {
+            setIsProcessing(false);
+          }
+        };
+        reader.readAsDataURL(file);
       } else {
-        onChange(result); // Mantém PDF como está
+        // PDF ou outro arquivo
+        setProcessingStatus("Enviando arquivo...");
+        const { url, error } = await uploadFileToStorage(file, folder, file.name);
+        if (error) {
+          toast({ variant: "destructive", title: "Erro no envio", description: error });
+        } else if (url) {
+          onChange(url);
+          toast({ title: "Arquivo anexado!", description: "Upload concluído com sucesso." });
+          setIsOpen(false);
+        }
+        setIsProcessing(false);
       }
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Erro no upload", description: err.message });
       setIsProcessing(false);
-      setIsOpen(false);
-    };
-    reader.readAsDataURL(file);
+    }
   };
 
   const startCamera = async () => {
@@ -93,17 +125,29 @@ export function ImagePicker({ value, onChange, className, label, aspect = "circl
     canvas.width = videoRef.current.videoWidth;
     canvas.height = videoRef.current.videoHeight;
     canvas.getContext('2d')?.drawImage(videoRef.current, 0, 0);
-    const dataUri = canvas.toDataURL('image/jpeg');
+    const dataUri = canvas.toDataURL('image/jpeg', 0.9);
     
     const stream = videoRef.current.srcObject as MediaStream;
-    stream.getTracks().forEach(track => track.stop());
+    stream?.getTracks().forEach(track => track.stop());
     
     setIsProcessing(true);
-    const compressed = await compressImage(dataUri);
-    onChange(compressed);
-    setIsProcessing(false);
-    setIsOpen(false);
-    setMode('options');
+    setProcessingStatus("Salvando foto no storage...");
+    try {
+      const compressed = await compressImage(dataUri);
+      const { url, error } = await uploadDataUrlToStorage(compressed, folder, `foto-${Date.now()}.jpg`);
+      if (error) {
+        toast({ variant: "destructive", title: "Erro no envio", description: error });
+      } else if (url) {
+        onChange(url);
+        toast({ title: "Foto salva!", description: "Upload concluído com sucesso." });
+        setIsOpen(false);
+        setMode('options');
+      }
+    } catch (err: any) {
+      toast({ variant: "destructive", title: "Erro ao salvar", description: err.message });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleLinkSave = () => {
@@ -171,24 +215,33 @@ export function ImagePicker({ value, onChange, className, label, aspect = "circl
             <DialogTitle>Adicionar Arquivo</DialogTitle>
           </DialogHeader>
 
-          {mode === 'options' && (
-            <div className="grid grid-cols-1 gap-3 py-4">
-              <div className="grid grid-cols-2 gap-2">
-                <Button variant="outline" className="h-20 flex-col gap-2 rounded-xl text-[10px] font-bold uppercase" onClick={startCamera} type="button">
-                    <Camera className="h-6 w-6 text-accent" /> Câmera
-                </Button>
-                <div className="relative">
-                    <Input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*,application/pdf" onChange={handleFileUpload} />
-                    <Button variant="outline" className="h-20 w-full flex-col gap-2 rounded-xl text-[10px] font-bold uppercase pointer-events-none">
-                        <Upload className="h-6 w-6 text-accent" /> Arquivo (Img/PDF)
-                    </Button>
-                </div>
-              </div>
-              <Button variant="outline" className="h-12 justify-start gap-3 rounded-xl text-[10px] font-bold uppercase" onClick={() => setMode('link')} type="button">
-                <LinkIcon className="h-5 w-5 text-accent" /> Colar Link da Imagem
-              </Button>
+          {isProcessing ? (
+            <div className="flex flex-col items-center justify-center py-10 gap-3">
+              <Loader2 className="h-8 w-8 animate-spin text-accent" />
+              <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground animate-pulse">
+                {processingStatus}
+              </p>
             </div>
-          )}
+          ) : (
+            <>
+              {mode === 'options' && (
+                <div className="grid grid-cols-1 gap-3 py-4">
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button variant="outline" className="h-20 flex-col gap-2 rounded-xl text-[10px] font-bold uppercase" onClick={startCamera} type="button">
+                        <Camera className="h-6 w-6 text-accent" /> Câmera
+                    </Button>
+                    <div className="relative">
+                        <Input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*,application/pdf" onChange={handleFileUpload} />
+                        <Button variant="outline" className="h-20 w-full flex-col gap-2 rounded-xl text-[10px] font-bold uppercase pointer-events-none">
+                            <Upload className="h-6 w-6 text-accent" /> Arquivo (Img/PDF)
+                        </Button>
+                    </div>
+                  </div>
+                  <Button variant="outline" className="h-12 justify-start gap-3 rounded-xl text-[10px] font-bold uppercase" onClick={() => setMode('link')} type="button">
+                    <LinkIcon className="h-5 w-5 text-accent" /> Colar Link da Imagem
+                  </Button>
+                </div>
+              )}
 
           {mode === 'link' && (
             <div className="space-y-4 py-4">
@@ -220,6 +273,8 @@ export function ImagePicker({ value, onChange, className, label, aspect = "circl
                 </Button>
               </div>
             </div>
+              )}
+            </>
           )}
         </DialogContent>
       </Dialog>

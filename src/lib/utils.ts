@@ -11,6 +11,11 @@ export function getDisplayAvatarUrl(url: string | undefined | null): string {
   if (!url) {
     return placeholder;
   }
+
+  // Se já for data URI ou blob URL, retorna diretamente
+  if (url.startsWith('data:image/') || url.startsWith('blob:')) {
+    return url;
+  }
   
   // Check for Google Image search redirect URL
   if (url.startsWith("https://www.google.com/url?")) {

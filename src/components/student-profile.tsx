@@ -12,6 +12,7 @@ import { useLoading } from "@/app/dashboard/layout";
 import { useAuth } from "@/hooks/use-auth";
 import { Grade, Attendance, Student, StudentDocument } from "@/types";
 import { cn, getDisplayAvatarUrl, formatCurrency } from "@/lib/utils";
+import { uploadFileToStorage } from "@/lib/supabase/storage";
 import React from "react";
 import { differenceInYears } from "date-fns";
 import { useData } from "@/hooks/use-data";
@@ -43,6 +44,7 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
   const [newDocUrl, setNewDocUrl] = React.useState("");
   const [newDocType, setNewDocType] = React.useState<'image' | 'pdf' | 'link'>('image');
   const [isSavingDoc, setIsSavingDoc] = React.useState(false);
+  const [isUploadingDoc, setIsUploadingDoc] = React.useState(false);
 
   if (!student) {
     return (
@@ -64,18 +66,30 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
       }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const isPdf = file.type === 'application/pdf';
     setNewDocType(isPdf ? 'pdf' : 'image');
+    if (!newDocName) {
+      setNewDocName(file.name.replace(/\.[^/.]+$/, ""));
+    }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setNewDocUrl(event.target?.result as string);
-    };
-    reader.readAsDataURL(file);
+    setIsUploadingDoc(true);
+    try {
+      const { url, error } = await uploadFileToStorage(file, 'documents', file.name);
+      if (error) {
+        toast({ variant: 'destructive', title: "Erro no envio", description: error });
+      } else if (url) {
+        setNewDocUrl(url);
+        toast({ title: "Arquivo anexado!", description: "Upload concluído com sucesso." });
+      }
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: "Erro no envio", description: err.message });
+    } finally {
+      setIsUploadingDoc(false);
+    }
   };
 
   const handleAddDocument = async () => {
@@ -221,8 +235,10 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
                                             className="flex-1"
                                         />
                                         <div className="relative">
-                                            <Input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*,application/pdf" onChange={handleFileUpload} />
-                                            <Button variant="outline" size="icon" type="button"><FileUp className="h-4 w-4" /></Button>
+                                            <Input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*,application/pdf" onChange={handleFileUpload} disabled={isUploadingDoc} />
+                                            <Button variant="outline" size="icon" type="button" disabled={isUploadingDoc}>
+                                                {isUploadingDoc ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
+                                            </Button>
                                         </div>
                                     </div>
                                     <p className="text-[9px] text-muted-foreground italic">Suporta JPEG, PNG, PDF ou Links.</p>

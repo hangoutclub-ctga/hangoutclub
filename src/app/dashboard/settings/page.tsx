@@ -389,7 +389,7 @@ export default function SettingsPage() {
                                     render={({ field }) => (
                                         <FormItem>
                                             <FormControl>
-                                                <ImagePicker value={field.value} onChange={field.onChange} label="Minha Foto" />
+                                                <ImagePicker value={field.value} onChange={field.onChange} label="Minha Foto" folder="avatars" />
                                             </FormControl>
                                         </FormItem>
                                     )}

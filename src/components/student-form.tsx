@@ -35,9 +35,9 @@ import { ptBR } from "date-fns/locale";
 import { RadioGroup, RadioGroupItem } from "./ui/radio-group";
 import { toast } from "@/hooks/use-toast";
 import { Switch } from "./ui/switch";
-import { Student, Class, StudentDocument } from "@/types";
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { ImagePicker } from "./image-picker";
+import { uploadFileToStorage } from "@/lib/supabase/storage";
 
 const formSchema = z.object({
   name: z.string().min(2, "O nome deve ter pelo menos 2 caracteres."),
@@ -119,6 +119,7 @@ export function StudentForm({ student, onSave, onCancel, availableClasses, stude
   );
   const [isSaving, setIsSaving] = React.useState(false);
   const [isAddingDoc, setIsAddingDoc] = React.useState(false);
+  const [isUploadingDoc, setIsUploadingDoc] = React.useState(false);
   const [newDocName, setNewDocName] = React.useState("");
   const [newDocUrl, setNewDocUrl] = React.useState("");
   const [newDocType, setNewDocType] = React.useState<'image' | 'pdf' | 'link'>('image');
@@ -223,18 +224,30 @@ export function StudentForm({ student, onSave, onCancel, availableClasses, stude
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
     const isPdf = file.type === 'application/pdf';
     setNewDocType(isPdf ? 'pdf' : 'image');
+    if (!newDocName) {
+      setNewDocName(file.name.replace(/\.[^/.]+$/, ""));
+    }
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      setNewDocUrl(event.target?.result as string);
-    };
-    reader.readAsDataURL(file);
+    setIsUploadingDoc(true);
+    try {
+      const { url, error } = await uploadFileToStorage(file, 'documents', file.name);
+      if (error) {
+        toast({ variant: 'destructive', title: "Erro no envio", description: error });
+      } else if (url) {
+        setNewDocUrl(url);
+        toast({ title: "Arquivo anexado!", description: "Upload concluído com sucesso." });
+      }
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: "Erro no envio", description: err.message });
+    } finally {
+      setIsUploadingDoc(false);
+    }
   };
 
   const formatCPF = (cpf: string) => {
@@ -296,7 +309,7 @@ export function StudentForm({ student, onSave, onCancel, availableClasses, stude
                 render={({ field }) => (
                     <FormItem>
                         <FormControl>
-                            <ImagePicker value={field.value} onChange={field.onChange} label="Foto do Aluno" />
+                            <ImagePicker value={field.value} onChange={field.onChange} label="Foto do Aluno" folder="avatars" />
                         </FormControl>
                         <FormMessage />
                     </FormItem>
@@ -765,8 +778,10 @@ export function StudentForm({ student, onSave, onCancel, availableClasses, stude
                                         className="flex-1"
                                     />
                                     <div className="relative">
-                                        <Input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*,application/pdf" onChange={handleFileUpload} />
-                                        <Button variant="outline" size="icon" type="button"><FileUp className="h-4 w-4" /></Button>
+                                        <Input type="file" className="absolute inset-0 opacity-0 cursor-pointer" accept="image/*,application/pdf" onChange={handleFileUpload} disabled={isUploadingDoc} />
+                                        <Button variant="outline" size="icon" type="button" disabled={isUploadingDoc}>
+                                            {isUploadingDoc ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
+                                        </Button>
                                     </div>
                                 </div>
                                 <p className="text-[9px] text-muted-foreground italic">Suporta JPEG, PNG, PDF ou URLs externas.</p>

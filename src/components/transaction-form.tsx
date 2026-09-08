@@ -178,6 +178,7 @@ export function TransactionForm({ defaultValues, allowedTypes = allTypes, onSave
                                     onChange={field.onChange} 
                                     label="Anexar Recibo/Foto" 
                                     aspect="video"
+                                    folder="receipts"
                                 />
                             </FormControl>
                             <FormMessage />

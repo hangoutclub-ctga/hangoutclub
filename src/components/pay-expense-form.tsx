@@ -5,8 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import React from "react";
-import Image from "next/image";
-import { CalendarIcon, UploadCloud, Camera, Link as LinkIcon, Loader2 } from "lucide-react";
+import { CalendarIcon, Loader2 } from "lucide-react";
 import { FixedExpense } from "@/types";
 import { parse, isValid } from 'date-fns';
 
@@ -22,7 +21,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { cn, getDisplayAvatarUrl } from "@/lib/utils";
+import { ImagePicker } from "./image-picker";
+import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -30,7 +30,7 @@ const formSchema = z.object({
   description: z.string().min(3, "Descrição muito curta."),
   value: z.coerce.number().positive("O valor deve ser positivo."),
   date: z.date({ required_error: "A data é obrigatória." }),
-  receiptUrl: z.string().url("Por favor, insira uma URL válida.").optional().or(z.literal('')),
+  receiptUrl: z.string().optional().or(z.literal('')),
 });
 
 export type PayExpenseFormValues = z.infer<typeof formSchema>;
@@ -52,9 +52,6 @@ export function PayExpenseForm({ expense, onSave }: PayExpenseFormProps) {
       receiptUrl: ""
     },
   });
-  
-  const receiptUrl = form.watch("receiptUrl");
-  const displayReceiptUrl = getDisplayAvatarUrl(receiptUrl);
 
   const [manualDate, setManualDate] = React.useState<string>(format(new Date(), 'dd/MM/yyyy'));
 
@@ -153,36 +150,24 @@ export function PayExpenseForm({ expense, onSave }: PayExpenseFormProps) {
             />
         </div>
 
-        <div className="flex gap-4 items-center">
-             <div className="w-24 h-24 rounded-lg border flex items-center justify-center bg-gray-100 overflow-hidden">
-                <Image 
-                    src={displayReceiptUrl}
-                    key={displayReceiptUrl}
-                    width={96}
-                    height={96}
-                    alt="Pré-visualização do comprovante"
-                    className="object-contain w-full h-full"
-                    data-ai-hint="document receipt"
-                    onError={(e) => { e.currentTarget.src = "https://placehold.co/128x128/E8E6E7/30475E.png"; }}
-                />
-            </div>
-            <FormField
-                control={form.control}
-                name="receiptUrl"
-                render={({ field }) => (
-                    <FormItem className="flex-grow">
-                        <FormLabel>URL do Comprovante (Opcional)</FormLabel>
-                         <div className="relative">
-                            <LinkIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                            <FormControl>
-                                <Input placeholder="https://..." {...field} className="pl-9" />
-                            </FormControl>
-                        </div>
-                        <FormMessage />
-                    </FormItem>
-                )}
-            />
-        </div>
+        <FormField
+            control={form.control}
+            name="receiptUrl"
+            render={({ field }) => (
+                <FormItem className="flex flex-col items-center justify-center p-4 border rounded-xl bg-muted/10">
+                    <FormControl>
+                        <ImagePicker 
+                            value={field.value} 
+                            onChange={field.onChange} 
+                            label="Comprovante de Pagamento" 
+                            aspect="square" 
+                            folder="receipts"
+                        />
+                    </FormControl>
+                    <FormMessage />
+                </FormItem>
+            )}
+        />
 
         <Button type="submit" className="w-full" disabled={isSaving}>
           {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

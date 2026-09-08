@@ -76,7 +76,7 @@ export const EmployeeForm = ({ employee, onSave, onCancel }: { employee?: User, 
                     <FormField control={form.control} name="avatar" render={({ field }) => (
                         <FormItem>
                             <FormControl>
-                                <ImagePicker value={field.value} onChange={field.onChange} label="Foto do Funcionário" />
+                                <ImagePicker value={field.value} onChange={field.onChange} label="Foto do Funcionário" folder="avatars" />
                             </FormControl>
                             <FormMessage />
                         </FormItem>

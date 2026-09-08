@@ -94,6 +94,7 @@ export function InventoryItemForm({ item, categories, onSave, onCancel }: Invent
                                 onChange={field.onChange} 
                                 label="Foto do Item" 
                                 aspect="square"
+                                folder="inventory"
                             />
                         </FormControl>
                         <FormMessage />

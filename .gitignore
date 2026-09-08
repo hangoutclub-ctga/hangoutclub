@@ -46,3 +46,7 @@ firestore-debug.log
 
 # supabase
 supabase/.temp/
+
+# pwa
+public/sw*
+public/workbox*
