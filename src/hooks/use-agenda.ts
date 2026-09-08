@@ -50,7 +50,7 @@ export const useAgenda = (date: Date | undefined, user: User | null, viewType: '
                 })
                 .map(c => ({
                     id: `CLS-${c.id}-${dateKey}`,
-                    task: `Aula: ${c.name}`,
+                    task: c.name,
                     time: c.schedule.split(' - ')[1] || '00:00',
                     details: `Modalidade: ${c.modality}`,
                     type: 'class' as const,
