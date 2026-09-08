@@ -205,7 +205,7 @@ export default function DashboardPage() {
                         receiptUrl: data.receiptUrl,
                         paymentMethod: data.paymentMethod
                       });
-                      toast({ title: "Transação Registrada!", description: "Salva no Supabase." }); 
+                      toast({ title: "Transação Registrada!", description: "Salva com sucesso." }); 
                       setIsTransactionOpen(false); 
                     } catch (err: any) {
                       toast({ variant: 'destructive', title: "Erro ao salvar", description: err.message });
@@ -276,10 +276,10 @@ export default function DashboardPage() {
                         try {
                           if (editingEvent?.id) {
                             await updateEvent(editingEvent.id, data);
-                            toast({ title: "Evento Atualizado!", description: "Salvo no Supabase." });
+                            toast({ title: "Evento Atualizado!", description: "Salvo com sucesso." });
                           } else {
                             await addEvent(data);
-                            toast({ title: "Evento Criado!", description: "Salvo no Supabase." });
+                            toast({ title: "Evento Criado!", description: "Salvo com sucesso." });
                           }
                           setIsEventOpen(false); 
                         } catch (err: any) {

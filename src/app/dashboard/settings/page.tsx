@@ -103,7 +103,7 @@ const PermissionsManager = () => {
         try {
             await updateUser(selectedUser.id, { permissions: selectedUser.permissions });
             await refetchData();
-            toast({ title: "Permissões Salvas!", description: "Atualizadas com sucesso no Supabase." });
+            toast({ title: "Permissões Salvas!", description: "Atualizadas com sucesso." });
         } catch (err: any) {
             toast({ variant: 'destructive', title: "Erro ao salvar", description: err.message });
         } finally {
@@ -184,10 +184,10 @@ const SystemManagementPanel = () => {
         try {
             if (editingEmployee) {
                 await updateUser(editingEmployee.id, data);
-                toast({ title: "Funcionário Atualizado!", description: "Salvo no Supabase." });
+                toast({ title: "Funcionário Atualizado!", description: "Dados salvos com sucesso." });
             } else {
                 await createUser(data);
-                toast({ title: "Funcionário Cadastrado!", description: "Salvo no Supabase." });
+                toast({ title: "Funcionário Cadastrado!", description: "Novo colaborador salvo com sucesso." });
             }
             await refetchData();
             setIsFormOpen(false);

@@ -64,7 +64,7 @@ export default function StudentsPage() {
         try {
             if (editingStudent) {
                 await updateStudent(editingStudent.id, data);
-                toast({ title: "Aluno Atualizado!", description: "As alterações foram salvas no Supabase." });
+                toast({ title: "Aluno Atualizado!", description: "As alterações foram salvas com sucesso." });
             } else {
                 await addStudent({
                     ...data,
@@ -73,7 +73,7 @@ export default function StudentsPage() {
                     attendance: [],
                     status: 'Ativo'
                 });
-                toast({ title: "Sucesso!", description: "Novo aluno cadastrado no Supabase." });
+                toast({ title: "Sucesso!", description: "Novo aluno cadastrado com sucesso." });
             }
             setIsFormOpen(false);
             setEditingStudent(undefined);

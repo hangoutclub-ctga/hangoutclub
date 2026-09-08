@@ -66,7 +66,7 @@ export default function LoginPage() {
             Hangout Club
           </CardTitle>
           <CardDescription className="text-xs">
-            Autenticação segura via Supabase Auth
+            Sistema de Gestão Escolar
           </CardDescription>
         </CardHeader>
 

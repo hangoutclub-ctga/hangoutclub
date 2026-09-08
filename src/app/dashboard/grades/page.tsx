@@ -179,7 +179,7 @@ export default function GradesPage() {
       ];
 
       await updateStudent(targetStudent.id, { grades: updatedGrades });
-      toast({ title: "Notas Salvas!", description: "As notas foram salvas com sucesso no Supabase." });
+      toast({ title: "Notas Salvas!", description: "As notas foram salvas com sucesso." });
       setSelectedPeriod("");
       setGrades({});
     } catch (err: any) {

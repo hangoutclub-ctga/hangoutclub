@@ -108,7 +108,7 @@ export default function FinancePage() {
                 receiptUrl: data.receiptUrl,
                 paymentMethod: data.paymentMethod
             });
-            toast({ title: "Transação Registrada!", description: "Salva com sucesso no Supabase." });
+            toast({ title: "Transação Registrada!", description: "Salva com sucesso." });
             setIsFormOpen(false);
             setPrefilledData(undefined);
         } catch (err: any) {
@@ -137,7 +137,7 @@ export default function FinancePage() {
                 paymentMethod: data.paymentMethod
             });
 
-            toast({ title: "Pagamento Confirmado!", description: "Despesa fixa registrada como saída no Supabase." });
+            toast({ title: "Pagamento Confirmado!", description: "Despesa fixa registrada como saída." });
             setIsPayFormOpen(false);
             setPayingExpense(null);
         } catch (err: any) {
@@ -155,7 +155,7 @@ export default function FinancePage() {
                 year: currentYear,
                 dueDate: data.dueDate
             });
-            toast({ title: "Despesa Fixa Adicionada!", description: "Salva com sucesso no Supabase." });
+            toast({ title: "Despesa Fixa Adicionada!", description: "Salva com sucesso." });
             setIsFixedFormOpen(false);
         } catch (err: any) {
             toast({ variant: 'destructive', title: "Erro ao criar despesa fixa", description: err.message });
@@ -165,7 +165,7 @@ export default function FinancePage() {
     const handleDelete = async (id: string) => {
         try {
             await deleteTransaction(id);
-            toast({ title: "Removido", description: "Transação removida do Supabase." });
+            toast({ title: "Removido", description: "Transação excluída com sucesso." });
         } catch (err: any) {
             toast({ variant: 'destructive', title: "Erro ao remover", description: err.message });
         }

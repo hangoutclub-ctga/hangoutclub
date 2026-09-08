@@ -82,14 +82,14 @@ export default function InventoryPage() {
         try {
             if (editingItem) {
                 await updateInventoryItem(editingItem.id, data);
-                toast({ title: "Item Atualizado!", description: "Salvo com sucesso no Supabase." });
+                toast({ title: "Item Atualizado!", description: "Item atualizado com sucesso." });
             } else {
                 await addInventoryItem({
                     ...data,
                     movements: [],
                     status: 'Ativo'
                 });
-                toast({ title: "Item Cadastrado!", description: "Salvo com sucesso no Supabase." });
+                toast({ title: "Item Cadastrado!", description: "Item cadastrado com sucesso." });
             }
             setIsFormOpen(false);
             setEditingItem(undefined);
@@ -125,7 +125,7 @@ export default function InventoryPage() {
             };
 
             await addStockMovement(itemId, newMovement, newStock);
-            toast({ title: "Movimentação Realizada!", description: "Estoque atualizado no Supabase." });
+            toast({ title: "Movimentação Realizada!", description: "Estoque atualizado com sucesso." });
         } catch (err: any) {
             toast({ variant: 'destructive', title: "Erro na movimentação", description: err.message });
         }

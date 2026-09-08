@@ -63,7 +63,7 @@ export default function ClassesPage() {
           teacher: teacherName,
           schedule: scheduleStr
         });
-        toast({ title: "Turma Atualizada!", description: "As alterações foram salvas no Supabase." });
+        toast({ title: "Turma Atualizada!", description: "As alterações foram salvas com sucesso." });
       } else {
         await addClass({
           name: data.name,
@@ -74,7 +74,7 @@ export default function ClassesPage() {
           studentIds: data.studentIds || [],
           status: 'Ativa'
         });
-        toast({ title: "Sucesso!", description: "Nova turma cadastrada no Supabase." });
+        toast({ title: "Sucesso!", description: "Nova turma cadastrada com sucesso." });
       }
       setIsFormOpen(false);
       setEditingClass(undefined);

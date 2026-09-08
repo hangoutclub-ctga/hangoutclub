@@ -146,10 +146,10 @@ export default function AgendaPage() {
                         try {
                             if (editingEvent?.id) {
                                 await updateEvent(editingEvent.id, eventData);
-                                toast({ title: "Evento Atualizado!", description: "Salvo no Supabase." });
+                                toast({ title: "Evento Atualizado!", description: "As alterações foram salvas com sucesso." });
                             } else {
                                 await addEvent(eventData);
-                                toast({ title: "Evento Criado!", description: "Salvo no Supabase." });
+                                toast({ title: "Evento Criado!", description: "O evento foi adicionado à agenda com sucesso." });
                             }
                             setIsFormOpen(false);
                         } catch (err: any) {
