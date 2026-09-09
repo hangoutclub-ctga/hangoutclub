@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { useLoading } from "@/app/dashboard/layout";
+import { useLoading } from "@/hooks/use-loading";
 import { useAuth } from "@/hooks/use-auth";
 import { Grade, Attendance, Student, StudentDocument } from "@/types";
 import { cn, getDisplayAvatarUrl, formatCurrency } from "@/lib/utils";

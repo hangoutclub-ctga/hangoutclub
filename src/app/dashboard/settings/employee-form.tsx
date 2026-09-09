@@ -19,6 +19,7 @@ import { ptBR } from 'date-fns/locale';
 import { useData } from "@/hooks/use-data";
 import { toast } from "@/hooks/use-toast";
 import { ImagePicker } from "@/components/image-picker";
+import { parseDobToDate } from "@/lib/utils";
 
 const employeeFormSchema = z.object({
   nickname: z.string().min(2, "O nome de usuário é obrigatório."),
@@ -32,7 +33,8 @@ type EmployeeFormValues = z.infer<typeof employeeFormSchema>;
 
 export const EmployeeForm = ({ employee, onSave, onCancel }: { employee?: User, onSave: (data: EmployeeFormValues) => Promise<void> | void, onCancel: () => void }) => {
     const { categories, isLoading } = useData();
-    const [manualDate, setManualDate] = useState<string>(employee?.dob ? format(new Date(employee.dob), 'dd/MM/yyyy') : '');
+    const initialDob = parseDobToDate(employee?.dob);
+    const [manualDate, setManualDate] = useState<string>(initialDob ? format(initialDob, 'dd/MM/yyyy') : '');
     const [isSaving, setIsSaving] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     
@@ -43,7 +45,7 @@ export const EmployeeForm = ({ employee, onSave, onCancel }: { employee?: User, 
             email: employee?.email || "",
             role: employee?.role || "Professor",
             password: "",
-            dob: employee?.dob ? new Date(employee.dob) : undefined,
+            dob: initialDob,
             avatar: employee?.avatar || ""
         }
     });

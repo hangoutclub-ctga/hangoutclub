@@ -8,7 +8,7 @@ import { CommunicationForm } from "@/components/communication-form";
 import { useData } from "@/hooks/use-data";
 import { Loader2, ChevronLeft, Home } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useLoading } from "@/app/dashboard/layout";
+import { useLoading } from "@/hooks/use-loading";
 
 export default function CommunicationPage() {
   const { categories, classes: allLiveClasses, students: allLiveStudents, isLoading: isCategoriesLoading } = useData();

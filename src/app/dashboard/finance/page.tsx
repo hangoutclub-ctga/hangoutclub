@@ -37,7 +37,7 @@ import { cn, formatCurrency, getDisplayAvatarUrl } from "@/lib/utils";
 import { useData } from "@/hooks/use-data";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useLoading } from "@/app/dashboard/layout";
+import { useLoading } from "@/hooks/use-loading";
 
 export default function FinancePage() {
     const { hasPermission } = useAuth();

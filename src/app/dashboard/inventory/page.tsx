@@ -45,7 +45,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useData } from "@/hooks/use-data";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useRouter } from "next/navigation";
-import { useLoading } from "@/app/dashboard/layout";
+import { useLoading } from "@/hooks/use-loading";
 
 export default function InventoryPage() {
     const { user, hasPermission } = useAuth();

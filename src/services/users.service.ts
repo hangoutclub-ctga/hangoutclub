@@ -60,6 +60,20 @@ export async function updateUser(id: string, user: Partial<User>): Promise<User>
   const supabase = createClient();
   const row = toUserUpdate(user);
 
+  // If password was provided and not empty, update it in auth.users via admin RPC
+  const newPassword = (user as any).password;
+  if (typeof newPassword === 'string' && newPassword.trim().length > 0) {
+    const { error: pwErr } = await (supabase.rpc as any)('admin_update_user_password', {
+      target_user_id: id,
+      new_password: newPassword.trim(),
+    });
+
+    if (pwErr) {
+      console.error(`Error updating password for user ${id}:`, pwErr);
+      throw new Error(pwErr.message || 'Erro ao atualizar a senha do colaborador.');
+    }
+  }
+
   const { data, error } = await supabase
     .from('profiles')
     .update(row)

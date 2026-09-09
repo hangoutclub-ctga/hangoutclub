@@ -19,7 +19,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useData } from "@/hooks/use-data";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
-import { useLoading } from "@/app/dashboard/layout";
+import { useLoading } from "@/hooks/use-loading";
 
 export default function StudentsPage() {
     const { user, hasPermission } = useAuth();

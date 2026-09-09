@@ -19,7 +19,7 @@ import { ManualEvent, DisplayEvent } from "@/types";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
-import { useLoading } from "@/app/dashboard/layout";
+import { useLoading } from "@/hooks/use-loading";
 
 export default function AgendaPage() {
   const { user } = useAuth();

@@ -21,6 +21,25 @@ export function toUser(row: Tables['profiles']['Row']): User {
   };
 }
 
+function formatDob(val: any): string | null {
+  if (!val) return null;
+  if (val instanceof Date) {
+    const y = val.getFullYear();
+    const m = String(val.getMonth() + 1).padStart(2, '0');
+    const d = String(val.getDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
+  }
+  if (typeof val === 'string') {
+    const trimmed = val.trim();
+    if (!trimmed) return null;
+    if (/^\d{4}-\d{2}-\d{2}/.test(trimmed)) {
+      return trimmed.slice(0, 10);
+    }
+    return trimmed;
+  }
+  return String(val);
+}
+
 export function toUserInsert(user: Partial<User>): Tables['profiles']['Insert'] {
   return {
     id: user.id,
@@ -29,7 +48,7 @@ export function toUserInsert(user: Partial<User>): Tables['profiles']['Insert'] 
     avatar: user.avatar || null,
     role: user.role || 'Professor',
     permissions: user.permissions || [],
-    dob: user.dob || null,
+    dob: formatDob(user.dob),
     phone: user.phone || null,
     cellphone: user.cellphone || null,
     is_provider: user.isProvider === 'Sim',
@@ -43,7 +62,7 @@ export function toUserUpdate(user: Partial<User>): Tables['profiles']['Update'] 
   if (user.avatar !== undefined) update.avatar = user.avatar || null;
   if (user.role !== undefined) update.role = user.role;
   if (user.permissions !== undefined) update.permissions = user.permissions;
-  if (user.dob !== undefined) update.dob = user.dob || null;
+  if (user.dob !== undefined) update.dob = formatDob(user.dob);
   if (user.phone !== undefined) update.phone = user.phone || null;
   if (user.cellphone !== undefined) update.cellphone = user.cellphone || null;
   if (user.isProvider !== undefined) update.is_provider = user.isProvider === 'Sim';
@@ -64,8 +83,8 @@ export function toStudent(row: Tables['students']['Row']): Student {
     email: row.email || undefined,
     phone: row.phone || undefined,
     cep: row.cep || undefined,
-    address: row.address,
-    addressNumber: row.address_number,
+    address: row.address || '',
+    addressNumber: row.address_number || '',
     addressComplement: row.address_complement || undefined,
     medicalInfo: row.medical_info || undefined,
     studentCondition: row.student_condition || 'Integral',

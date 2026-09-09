@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAgenda } from "@/hooks/use-agenda";
 import { useData } from "@/hooks/use-data";
 import { useRouter } from "next/navigation";
+import { useStockAlert } from "@/hooks/use-stock-alert";
 import {
   Dialog,
   DialogContent,
@@ -30,6 +31,7 @@ import { ClassProfile } from "@/components/class-profile";
 export default function DashboardPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const { openStockAlert } = useStockAlert();
   const { 
     students, 
     classes, 
@@ -482,16 +484,23 @@ export default function DashboardPage() {
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-6">
           <Card className={cn("border-2 transition-all", lowStockCount > 0 ? "border-red-500/50 bg-red-500/5" : "border-muted")}>
             <CardHeader className="flex flex-row items-center justify-between p-2 sm:p-3 pb-1 space-y-0">
-              <CardTitle className="text-[10px] sm:text-xs font-bold uppercase text-red-600">Estoque Baixo</CardTitle>
-              <AlertTriangle className="h-3.5 w-3.5 text-red-500" />
+              <CardTitle className={cn("text-[10px] sm:text-xs font-bold uppercase", lowStockCount > 0 ? "text-red-600" : "text-muted-foreground")}>
+                Estoque Baixo
+              </CardTitle>
+              <AlertTriangle className={cn("h-3.5 w-3.5", lowStockCount > 0 ? "text-red-500" : "text-muted-foreground")} />
             </CardHeader>
             <CardContent className="px-2 sm:px-3 pb-1.5 pt-0">
               <div className="text-xl sm:text-3xl font-black">{lowStockCount}</div>
-              <p className="text-[9px] sm:[10px] text-muted-foreground mt-0.5">Reposição necessária.</p>
+              <p className="text-[9px] sm:[10px] text-muted-foreground mt-0.5">
+                {lowStockCount > 0 ? "Reposição necessária." : "Tudo em dia."}
+              </p>
             </CardContent>
-            <CardFooter className="px-2 sm:px-3 pb-3">
-              <Button variant="outline" size="sm" className="h-6 text-[9px] sm:text-[10px] gap-1 px-2" onClick={() => router.push('/dashboard/inventory')}>
-                Ver <ArrowRight className="h-2.5 w-2.5" />
+            <CardFooter className="px-2 sm:px-3 pb-3 flex gap-2">
+              <Button variant="outline" size="sm" className="h-6 text-[9px] sm:text-[10px] gap-1 px-2" onClick={openStockAlert}>
+                Alerta <AlertTriangle className="h-2.5 w-2.5 text-red-500" />
+              </Button>
+              <Button variant="ghost" size="sm" className="h-6 text-[9px] sm:text-[10px] gap-1 px-2" onClick={() => router.push('/dashboard/inventory')}>
+                Ver Estoque <ArrowRight className="h-2.5 w-2.5" />
               </Button>
             </CardFooter>
           </Card>

@@ -32,7 +32,7 @@ import { Calendar } from "@/components/ui/calendar";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useRouter } from "next/navigation";
-import { useLoading } from "@/app/dashboard/layout";
+import { useLoading } from "@/hooks/use-loading";
 import { createClient } from "@/lib/supabase/client";
 
 const profileSchema = z.object({

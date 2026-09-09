@@ -4,13 +4,14 @@ import { useMemo } from 'react';
 import { format, getDay, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay } from 'date-fns';
 import type { User, DisplayEvent } from '@/types';
 import { useData } from '@/hooks/use-data';
+import { isBirthdayOnDay } from '@/lib/utils';
 
 const dayOfWeekMap: { [key: string]: number } = {
     'seg': 1, 'ter': 2, 'qua': 3, 'qui': 4, 'sex': 5, 'sab': 6, 'dom': 0,
 };
 
 export const useAgenda = (date: Date | undefined, user: User | null, viewType: 'day' | 'week' = 'day', selectedOwner: string = "todos") => {
-    const { manualEvents, classes, students } = useData();
+    const { manualEvents, classes, students, users } = useData();
 
     const agendaEvents: DisplayEvent[] = useMemo(() => {
         if (!date || !user) return [];
@@ -61,25 +62,35 @@ export const useAgenda = (date: Date | undefined, user: User | null, viewType: '
                     classId: c.id
                 }));
 
-            const birthdays = students
-                .filter(s => {
-                    if (s.status === 'Apagado' || !s.dob) return false;
-                    const bday = new Date(s.dob);
-                    return bday.getUTCDate() === day.getDate() && bday.getUTCMonth() === day.getMonth();
-                })
+            const studentBirthdays = students
+                .filter(s => s.status !== 'Apagado' && isBirthdayOnDay(s.dob, day))
                 .map(s => ({
-                    id: `BDAY-${s.id}-${dateKey}`,
+                    id: `BDAY-STUDENT-${s.id}-${dateKey}`,
                     task: `Aniversário: ${s.name}`,
                     time: "00:00",
                     details: `Hoje é o aniversário de ${s.name}!`,
-                    type: 'birthday' as any,
+                    type: 'birthday' as const,
                     owners: ['Sistema'],
                     recurrent: true,
                     date: day,
                     completed: false
                 }));
 
-            allGeneratedEvents = [...allGeneratedEvents, ...manual, ...classEvents, ...birthdays];
+            const userBirthdays = users
+                .filter(u => isBirthdayOnDay(u.dob, day))
+                .map(u => ({
+                    id: `BDAY-USER-${u.id}-${dateKey}`,
+                    task: `Aniversário: ${u.nickname}`,
+                    time: "00:00",
+                    details: `Hoje é o aniversário de ${u.nickname} (${u.role})!`,
+                    type: 'birthday' as const,
+                    owners: ['Sistema'],
+                    recurrent: true,
+                    date: day,
+                    completed: false
+                }));
+
+            allGeneratedEvents = [...allGeneratedEvents, ...manual, ...classEvents, ...studentBirthdays, ...userBirthdays];
         });
 
         let filtered = allGeneratedEvents;
@@ -96,7 +107,7 @@ export const useAgenda = (date: Date | undefined, user: User | null, viewType: '
             if (dateCompare !== 0) return dateCompare;
             return a.time.localeCompare(b.time);
         });
-    }, [date, user, viewType, selectedOwner, manualEvents, classes, students]);
+    }, [date, user, viewType, selectedOwner, manualEvents, classes, students, users]);
 
     return {
         events: agendaEvents,

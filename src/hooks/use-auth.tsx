@@ -108,6 +108,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const logout = async () => {
     try {
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('low_stock_alert_seen');
+      }
       await supabase.auth.signOut();
     } catch (err) {
       console.error("Error signing out:", err);

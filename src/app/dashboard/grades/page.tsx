@@ -48,7 +48,7 @@ import { useData } from "@/hooks/use-data";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getDisplayAvatarUrl } from "@/lib/utils";
 import { useRouter } from "next/navigation";
-import { useLoading } from "@/app/dashboard/layout";
+import { useLoading } from "@/hooks/use-loading";
 
 type GradeWithStudentInfo = Grade & { studentName: string, studentId: string };
 
