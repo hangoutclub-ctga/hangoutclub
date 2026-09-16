@@ -1,5 +1,5 @@
 import { Database } from '@/types/database.types';
-import { Student, Class, User, Transaction, FixedExpense, InventoryItem, ManualEvent, CommunicationTemplate, Grade, Attendance, StudentDocument, StockMovement } from '@/types';
+import { Student, Class, User, Transaction, FixedExpense, InventoryItem, ManualEvent, CommunicationTemplate, Grade, Attendance, StudentDocument, StockMovement, EventType, SystemCategory } from '@/types';
 
 type Tables = Database['public']['Tables'];
 
@@ -388,3 +388,70 @@ export function toCommunicationTemplate(row: Tables['communication_templates']['
     message: row.message,
   };
 }
+
+// ========================
+// EVENT TYPES
+// ========================
+export function toEventType(row: Tables['event_types']['Row']): EventType {
+  return {
+    id: row.id,
+    name: row.name,
+    color: row.color || undefined,
+    description: row.description || undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function toEventTypeInsert(item: Partial<EventType>): Tables['event_types']['Insert'] {
+  return {
+    id: item.id,
+    name: item.name || '',
+    color: item.color || '#3b82f6',
+    description: item.description || null,
+  };
+}
+
+export function toEventTypeUpdate(item: Partial<EventType>): Tables['event_types']['Update'] {
+  const update: Tables['event_types']['Update'] = {};
+  if (item.name !== undefined) update.name = item.name;
+  if (item.color !== undefined) update.color = item.color || null;
+  if (item.description !== undefined) update.description = item.description || null;
+  return update;
+}
+
+// ========================
+// SYSTEM CATEGORIES
+// ========================
+export function toSystemCategory(row: Tables['system_categories']['Row']): SystemCategory {
+  return {
+    id: row.id,
+    type: row.type as SystemCategory['type'],
+    name: row.name,
+    color: row.color || undefined,
+    description: row.description || undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function toSystemCategoryInsert(item: Partial<SystemCategory>): Tables['system_categories']['Insert'] {
+  return {
+    id: item.id,
+    type: item.type || 'student_condition',
+    name: item.name || '',
+    color: item.color || '#3b82f6',
+    description: item.description || null,
+  };
+}
+
+export function toSystemCategoryUpdate(item: Partial<SystemCategory>): Tables['system_categories']['Update'] {
+  const update: Tables['system_categories']['Update'] = {};
+  if (item.name !== undefined) update.name = item.name;
+  if (item.color !== undefined) update.color = item.color || null;
+  if (item.description !== undefined) update.description = item.description || null;
+  if (item.type !== undefined) update.type = item.type;
+  return update;
+}
+
+

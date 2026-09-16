@@ -22,10 +22,10 @@ import { useRouter } from "next/navigation";
 import { useLoading } from "@/hooks/use-loading";
 
 export default function AgendaPage() {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const router = useRouter();
   const { handleLinkClick } = useLoading();
-  const { users, addEvent, updateEvent, deleteEvent } = useData();
+  const { users, addEvent, updateEvent, deleteEvent, eventTypes } = useData();
   const [confirmedDate, setConfirmedDate] = useState<Date>(new Date());
   const [tempDate, setTempDate] = useState<Date>(new Date());
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
@@ -49,6 +49,8 @@ export default function AgendaPage() {
   };
 
   const getTypeLabel = (type: string) => {
+    const found = eventTypes.find(t => t.id === type || t.name.toLowerCase() === type.toLowerCase());
+    if (found) return found.name;
     switch (type) {
       case 'task': return 'Tarefa';
       case 'class': return 'Aula';
@@ -57,7 +59,7 @@ export default function AgendaPage() {
       case 'test': return 'Prova';
       case 'planning': return 'Planejamento';
       case 'birthday': return 'Aniversário';
-      default: return 'Evento';
+      default: return type || 'Evento';
     }
   };
 
@@ -226,7 +228,14 @@ export default function AgendaPage() {
                         <Eye className="h-4 w-4" />
                       </Button>
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => { setEditingEvent(evt as any); setIsFormOpen(true); }}><Edit className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => toast({ title: "Evento Removido" })}><Trash2 className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={async () => {
+                        try {
+                          await deleteEvent(evt.id);
+                          toast({ title: "Evento Removido" });
+                        } catch (err: any) {
+                          toast({ variant: "destructive", title: "Erro ao remover", description: err.message });
+                        }
+                      }}><Trash2 className="h-4 w-4" /></Button>
                     </div>
                   )}
                 </div>

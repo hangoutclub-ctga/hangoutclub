@@ -124,13 +124,34 @@ export type InventoryItem = {
     status: 'Ativo' | 'Apagado';
 }
 
+export type EventType = {
+  id: string;
+  name: string;
+  color?: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+export type SystemCategoryType = 'student_condition' | 'class_modality' | 'inventory_category';
+
+export type SystemCategory = {
+  id: string;
+  type: SystemCategoryType;
+  name: string;
+  color?: string;
+  description?: string;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
 export type ManualEvent = {
     id?: string;
     title: string;
-    date: import("firebase/firestore").Timestamp;
+    date: any;
     time: string;
     details: string;
-    type: 'task' | 'meeting' | 'trial' | 'test' | 'planning';
+    type: string;
     owners: string[]; 
     recurrent: boolean;
     recurrenceDays?: string[];

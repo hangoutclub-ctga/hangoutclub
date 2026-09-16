@@ -2,7 +2,7 @@
 "use client"
 
 import { Row, Table } from "@tanstack/react-table"
-import { Eye, Edit, Trash2, Printer } from "lucide-react"
+import { Eye, Edit, Trash2 } from "lucide-react"
 import React from "react"
 
 import { Button } from "@/components/ui/button"
@@ -15,7 +15,6 @@ import {
   DialogDescription,
   DialogClose,
 } from "@/components/ui/dialog"
-import { StudentProfile } from "@/components/student-profile"
 import { Student } from "@/types"
 import { useAuth } from "@/hooks/use-auth"
 
@@ -29,12 +28,9 @@ declare module '@tanstack/react-table' {
     interface TableMeta<TData extends Record<string, unknown>> {
       editStudent: (student: TData) => void;
       deleteStudent: (studentId: string) => void;
+      viewStudent: (student: TData) => void;
     }
 }
-
-const handlePrint = () => {
-    window.print();
-};
 
 export function DataTableRowActions<TData>({
   row,
@@ -46,29 +42,18 @@ export function DataTableRowActions<TData>({
 
   return (
     <div className="flex items-center justify-end gap-1">
-        <Dialog>
-            <DialogTrigger asChild>
-                <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8 text-accent hover:text-accent hover:bg-accent/10"
-                >
-                    <Eye className="h-4 w-4" />
-                    <span className="sr-only">Ver ficha</span>
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="sm:max-w-[80vw] p-0">
-                <DialogHeader className="p-6 flex flex-row justify-between items-center">
-                    <DialogTitle>Ficha do Aluno: {student.name}</DialogTitle>
-                    <div className="flex gap-2">
-                        <Button variant="outline" size="icon" onClick={handlePrint}>
-                            <Printer className="h-4 w-4" />
-                        </Button>
-                    </div>
-                </DialogHeader>
-                <StudentProfile student={student} />
-            </DialogContent>
-        </Dialog>
+        <Button 
+            variant="ghost" 
+            size="icon" 
+            className="h-8 w-8 text-accent hover:text-accent hover:bg-accent/10"
+            onClick={(e) => {
+                e.stopPropagation();
+                (table.options.meta as any)?.viewStudent?.(student);
+            }}
+        >
+            <Eye className="h-4 w-4" />
+            <span className="sr-only">Ver ficha</span>
+        </Button>
         
         {isAdmin && (
           <>

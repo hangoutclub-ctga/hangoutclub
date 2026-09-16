@@ -4,3 +4,7 @@ export * from './finance.service';
 export * from './inventory.service';
 export * from './events.service';
 export * from './users.service';
+export * from './event-types.service';
+export * from './categories.service';
+
+

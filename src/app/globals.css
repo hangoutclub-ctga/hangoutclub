@@ -94,51 +94,139 @@
 }
 
 @media print {
-  body {
-    background: #fff;
-    color: #000;
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm;
   }
 
-  /* Hide sidebar, header, and other non-essential elements */
-  aside, header, .no-print {
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html, body, .dark, [data-theme], [class*="dark"] {
+    background-color: #ffffff !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    height: auto !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* When printing the student sheet, hide all root elements that do not contain the sheet */
+  body:has(.student-print-sheet) > *:not(:has(.student-print-sheet)) {
+    display: none !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    overflow: hidden !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Force display of the student print sheet and its immediate wrapper */
+  div:has(> .student-print-sheet),
+  .student-print-sheet {
+    display: block !important;
+    width: 100% !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  /* Hide sidebar, headers, navigation and non-printable elements */
+  aside, header:not(.student-print-sheet header), nav, .no-print {
     display: none !important;
   }
 
-  /* Expand main content */
+  /* Radix UI Dialog Reset for Print */
+  div:has(> [role="dialog"]) {
+    position: static !important;
+    display: block !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Hide dark modal overlay backdrop */
+  div[class*="bg-black"],
+  div[data-state][class*="bg-black"],
+  .fixed.inset-0.bg-black\/80 {
+    display: none !important;
+  }
+
+  /* Reset dialog container so it paginates naturally across pages without gaps */
+  [role="dialog"] {
+    position: static !important;
+    display: block !important;
+    left: auto !important;
+    top: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 0 !important;
+    border: none !important;
+    box-shadow: none !important;
+    background: transparent !important;
+  }
+
+  /* Hide close button and action buttons inside dialogs during print */
+  [role="dialog"] > button[class*="absolute"],
+  [role="dialog"] button:has(svg.lucide-x),
+  button.no-print,
+  .dialog-close {
+    display: none !important;
+  }
+
+  /* Expand main content when printing regular pages */
   main {
     margin-left: 0 !important;
     padding: 0 !important;
     border: none !important;
+    width: 100% !important;
   }
-  
-  .printable-content {
-      padding: 0 !important;
-  }
-  
-  /* Make sure the content to print takes full width */
+
+  .printable-content,
   .printable-area {
-    width: 100%;
-    padding: 0;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Page break rules for clean document printing */
+  .print-avoid-break {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  thead {
+    display: table-header-group !important;
   }
 
   /* Style cards for printing */
   .card-print {
     box-shadow: none !important;
-    border: 1px solid #ddd !important;
-    background: #fff !important;
+    border: 1px solid #e2e8f0 !important;
+    background: #ffffff !important;
   }
   
   .card-print-no-border {
-      border: none !important;
-      box-shadow: none !important;
+    border: none !important;
+    box-shadow: none !important;
   }
 
-  h1, h2, h3, h4, h5, p, span, div {
-    color: #000 !important;
-  }
-  
-  /* Make grid layouts stack vertically for printing */
+  /* Make grid layouts stack vertically for printing if requested */
   .print-stack-grid {
-      grid-template-columns: 1fr !important;
+    grid-template-columns: 1fr !important;
   }
 }

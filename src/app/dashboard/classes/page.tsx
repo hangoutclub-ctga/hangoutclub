@@ -23,7 +23,7 @@ import { useLoading } from "@/hooks/use-loading";
 
 export default function ClassesPage() {
   const { user, hasPermission } = useAuth();
-  const { classes, students, users, addClass, updateClass, deleteClass, isLoading } = useData();
+  const { classes, students, users, addClass, updateClass, deleteClass, isLoading, categories } = useData();
   const router = useRouter();
   const { handleLinkClick } = useLoading();
   
@@ -172,7 +172,7 @@ export default function ClassesPage() {
                   allUsers={users}
                   onSave={handleSaveClass}
                   onCancel={() => setIsFormOpen(false)}
-                  classModalities={['Regular', 'VIP', 'Acompanhamento']}
+                  classModalities={categories.classModalities}
               />
             </DialogContent>
           </Dialog>
@@ -183,7 +183,7 @@ export default function ClassesPage() {
           columns={columns} 
           data={filteredClasses}
           users={users}
-          classModalities={['Regular', 'VIP', 'Acompanhamento']}
+          classModalities={categories.classModalities}
           onEdit={handleOpenForm}
           onView={(c) => setViewingClass(c)}
           onDelete={handleDeleteClass}

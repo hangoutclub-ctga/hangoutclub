@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
-import { ShieldCheck, User as UserIcon, Briefcase, PlusCircle, Edit, Trash2, Save, CalendarIcon, Menu, ChevronLeft, Home, Loader2 } from "lucide-react";
+import { ShieldCheck, User as UserIcon, Briefcase, PlusCircle, Edit, Trash2, Save, CalendarIcon, Menu, ChevronLeft, Home, Loader2, Tags } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { User } from "@/types";
 import { Switch } from "@/components/ui/switch";
@@ -22,6 +22,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog"
 import { EmployeeForm } from "./employee-form";
+import { CategoryManager } from "./category-manager";
 import { useData } from "@/hooks/use-data";
 import { updateUser, createUser } from "@/services/users.service";
 import { ImagePicker } from "@/components/image-picker";
@@ -408,8 +409,9 @@ export default function SettingsPage() {
                           <Menu className="h-6 w-6 text-accent" />
                       </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuContent align="end" className="w-56">
                       <DropdownMenuItem onClick={() => setActiveTab("profile")}>Dados do Usuário</DropdownMenuItem>
+                      {canEditPermissions && <DropdownMenuItem onClick={() => setActiveTab("categories")}>Cadastro de Categorias</DropdownMenuItem>}
                       {canEditPermissions && <DropdownMenuItem onClick={() => setActiveTab("permissions")}>Permissões</DropdownMenuItem>}
                       {canEditPermissions && <DropdownMenuItem onClick={() => setActiveTab("employees")}>Funcionários</DropdownMenuItem>}
                   </DropdownMenuContent>
@@ -419,8 +421,9 @@ export default function SettingsPage() {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
         {!isMobile && (
-            <TabsList className={cn("grid w-full mb-8 h-auto p-1 bg-muted/50 rounded-xl", canEditPermissions ? "grid-cols-3" : "grid-cols-1")}>
+            <TabsList className={cn("grid w-full mb-8 h-auto p-1 bg-muted/50 rounded-xl", canEditPermissions ? "grid-cols-4" : "grid-cols-1")}>
                 <TabsTrigger value="profile" className="py-2.5 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm"><UserIcon className="mr-2 h-4 w-4" /> Dados do Usuário</TabsTrigger>
+                {canEditPermissions && <TabsTrigger value="categories" className="py-2.5 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm"><Tags className="mr-2 h-4 w-4" /> Cadastro de Categorias</TabsTrigger>}
                 {canEditPermissions && <TabsTrigger value="permissions" className="py-2.5 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm"><ShieldCheck className="mr-2 h-4 w-4" /> Permissões</TabsTrigger>}
                 {canEditPermissions && <TabsTrigger value="employees" className="py-2.5 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm"><Briefcase className="mr-2 h-4 w-4" /> Funcionários</TabsTrigger>}
             </TabsList>
@@ -642,6 +645,7 @@ export default function SettingsPage() {
 
         {canEditPermissions && (
             <>
+                <TabsContent value="categories" className="mt-0 outline-none animate-in fade-in duration-500"><CategoryManager /></TabsContent>
                 <TabsContent value="permissions" className="mt-0 outline-none animate-in fade-in duration-500"><PermissionsManager /></TabsContent>
                 <TabsContent value="employees" className="mt-0 outline-none animate-in fade-in duration-500"><SystemManagementPanel /></TabsContent>
             </>

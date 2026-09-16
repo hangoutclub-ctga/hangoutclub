@@ -1,9 +1,30 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Student, Class, InventoryItem, Transaction, FixedExpense, ManualEvent, CommunicationTemplate, StockMovement } from '@/types';
+import { User, Student, Class, InventoryItem, Transaction, FixedExpense, ManualEvent, CommunicationTemplate, StockMovement, EventType, SystemCategory } from '@/types';
 import { DataContext } from '@/hooks/use-data';
 import * as services from '@/services';
+
+const defaultEventTypes: EventType[] = [
+  { id: 'class', name: 'Aula', color: '#3b82f6', description: 'Aulas regulares ou individuais' },
+  { id: 'task', name: 'Tarefa', color: '#10b981', description: 'Tarefas internas e rotinas administrativas' },
+  { id: 'meeting', name: 'Reunião', color: '#8b5cf6', description: 'Reuniões com pais, equipe ou fornecedores' },
+  { id: 'trial', name: 'Aula Experimental', color: '#f59e0b', description: 'Aulas demonstrativas ou de nivelamento com novos alunos' },
+  { id: 'test', name: 'Prova', color: '#ef4444', description: 'Avaliações e testes de proficiência' },
+  { id: 'planning', name: 'Planejamento de Aula', color: '#6366f1', description: 'Horário reservado para preparo de aulas e materiais' },
+];
+
+const defaultSystemCategories: SystemCategory[] = [
+  { id: 'cond_integral', type: 'student_condition', name: 'Integral', color: '#3b82f6', description: 'Aluno com plano de período integral' },
+  { id: 'cond_bolsa', type: 'student_condition', name: 'Bolsa', color: '#10b981', description: 'Aluno bolsista com desconto institucional' },
+  { id: 'cond_desconto', type: 'student_condition', name: 'Desconto', color: '#f59e0b', description: 'Aluno com percentual de desconto comercial' },
+  { id: 'mod_regular', type: 'class_modality', name: 'Regular', color: '#3b82f6', description: 'Turma padrão com múltiplos alunos' },
+  { id: 'mod_vip', type: 'class_modality', name: 'VIP', color: '#8b5cf6', description: 'Turma individual ou atendimento exclusivo' },
+  { id: 'mod_acompanhamento', type: 'class_modality', name: 'Acompanhamento', color: '#10b981', description: 'Aulas de suporte pedagógico e reforço' },
+  { id: 'inv_didatico', type: 'inventory_category', name: 'Material Didático', color: '#3b82f6', description: 'Apostilas, livros, cadernos e materiais pedagógicos' },
+  { id: 'inv_escritorio', type: 'inventory_category', name: 'Material de Escritório', color: '#6366f1', description: 'Papelaria, impressos e suprimentos administrativos' },
+  { id: 'inv_limpeza', type: 'inventory_category', name: 'Limpeza', color: '#14b8a6', description: 'Produtos e materiais de limpeza e higiene' },
+];
 
 export const DataProvider = ({ children }: { children: React.ReactNode }) => {
   const [users, setUsers] = useState<User[]>([]);
@@ -13,13 +34,17 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [fixedExpenses, setFixedExpenses] = useState<FixedExpense[]>([]);
   const [manualEvents, setManualEvents] = useState<ManualEvent[]>([]);
+  const [eventTypes, setEventTypes] = useState<EventType[]>(defaultEventTypes);
+  const [systemCategories, setSystemCategories] = useState<SystemCategory[]>(defaultSystemCategories);
   const [isLoading, setIsLoading] = useState(true);
 
   const categories = {
-    studentConditions: ['Integral', 'Bolsa', 'Desconto'],
-    classModalities: ['Regular', 'VIP', 'Acompanhamento'],
-    inventoryCategories: ["Material Didático", "Escritório", "Limpeza"],
+    studentConditions: systemCategories.filter(c => c.type === 'student_condition').map(c => c.name),
+    classModalities: systemCategories.filter(c => c.type === 'class_modality').map(c => c.name),
+    inventoryCategories: systemCategories.filter(c => c.type === 'inventory_category').map(c => c.name),
     userRoles: ["Admin", "Professor", "Secretaria"],
+    eventTypes,
+    systemCategories,
     communicationTemplates: [
       { 
         id: 'payment_reminder', 
@@ -51,7 +76,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
   const fetchData = useCallback(async () => {
     setIsLoading(true);
     try {
-      const [u, s, c, inv, trx, fx, ev] = await Promise.all([
+      const [u, s, c, inv, trx, fx, ev, et, sc] = await Promise.all([
         services.fetchUsers().catch(() => []),
         services.fetchStudents().catch(() => []),
         services.fetchClasses().catch(() => []),
@@ -59,6 +84,8 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
         services.fetchTransactions().catch(() => []),
         services.fetchFixedExpenses().catch(() => []),
         services.fetchEvents().catch(() => []),
+        services.fetchEventTypes().catch(() => defaultEventTypes),
+        services.fetchSystemCategories().catch(() => defaultSystemCategories),
       ]);
 
       setUsers(u);
@@ -68,6 +95,16 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
       setTransactions(trx);
       setFixedExpenses(fx);
       setManualEvents(ev);
+      if (et && et.length > 0) {
+        setEventTypes(et);
+      } else {
+        setEventTypes(defaultEventTypes);
+      }
+      if (sc && sc.length > 0) {
+        setSystemCategories(sc);
+      } else {
+        setSystemCategories(defaultSystemCategories);
+      }
     } catch (err) {
       console.error("Failed to load data from Supabase:", err);
     } finally {
@@ -211,6 +248,46 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     setManualEvents(prev => prev.filter(item => item.id !== id));
   };
 
+  // ========================
+  // EVENT TYPES MUTATIONS
+  // ========================
+  const addEventType = async (item: Partial<EventType>): Promise<EventType> => {
+    const created = await services.createEventType(item);
+    setEventTypes(prev => [...prev, created]);
+    return created;
+  };
+
+  const updateEventType = async (id: string, item: Partial<EventType>): Promise<EventType> => {
+    const updated = await services.updateEventType(id, item);
+    setEventTypes(prev => prev.map(t => t.id === id ? updated : t));
+    return updated;
+  };
+
+  const deleteEventType = async (id: string): Promise<void> => {
+    await services.deleteEventType(id);
+    setEventTypes(prev => prev.filter(t => t.id !== id));
+  };
+
+  // ========================
+  // SYSTEM CATEGORIES MUTATIONS
+  // ========================
+  const addSystemCategory = async (item: Partial<SystemCategory>): Promise<SystemCategory> => {
+    const created = await services.createSystemCategory(item);
+    setSystemCategories(prev => [...prev, created]);
+    return created;
+  };
+
+  const updateSystemCategory = async (id: string, item: Partial<SystemCategory>): Promise<SystemCategory> => {
+    const updated = await services.updateSystemCategory(id, item);
+    setSystemCategories(prev => prev.map(c => c.id === id ? updated : c));
+    return updated;
+  };
+
+  const deleteSystemCategory = async (id: string): Promise<void> => {
+    await services.deleteSystemCategory(id);
+    setSystemCategories(prev => prev.filter(c => c.id !== id));
+  };
+
   const deleteUser = async (id: string): Promise<void> => {
     setUsers(prev => prev.filter(item => item.id !== id));
     await services.deleteUser(id);
@@ -226,6 +303,8 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
         transactions,
         fixedExpenses,
         manualEvents,
+        eventTypes,
+        systemCategories,
         categories,
         isLoading,
         refetchData: fetchData,
@@ -247,6 +326,12 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
         addEvent,
         updateEvent,
         deleteEvent,
+        addEventType,
+        updateEventType,
+        deleteEventType,
+        addSystemCategory,
+        updateSystemCategory,
+        deleteSystemCategory,
         deleteUser,
       }}
     >

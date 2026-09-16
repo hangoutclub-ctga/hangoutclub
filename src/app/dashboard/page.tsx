@@ -40,7 +40,8 @@ export default function DashboardPage() {
     inventoryItems, 
     addTransaction, 
     addEvent, 
-    updateEvent 
+    updateEvent,
+    eventTypes 
   } = useData();
 
   const [confirmedDate, setConfirmedDate] = useState<Date>(new Date());
@@ -159,6 +160,8 @@ export default function DashboardPage() {
   };
 
   const getTypeLabel = (type: string) => {
+    const found = eventTypes.find(t => t.id === type || t.name.toLowerCase() === type.toLowerCase());
+    if (found) return found.name;
     switch (type) {
       case 'task': return 'Tarefa';
       case 'class': return 'Aula';
@@ -167,7 +170,7 @@ export default function DashboardPage() {
       case 'test': return 'Prova';
       case 'planning': return 'Planejamento';
       case 'birthday': return 'Aniversário';
-      default: return 'Evento';
+      default: return type || 'Evento';
     }
   };
 

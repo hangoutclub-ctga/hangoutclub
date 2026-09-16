@@ -2,7 +2,7 @@
 "use client";
 
 import Link from "next/link";
-import { User, Shield, GraduationCap, BookOpen, Wallet, FileText, CheckCircle, XCircle, Clock, Printer, Megaphone, CalendarDays, ExternalLink, ImageIcon, FileWarning, Eye, Plus, FileUp, X, Loader2 } from "lucide-react";
+import { User, Shield, GraduationCap, BookOpen, Wallet, FileText, CheckCircle, XCircle, Clock, Printer, Megaphone, CalendarDays, ExternalLink, ImageIcon, FileWarning, Eye, Plus, FileUp, X, Loader2, HeartPulse } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -20,6 +20,7 @@ import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, Dialog
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { toast } from "@/hooks/use-toast";
+import { StudentPrintSheet } from "./student-print-sheet";
 
 const getAttendanceIcon = (status: string) => {
     switch (status) {
@@ -122,14 +123,16 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
   };
 
   return (
-    <div className="flex flex-col gap-6 p-6 pt-0 max-h-[85vh] overflow-y-auto">
-      <div className="grid md:grid-cols-3 gap-6">
-        <div className="md:col-span-1 flex flex-col gap-6">
+    <>
+      {/* Visualização de Tela (Modal Interativo) */}
+      <div className="flex flex-col gap-6 p-6 pt-0 max-h-[85vh] overflow-y-auto print:hidden">
+        <div className="grid md:grid-cols-3 gap-6">
+          <div className="md:col-span-1 flex flex-col gap-6">
             <Card className="shadow-sm">
-                <CardHeader className="flex flex-row items-center gap-2 pb-2">
-                    <User className="h-4 w-4 text-accent"/>
-                    <CardTitle className="text-lg">Dados Pessoais</CardTitle>
-                </CardHeader>
+              <CardHeader className="flex flex-row items-center gap-2 pb-2">
+                <User className="h-4 w-4 text-accent"/>
+                <CardTitle className="text-lg">Dados Pessoais</CardTitle>
+              </CardHeader>
                 <CardContent className="space-y-3 text-xs">
                     <div className="flex items-center gap-3 bg-muted/20 p-2 rounded-lg">
                          <Avatar className="h-12 w-12 border">
@@ -182,6 +185,18 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
                     )}
                 </CardContent>
             </Card>
+
+            {student.medicalInfo && (
+              <Card className="shadow-sm border-amber-300 bg-amber-50/40">
+                <CardHeader className="flex flex-row items-center gap-2 pb-2">
+                  <HeartPulse className="h-4 w-4 text-amber-700"/>
+                  <CardTitle className="text-base text-amber-950">Informações Médicas</CardTitle>
+                </CardHeader>
+                <CardContent className="text-xs text-amber-900 whitespace-pre-line">
+                  {student.medicalInfo}
+                </CardContent>
+              </Card>
+            )}
 
             <Card className="shadow-sm border-accent/10">
                 <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 bg-muted/5">
@@ -394,5 +409,11 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
         </div>
       </div>
     </div>
+
+      {/* Modelo Oficial Formatado para Impressão A4 (Aparece apenas na impressão) */}
+      <div className="hidden print:block w-full">
+        <StudentPrintSheet student={student} canViewFinance={canViewFinance} />
+      </div>
+    </>
   );
 }

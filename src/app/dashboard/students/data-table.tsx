@@ -119,7 +119,8 @@ export function DataTable<TData, TValue>({
     manualPagination: true,
     meta: {
         editStudent: (student: TData) => onEdit(student),
-        deleteStudent: (studentId: string) => onDelete(studentId)
+        deleteStudent: (studentId: string) => onDelete(studentId),
+        viewStudent: (student: TData) => onView(student)
     }
   })
   
@@ -136,11 +137,15 @@ export function DataTable<TData, TValue>({
     }, 600);
   };
 
-  const handlePointerUp = (row: any, original: TData) => {
+  const handlePointerUp = (row: any, original: TData, e?: React.PointerEvent) => {
     const id = row.id;
     if (longPressTimers.current[id]) {
         clearTimeout(longPressTimers.current[id]);
         delete longPressTimers.current[id];
+        const target = e?.target as HTMLElement | null;
+        if (target?.closest('button') || target?.closest('[role="button"]') || target?.closest('[role="checkbox"]') || target?.closest('[data-no-row-click]')) {
+            return;
+        }
         // Foi um clique simples -> Visualizar Ficha
         onView(original);
     }
@@ -196,7 +201,7 @@ export function DataTable<TData, TValue>({
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
                   onPointerDown={() => handlePointerDown(row)}
-                  onPointerUp={() => handlePointerUp(row, row.original)}
+                  onPointerUp={(e) => handlePointerUp(row, row.original, e)}
                   onPointerLeave={() => handlePointerLeave(row)}
                   className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
                 >

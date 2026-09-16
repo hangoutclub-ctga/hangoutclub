@@ -59,7 +59,8 @@ export default function InventoryPage() {
         addInventoryItem, 
         updateInventoryItem, 
         addStockMovement, 
-        deleteInventoryItem 
+        deleteInventoryItem,
+        categories 
     } = useData();
 
     const [search, setSearch] = React.useState("");
@@ -167,7 +168,7 @@ export default function InventoryPage() {
                     </DialogTrigger>
                     <DialogContent className="sm:max-w-[500px]">
                         <DialogHeader><DialogTitle>{editingItem ? 'Editar Item' : 'Novo Item'}</DialogTitle></DialogHeader>
-                        <InventoryItemForm item={editingItem} categories={['Material Didático', 'Material de Escritório', 'Limpeza']} onSave={handleSaveItem} onCancel={() => setIsFormOpen(false)} />
+                        <InventoryItemForm item={editingItem} categories={categories.inventoryCategories} onSave={handleSaveItem} onCancel={() => setIsFormOpen(false)} />
                     </DialogContent>
                 </Dialog>
             </div>

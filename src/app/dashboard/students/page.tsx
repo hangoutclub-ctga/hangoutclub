@@ -29,7 +29,8 @@ export default function StudentsPage() {
         addStudent, 
         updateStudent, 
         deleteStudent, 
-        isLoading 
+        isLoading,
+        categories 
     } = useData();
     const router = useRouter();
     const { handleLinkClick } = useLoading();
@@ -150,7 +151,7 @@ export default function StudentsPage() {
                           onSave={handleSaveStudent} 
                           onCancel={() => setIsFormOpen(false)}
                           availableClasses={classes}
-                          studentConditions={['Integral', 'Bolsa', 'Desconto']}
+                          studentConditions={categories.studentConditions}
                       />
                     </DialogContent>
                   </Dialog>
@@ -161,7 +162,7 @@ export default function StudentsPage() {
                 columns={columns} 
                 data={filteredStudents}
                 classes={classes}
-                studentConditions={['Integral', 'Bolsa', 'Desconto']}
+                studentConditions={categories.studentConditions}
                 onEdit={handleOpenForm}
                 onView={(student) => setViewingStudent(student)}
                 onDelete={handleDeleteStudent}
@@ -185,10 +186,11 @@ export default function StudentsPage() {
 
             <Dialog open={!!viewingStudent} onOpenChange={(open) => !open && setViewingStudent(null)}>
                 <DialogContent className="sm:max-w-[80vw] p-0">
-                    <DialogHeader className="p-6 flex flex-row justify-between items-center">
+                    <DialogHeader className="p-6 flex flex-row justify-between items-center no-print">
                         <DialogTitle>Ficha do Aluno: {viewingStudent?.name}</DialogTitle>
-                        <Button variant="outline" size="icon" onClick={() => window.print()}>
+                        <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-2 text-xs">
                             <Printer className="h-4 w-4" />
+                            <span className="hidden sm:inline">Imprimir Ficha</span>
                         </Button>
                     </DialogHeader>
                     {viewingStudent && <StudentProfile student={viewingStudent} />}

@@ -31,7 +31,8 @@ import { CalendarIcon, User, AlertCircle, Loader2, Repeat } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { Role, User as UserType, DisplayEvent } from "@/types";
+import { Role, User as UserType, DisplayEvent, EventType } from "@/types";
+import { useData } from "@/hooks/use-data";
 import { Switch } from "./ui/switch";
 import { DialogClose } from "./ui/dialog";
 import { Checkbox } from "./ui/checkbox";
@@ -48,7 +49,7 @@ const recurrenceWeekDays = [
 ];
 
 const createFormSchema = (isAllUsersView?: boolean) => z.object({
-  type: z.enum(["task", "class", "meeting", "trial", "test", "planning"]),
+  type: z.string().min(1, "Selecione o tipo de evento."),
   title: z.string().min(3, "O título do evento é muito curto."),
   date: z.date({ required_error: "A data do evento é obrigatória." }),
   time: z.string().min(1, "Horário é obrigatório."),
@@ -68,9 +69,12 @@ interface EventFormProps {
     onCancel: () => void;
     isAllUsersView?: boolean;
     existingEvents: DisplayEvent[];
+    eventTypes?: EventType[];
 }
 
-export function EventForm({ onSave, eventData, onCancel, isAllUsersView = false, allUsers, existingEvents }: EventFormProps) {
+export function EventForm({ onSave, eventData, onCancel, isAllUsersView = false, allUsers, existingEvents, eventTypes: propEventTypes }: EventFormProps) {
+  const { eventTypes: contextEventTypes } = useData();
+  const availableEventTypes = (propEventTypes && propEventTypes.length > 0) ? propEventTypes : contextEventTypes;
   const formSchema = createFormSchema(isAllUsersView);
   const [isSaving, setIsSaving] = React.useState(false);
   
@@ -87,7 +91,7 @@ export function EventForm({ onSave, eventData, onCancel, isAllUsersView = false,
   const form = useForm<EventFormValues>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      type: eventData?.type || "task",
+      type: eventData?.type || (availableEventTypes[0]?.id || "task"),
       title: eventData?.title || "",
       date: initialDate,
       time: eventData?.time || "",
@@ -285,19 +289,24 @@ export function EventForm({ onSave, eventData, onCancel, isAllUsersView = false,
             render={({ field }) => (
                 <FormItem>
                 <FormLabel>Tipo de Evento</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
                     <FormControl>
                     <SelectTrigger>
                         <SelectValue placeholder="Selecione o tipo" />
                     </SelectTrigger>
                     </FormControl>
-                    <SelectContent className="rounded-xl">
-                    <SelectItem value="class">Aula</SelectItem>
-                    <SelectItem value="task">Tarefa</SelectItem>
-                    <SelectItem value="meeting">Reunião</SelectItem>
-                    <SelectItem value="trial">Aula Experimental</SelectItem>
-                    <SelectItem value="test">Prova</SelectItem>
-                    <SelectItem value="planning">Planejamento de Aula</SelectItem>
+                    <SelectContent className="rounded-xl max-h-60">
+                    {availableEventTypes.map((t) => (
+                      <SelectItem key={t.id} value={t.id}>
+                        <div className="flex items-center gap-2">
+                          <span
+                            className="w-2.5 h-2.5 rounded-full inline-block shrink-0 shadow-2xs"
+                            style={{ backgroundColor: t.color || "#3b82f6" }}
+                          />
+                          <span>{t.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
                     </SelectContent>
                 </Select>
                 <FormMessage />

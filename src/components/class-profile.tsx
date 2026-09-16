@@ -201,9 +201,12 @@ export function ClassProfile({ classId, defaultTab = "students", onAttendanceSav
                                                <Dialog>
                                                     <DialogTrigger asChild><Button variant="outline" size="sm">Ver Ficha</Button></DialogTrigger>
                                                     <DialogContent className="sm:max-w-[80vw] p-0">
-                                                        <DialogHeader className="p-6 flex flex-row justify-between items-center">
+                                                        <DialogHeader className="p-6 flex flex-row justify-between items-center no-print">
                                                             <DialogTitle>Ficha do Aluno: {student.name}</DialogTitle>
-                                                            <Button variant="outline" size="icon" onClick={() => window.print()}><Printer className="h-4 w-4" /></Button>
+                                                            <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-2 text-xs">
+                                                                <Printer className="h-4 w-4" />
+                                                                <span className="hidden sm:inline">Imprimir Ficha</span>
+                                                            </Button>
                                                         </DialogHeader>
                                                         <StudentProfile student={student} />
                                                     </DialogContent>

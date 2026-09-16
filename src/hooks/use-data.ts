@@ -1,7 +1,7 @@
 "use client";
 
 import { createContext, useContext } from 'react';
-import { User, Student, Class, InventoryItem, Transaction, FixedExpense, ManualEvent, CommunicationTemplate, StockMovement } from '@/types';
+import { User, Student, Class, InventoryItem, Transaction, FixedExpense, ManualEvent, CommunicationTemplate, StockMovement, EventType, SystemCategory } from '@/types';
 
 export interface DataContextType {
     users: User[];
@@ -11,12 +11,16 @@ export interface DataContextType {
     transactions: Transaction[];
     fixedExpenses: FixedExpense[];
     manualEvents: ManualEvent[];
+    eventTypes: EventType[];
+    systemCategories: SystemCategory[];
     categories: {
         studentConditions: string[];
         classModalities: string[];
         inventoryCategories: string[];
         userRoles: string[];
         communicationTemplates: CommunicationTemplate[];
+        eventTypes: EventType[];
+        systemCategories: SystemCategory[];
     };
     isLoading: boolean;
     refetchData: () => Promise<void>;
@@ -45,6 +49,14 @@ export interface DataContextType {
     addEvent: (e: Partial<ManualEvent>) => Promise<ManualEvent>;
     updateEvent: (id: string, e: Partial<ManualEvent>) => Promise<ManualEvent>;
     deleteEvent: (id: string) => Promise<void>;
+
+    addEventType: (item: Partial<EventType>) => Promise<EventType>;
+    updateEventType: (id: string, item: Partial<EventType>) => Promise<EventType>;
+    deleteEventType: (id: string) => Promise<void>;
+
+    addSystemCategory: (item: Partial<SystemCategory>) => Promise<SystemCategory>;
+    updateSystemCategory: (id: string, item: Partial<SystemCategory>) => Promise<SystemCategory>;
+    deleteSystemCategory: (id: string) => Promise<void>;
 
     deleteUser: (id: string) => Promise<void>;
 }
