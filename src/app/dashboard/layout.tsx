@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, createContext, useContext } from "react";
+import ReactDOM from "react-dom";
 import { useRouter, usePathname } from "next/navigation";
 import { Home, Users, BookOpen, Wallet, LogOut, Settings, Calendar, Award, Loader2, Trash2, Send, Package, AlertTriangle, Printer, X, Search, CheckCircle2 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -27,6 +28,8 @@ import { GlobalSearch } from "@/components/global-search";
 import { StockAlertProvider, useStockAlert } from "@/hooks/use-stock-alert";
 import { LoadingContext, useLoading } from "@/hooks/use-loading";
 
+import { ShoppingPrintSheet } from "@/components/shopping-print-sheet";
+
 const LoadingOverlay = () => (
   <div className="fixed inset-0 z-[100] flex items-center justify-center bg-background/60 backdrop-blur-sm">
     <div className="flex flex-col items-center gap-4">
@@ -45,69 +48,88 @@ const LowStockAlert = ({
   onOpenChange: (open: boolean) => void;
   lowStockItems: any[];
 }) => {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const handlePrint = () => {
     window.print();
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md printable-area rounded-2xl w-[94vw]">
-        <DialogHeader className="no-print">
-          <DialogTitle className="flex items-center gap-2 text-red-600">
-            <AlertTriangle className="h-5 w-5" /> Alerta de Compras
-          </DialogTitle>
-        </DialogHeader>
-        <div className="space-y-4 py-4">
-          {lowStockItems.length > 0 ? (
-            <>
-              <p className="text-sm font-medium text-muted-foreground no-print">
-                Os seguintes itens do inventário atingiram o nível mínimo e precisam ser repostos:
-              </p>
-              
-              <div className="border rounded-xl overflow-hidden">
-                <div className="bg-muted/50 p-2 border-b grid grid-cols-3 text-[10px] font-bold uppercase tracking-wider">
-                  <span>Item</span>
-                  <span className="text-center">Mínimo</span>
-                  <span className="text-right">Atual</span>
-                </div>
-                <div className="divide-y max-h-[40vh] overflow-y-auto">
-                  {lowStockItems.map(item => (
-                    <div key={item.id} className="p-3 grid grid-cols-3 items-center text-sm">
-                      <span className="font-bold text-primary truncate pr-2">{item.name}</span>
-                      <span className="text-center font-mono text-muted-foreground">{item.minStock}</span>
-                      <span className="text-right font-mono font-bold text-red-600">{item.stock}</span>
-                    </div>
-                  ))}
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-md md:max-w-lg rounded-2xl w-[94vw] p-6 text-slate-900">
+          {/* VISUALIZAÇÃO INTERATIVA EM TELA (OCULTA NA IMPRESSÃO) */}
+          <div className="no-print space-y-4">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2 text-red-600">
+                <AlertTriangle className="h-5 w-5" /> Alerta de Compras
+              </DialogTitle>
+            </DialogHeader>
+
+            {lowStockItems.length > 0 ? (
+              <div className="space-y-3">
+                <p className="text-sm font-medium text-muted-foreground">
+                  Os seguintes itens do inventário atingiram o nível mínimo e precisam ser repostos:
+                </p>
+
+                <div className="border border-slate-200 rounded-xl overflow-hidden max-h-[50vh] overflow-y-auto">
+                  <table className="w-full text-left text-sm">
+                    <thead className="bg-muted/50 border-b border-slate-200 text-[10px] font-bold uppercase tracking-wider text-slate-700 sticky top-0 bg-background/95 backdrop-blur">
+                      <tr>
+                        <th className="p-2.5">Item</th>
+                        <th className="p-2.5 text-center w-20">Mínimo</th>
+                        <th className="p-2.5 text-right w-20">Atual</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200">
+                      {lowStockItems.map((item) => (
+                        <tr key={item.id}>
+                          <td className="p-2.5 font-bold text-primary">{item.name}</td>
+                          <td className="p-2.5 text-center font-mono text-muted-foreground">{item.minStock}</td>
+                          <td className="p-2.5 text-right font-mono font-bold text-red-600">{item.stock}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
-            </>
-          ) : (
-            <div className="py-6 text-center space-y-2">
-              <CheckCircle2 className="h-10 w-10 text-green-500 mx-auto" />
-              <p className="font-bold text-base text-primary">Estoque Regular</p>
-              <p className="text-xs text-muted-foreground">
-                Nenhum item do inventário atingiu o nível mínimo no momento.
-              </p>
-            </div>
-          )}
-          
-          <div className="hidden print:block pt-8 text-center border-t mt-12">
-            <p className="text-xs text-muted-foreground italic">Lista gerada em: {new Date().toLocaleDateString('pt-BR')}</p>
-            <p className="text-sm font-bold text-primary mt-2">Hangout Club - Gestão de Materiais</p>
+            ) : (
+              <div className="py-6 text-center space-y-2">
+                <CheckCircle2 className="h-10 w-10 text-green-500 mx-auto" />
+                <p className="font-bold text-base text-primary">Estoque Regular</p>
+                <p className="text-xs text-muted-foreground">
+                  Nenhum item do inventário atingiu o nível mínimo no momento.
+                </p>
+              </div>
+            )}
+
+            <DialogFooter className="gap-2 flex-row sm:justify-end pt-2">
+              {lowStockItems.length > 0 && (
+                <Button variant="outline" size="sm" onClick={handlePrint} className="flex-1 sm:flex-none h-10">
+                  <Printer className="mr-2 h-4 w-4" /> Imprimir Lista
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} className="flex-1 sm:flex-none h-10">
+                Fechar
+              </Button>
+            </DialogFooter>
           </div>
-        </div>
-        <DialogFooter className="no-print gap-2 flex-row sm:justify-end">
-          {lowStockItems.length > 0 && (
-            <Button variant="outline" size="sm" onClick={handlePrint} className="flex-1 sm:flex-none h-10">
-              <Printer className="mr-2 h-4 w-4" /> Imprimir Lista
-            </Button>
-          )}
-          <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)} className="flex-1 sm:flex-none h-10">
-            Fechar
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      {/* FOLHA DE IMPRESSÃO: Renderizada via createPortal diretamente no body,
+          fora de qualquer ancestral no-print ou overflow:hidden */}
+      {mounted && open && lowStockItems.length > 0 && ReactDOM.createPortal(
+        <div className="shopping-print-sheet print-only">
+          <ShoppingPrintSheet items={lowStockItems} />
+        </div>,
+        document.body
+      )}
+    </>
   );
 };
 

@@ -93,6 +93,11 @@
   }
 }
 
+/* Screen mode: hide print-only elements */
+.print-only {
+  display: none !important;
+}
+
 @media print {
   @page {
     size: A4 portrait;
@@ -102,6 +107,14 @@
   *, *::before, *::after {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+    animation: none !important;
+    transition: none !important;
+    -webkit-animation: none !important;
+    -webkit-transition: none !important;
+    --tw-enter-opacity: 1 !important;
+    --tw-enter-scale: 1 !important;
+    --tw-enter-translate-x: 0 !important;
+    --tw-enter-translate-y: 0 !important;
   }
 
   html, body, .dark, [data-theme], [class*="dark"] {
@@ -115,8 +128,13 @@
     overflow: visible !important;
   }
 
-  /* When printing the student sheet, hide all root elements that do not contain the sheet */
-  body:has(.student-print-sheet) > *:not(:has(.student-print-sheet)) {
+  /* When printing, isolate the printable content tree and hide everything else.
+     The shopping-print-sheet is rendered via createPortal as a direct body child,
+     so it needs to survive ALL isolation rules. */
+  body:has([role="dialog"]) > *:not(:has([role="dialog"])):not(.shopping-print-sheet):not(:has(.shopping-print-sheet)),
+  body:has(.student-print-sheet) > *:not(:has(.student-print-sheet)),
+  body:has(.shopping-print-sheet) > *:not(.shopping-print-sheet):not(:has(.shopping-print-sheet)),
+  body:has(.printable-area) > *:not(:has(.printable-area)) {
     display: none !important;
     height: 0 !important;
     max-height: 0 !important;
@@ -125,21 +143,38 @@
     padding: 0 !important;
   }
 
-  /* Force display of the student print sheet and its immediate wrapper */
+  /* Force display of print-only sheets and containers */
+  .print-only,
   div:has(> .student-print-sheet),
-  .student-print-sheet {
+  .student-print-sheet,
+  div:has(> .shopping-print-sheet),
+  .shopping-print-sheet {
     display: block !important;
     width: 100% !important;
     background: #ffffff !important;
     color: #0f172a !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
 
-  /* Hide sidebar, headers, navigation and non-printable elements */
-  aside, header:not(.student-print-sheet header), nav, .no-print {
+  /* Hide sidebar, headers, navigation, notifications and non-printable elements */
+  aside,
+  header:not(.student-print-sheet header):not(.shopping-print-sheet header),
+  nav,
+  .no-print,
+  .no-print *,
+  .screen-only,
+  [data-radix-portal]:has([role="status"]),
+  [data-radix-portal]:has([role="region"]),
+  [role="status"],
+  [role="region"],
+  ol[tabindex="-1"],
+  .toaster {
     display: none !important;
   }
 
   /* Radix UI Dialog Reset for Print */
+  [data-radix-portal],
   div:has(> [role="dialog"]) {
     position: static !important;
     display: block !important;
@@ -162,6 +197,7 @@
     left: auto !important;
     top: auto !important;
     transform: none !important;
+    -webkit-transform: none !important;
     width: 100% !important;
     max-width: 100% !important;
     height: auto !important;
@@ -173,6 +209,8 @@
     border: none !important;
     box-shadow: none !important;
     background: transparent !important;
+    opacity: 1 !important;
+    visibility: visible !important;
   }
 
   /* Hide close button and action buttons inside dialogs during print */
