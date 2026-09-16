@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/client';
-import { toTransaction, toTransactionInsert, toFixedExpense, toFixedExpenseInsert, toFixedExpenseUpdate } from '@/lib/supabase/mappers';
+import { toTransaction, toTransactionInsert, toTransactionUpdate, toFixedExpense, toFixedExpenseInsert, toFixedExpenseUpdate } from '@/lib/supabase/mappers';
 import { Transaction, FixedExpense } from '@/types';
 
 export async function fetchTransactions(): Promise<Transaction[]> {
@@ -29,6 +29,25 @@ export async function createTransaction(t: Partial<Transaction>): Promise<Transa
 
   if (error) {
     console.error('Error creating transaction:', error);
+    throw error;
+  }
+
+  return toTransaction(data);
+}
+
+export async function updateTransaction(id: string, t: Partial<Transaction>): Promise<Transaction> {
+  const supabase = createClient();
+  const row = toTransactionUpdate(t);
+
+  const { data, error } = await supabase
+    .from('transactions')
+    .update(row)
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) {
+    console.error(`Error updating transaction ${id}:`, error);
     throw error;
   }
 

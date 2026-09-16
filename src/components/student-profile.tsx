@@ -2,6 +2,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { User, Shield, GraduationCap, BookOpen, Wallet, FileText, CheckCircle, XCircle, Clock, Printer, Megaphone, CalendarDays, ExternalLink, ImageIcon, FileWarning, Eye, Plus, FileUp, X, Loader2, HeartPulse } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -14,13 +15,15 @@ import { Grade, Attendance, Student, StudentDocument } from "@/types";
 import { cn, getDisplayAvatarUrl, formatCurrency } from "@/lib/utils";
 import { uploadFileToStorage } from "@/lib/supabase/storage";
 import React from "react";
-import { differenceInYears } from "date-fns";
+import { differenceInYears, format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { useData } from "@/hooks/use-data";
 import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogClose } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { toast } from "@/hooks/use-toast";
 import { StudentPrintSheet } from "./student-print-sheet";
+import { TransactionForm } from "./transaction-form";
 
 const getAttendanceIcon = (status: string) => {
     switch (status) {
@@ -34,8 +37,9 @@ const getAttendanceIcon = (status: string) => {
 export function StudentProfile({ student: initialStudent }: { student: Student }) {
   const { handleLinkClick } = useLoading();
   const { hasPermission } = useAuth();
-  const { students, updateStudent } = useData();
+  const { students, transactions, addTransaction, updateStudent } = useData();
   const canViewFinance = hasPermission('finance:view');
+  const canEditFinance = hasPermission('finance:edit');
 
   const student = students.find(s => s.id === initialStudent.id) || initialStudent;
   
@@ -46,6 +50,55 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
   const [newDocType, setNewDocType] = React.useState<'image' | 'pdf' | 'link'>('image');
   const [isSavingDoc, setIsSavingDoc] = React.useState(false);
   const [isUploadingDoc, setIsUploadingDoc] = React.useState(false);
+
+  // Financial state
+  const [isReceiptOpen, setIsReceiptOpen] = React.useState(false);
+  const [selectedReceipt, setSelectedReceipt] = React.useState<string | null>(null);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = React.useState(false);
+
+  // Real transactions for this student
+  const studentTransactions = React.useMemo(() => {
+    const studentName = student.name.trim().toLowerCase();
+    return transactions
+      .filter(t => {
+        if (t.type !== 'Entrada') return false;
+        const txName = (t.name || '').trim().toLowerCase();
+        return txName === studentName ||
+               studentName.startsWith(txName) ||
+               txName.startsWith(studentName);
+      })
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  }, [transactions, student.name]);
+
+  const mock2023Dates = ['2023-08-05', '2023-09-05', '2023-10-05', '2023-09-10', '2023-10-10'];
+  const legacyPayments = React.useMemo(() => {
+    return (student.paymentHistory || []).filter(
+      p => !mock2023Dates.includes(p.date)
+    );
+  }, [student.paymentHistory]);
+
+  const displayPayments = React.useMemo(() => {
+    if (studentTransactions.length > 0) {
+      return studentTransactions.map(t => ({
+        id: t.id,
+        date: t.date,
+        description: t.description,
+        amount: t.value,
+        paymentMethod: t.paymentMethod,
+        receiptUrl: t.receiptUrl,
+        status: 'Pago' as const
+      }));
+    }
+    return legacyPayments.map((p, idx) => ({
+      id: `legacy-${idx}`,
+      date: p.date,
+      description: p.description,
+      amount: p.amount,
+      paymentMethod: undefined,
+      receiptUrl: undefined,
+      status: p.status || ('Pago' as const)
+    }));
+  }, [studentTransactions, legacyPayments]);
 
   if (!student) {
     return (
@@ -380,7 +433,20 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
                         <Wallet className="h-4 w-4 text-accent"/>
                         <CardTitle className="text-lg">Histórico Financeiro</CardTitle>
                     </div>
-                    <Badge className="bg-accent/10 text-accent border-accent/20 font-mono">Mensalidade: {formatCurrency(student.monthlyFee)}</Badge>
+                    <div className="flex items-center gap-2">
+                        <Badge className="bg-accent/10 text-accent border-accent/20 font-mono">Mensalidade: {formatCurrency(student.monthlyFee)}</Badge>
+                        {canEditFinance && (
+                            <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="h-7 text-xs border-accent/40 text-accent hover:bg-accent/10 rounded-lg px-2.5"
+                                onClick={() => setIsPaymentDialogOpen(true)}
+                            >
+                                <Plus className="h-3.5 w-3.5 mr-1" />
+                                Novo Pagamento
+                            </Button>
+                        )}
+                    </div>
                 </CardHeader>
                 <CardContent className="p-0">
                    <Table>
@@ -388,18 +454,45 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
                             <TableRow className="bg-muted/5">
                                 <TableHead className="h-9 text-[10px] uppercase font-bold">Data</TableHead>
                                 <TableHead className="h-9 text-[10px] uppercase font-bold">Descrição</TableHead>
+                                <TableHead className="h-9 text-[10px] uppercase font-bold hidden sm:table-cell">Forma</TableHead>
                                 <TableHead className="h-9 text-[10px] uppercase font-bold text-right">Valor</TableHead>
+                                <TableHead className="h-9 text-[10px] uppercase font-bold text-center w-14">Comp.</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
-                            {student.paymentHistory && student.paymentHistory.length > 0 ? student.paymentHistory.map((payment: any, index: number) => (
-                                <TableRow key={index} className="hover:bg-muted/5">
-                                    <TableCell className="py-2 text-xs">{new Date(payment.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</TableCell>
+                            {displayPayments.length > 0 ? displayPayments.map((payment) => (
+                                <TableRow key={payment.id} className="hover:bg-muted/5">
+                                    <TableCell className="py-2 text-xs font-mono">{new Date(payment.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</TableCell>
                                     <TableCell className="py-2 text-xs font-medium">{payment.description}</TableCell>
-                                    <TableCell className="py-2 text-xs text-right font-bold text-green-600">{formatCurrency(payment.amount)}</TableCell>
+                                    <TableCell className="py-2 text-xs hidden sm:table-cell">
+                                        {payment.paymentMethod ? (
+                                            <Badge variant="outline" className="text-[9px] font-normal px-1.5 py-0 h-4">
+                                                {payment.paymentMethod}
+                                            </Badge>
+                                        ) : '-'}
+                                    </TableCell>
+                                    <TableCell className="py-2 text-xs text-right font-bold text-green-600 font-mono">{formatCurrency(payment.amount)}</TableCell>
+                                    <TableCell className="py-2 text-center p-1">
+                                        {payment.receiptUrl ? (
+                                            <Button 
+                                                variant="ghost" 
+                                                size="icon" 
+                                                className="h-6 w-6 text-accent hover:bg-accent/10" 
+                                                onClick={() => {
+                                                    setSelectedReceipt(payment.receiptUrl!);
+                                                    setIsReceiptOpen(true);
+                                                }}
+                                                title="Ver Comprovante"
+                                            >
+                                                <Eye className="h-3.5 w-3.5" />
+                                            </Button>
+                                        ) : (
+                                            <span className="text-muted-foreground/30 text-xs">-</span>
+                                        )}
+                                    </TableCell>
                                 </TableRow>
                             )) : (
-                                <TableRow><TableCell colSpan={3} className="h-20 text-center text-xs text-muted-foreground italic">Nenhum pagamento registrado.</TableCell></TableRow>
+                                <TableRow><TableCell colSpan={5} className="h-20 text-center text-xs text-muted-foreground italic">Nenhum pagamento registrado.</TableCell></TableRow>
                             )}
                         </TableBody>
                     </Table>
@@ -410,9 +503,72 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
       </div>
     </div>
 
+      {/* Dialog Comprovante de Pagamento */}
+      <Dialog open={isReceiptOpen} onOpenChange={setIsReceiptOpen}>
+          <DialogContent className="sm:max-w-[500px] rounded-2xl w-[94vw]">
+              <DialogHeader><DialogTitle>Comprovante de Pagamento</DialogTitle></DialogHeader>
+              <div className="flex justify-center p-4 bg-muted/20 rounded-lg border">
+                  {selectedReceipt ? (
+                      <Image 
+                          src={getDisplayAvatarUrl(selectedReceipt)} 
+                          alt="Comprovante" 
+                          width={400} 
+                          height={600} 
+                          className="max-h-[70vh] object-contain rounded-md"
+                          data-ai-hint="payment receipt"
+                      />
+                  ) : (
+                      <div className="py-20 text-muted-foreground italic">Comprovante não disponível.</div>
+                  )}
+              </div>
+              <div className="flex justify-center mt-4">
+                  <Button variant="outline" onClick={() => setIsReceiptOpen(false)} className="rounded-xl h-10 px-8">Fechar</Button>
+              </div>
+          </DialogContent>
+      </Dialog>
+
+      {/* Dialog Novo Pagamento */}
+      <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
+          <DialogContent className="sm:max-w-[500px] rounded-2xl w-[94vw]">
+              <DialogHeader><DialogTitle>Registrar Pagamento - {student.name}</DialogTitle></DialogHeader>
+              <TransactionForm 
+                  allowedTypes={["Entrada (Aluno)"]}
+                  defaultValues={{
+                      type: 'Entrada (Aluno)',
+                      name: student.name,
+                      value: student.monthlyFee || 0,
+                      description: `Mensalidade ${format(new Date(), 'MMMM', { locale: ptBR })}`,
+                      date: new Date(),
+                      paymentMethod: 'PIX',
+                      receiptUrl: '',
+                  }}
+                  onSave={async (data) => {
+                      try {
+                          await addTransaction({
+                              type: 'Entrada',
+                              category: 'Aluno',
+                              name: data.name,
+                              description: data.description,
+                              value: data.value,
+                              date: data.date.toISOString(),
+                              receiptUrl: data.receiptUrl,
+                              paymentMethod: data.paymentMethod
+                          });
+                          toast({ title: "Pagamento Registrado!", description: "Salvo com sucesso." });
+                          setIsPaymentDialogOpen(false);
+                      } catch (err: any) {
+                          toast({ variant: 'destructive', title: "Erro ao salvar", description: err.message });
+                      }
+                  }}
+                  onCancel={() => setIsPaymentDialogOpen(false)}
+                  students={students}
+              />
+          </DialogContent>
+      </Dialog>
+
       {/* Modelo Oficial Formatado para Impressão A4 (Aparece apenas na impressão) */}
       <div className="hidden print:block w-full">
-        <StudentPrintSheet student={student} canViewFinance={canViewFinance} />
+        <StudentPrintSheet student={student} canViewFinance={canViewFinance} payments={displayPayments} />
       </div>
     </>
   );

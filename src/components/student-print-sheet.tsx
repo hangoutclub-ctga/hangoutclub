@@ -18,12 +18,22 @@ import {
   ShieldCheck
 } from "lucide-react";
 
+export interface StudentPaymentRecord {
+  date: string;
+  description: string;
+  amount: number;
+  paymentMethod?: string;
+  receiptUrl?: string;
+  status?: string;
+}
+
 interface StudentPrintSheetProps {
   student: Student;
   canViewFinance?: boolean;
+  payments?: StudentPaymentRecord[];
 }
 
-export function StudentPrintSheet({ student, canViewFinance = false }: StudentPrintSheetProps) {
+export function StudentPrintSheet({ student, canViewFinance = false, payments: propPayments }: StudentPrintSheetProps) {
   if (!student) return null;
 
   const now = new Date();
@@ -66,7 +76,19 @@ export function StudentPrintSheet({ student, canViewFinance = false }: StudentPr
   const documents = student.documents || [];
 
   // Payments
-  const payments = student.paymentHistory || [];
+  const mock2023Dates = ['2023-08-05', '2023-09-05', '2023-10-05', '2023-09-10', '2023-10-10'];
+  const payments: StudentPaymentRecord[] = propPayments && propPayments.length > 0
+    ? propPayments
+    : (student.paymentHistory || [])
+        .filter(p => !mock2023Dates.includes(p.date))
+        .map(p => ({
+          date: p.date,
+          description: p.description,
+          amount: p.amount,
+          status: p.status,
+          paymentMethod: undefined,
+          receiptUrl: undefined
+        }));
 
   return (
     <div className="student-print-sheet text-slate-900 bg-white font-sans text-[12px] leading-relaxed max-w-[210mm] mx-auto p-0 print:p-0">
@@ -401,12 +423,14 @@ export function StudentPrintSheet({ student, canViewFinance = false }: StudentPr
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-200">
-                {payments.slice(0, 6).map((pay, idx) => (
+                {payments.slice(0, 10).map((pay, idx) => (
                   <tr key={idx}>
                     <td className="py-1 px-3 font-mono text-slate-700">
                       {new Date(pay.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
                     </td>
-                    <td className="py-1 px-3 font-medium text-slate-800">{pay.description}</td>
+                    <td className="py-1 px-3 font-medium text-slate-800">
+                      {pay.description} {pay.paymentMethod ? <span className="text-[8px] text-slate-500">({pay.paymentMethod})</span> : ''}
+                    </td>
                     <td className="py-1 px-3 text-right font-mono font-bold text-slate-900">
                       {formatCurrency(pay.amount)}
                     </td>

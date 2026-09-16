@@ -233,6 +233,19 @@ export function toTransactionInsert(t: Partial<Transaction>): Tables['transactio
   };
 }
 
+export function toTransactionUpdate(t: Partial<Transaction>): Tables['transactions']['Update'] {
+  const update: Tables['transactions']['Update'] = {};
+  if (t.type !== undefined) update.type = t.type;
+  if (t.category !== undefined) update.category = t.category;
+  if (t.name !== undefined) update.name = t.name;
+  if (t.description !== undefined) update.description = t.description;
+  if (t.value !== undefined) update.value = t.value;
+  if (t.date !== undefined) update.date = t.date;
+  if (t.receiptUrl !== undefined) update.receipt_url = t.receiptUrl || null;
+  if (t.paymentMethod !== undefined) update.payment_method = t.paymentMethod || null;
+  return update;
+}
+
 // ========================
 // FIXED EXPENSES
 // ========================

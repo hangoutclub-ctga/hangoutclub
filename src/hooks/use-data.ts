@@ -35,6 +35,7 @@ export interface DataContextType {
     deleteClass: (id: string, soft?: boolean) => Promise<void>;
 
     addTransaction: (t: Partial<Transaction>) => Promise<Transaction>;
+    updateTransaction: (id: string, t: Partial<Transaction>) => Promise<Transaction>;
     deleteTransaction: (id: string) => Promise<void>;
 
     addFixedExpense: (fe: Partial<FixedExpense>) => Promise<FixedExpense>;

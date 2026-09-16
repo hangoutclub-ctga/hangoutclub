@@ -73,7 +73,11 @@ export default function FinancePage() {
         { value: 10, label: 'Outubro' }, { value: 11, label: 'Novembro' }, { value: 12, label: 'Dezembro' }
     ];
 
-    const years = [2023, 2024, 2025, 2026];
+    const currentSystemYear = new Date().getFullYear();
+    const years = useMemo(() => {
+        const yearSet = new Set([2023, 2024, 2025, 2026, currentSystemYear, currentSystemYear + 1]);
+        return Array.from(yearSet).sort((a, b) => a - b);
+    }, [currentSystemYear]);
 
     const filteredByDate = useMemo(() => {
         return transactions.filter(t => {
@@ -171,15 +175,42 @@ export default function FinancePage() {
         }
     };
 
-    const pendingStudents = students.filter(s => s.status === 'Ativo' && s.studentCondition !== 'Bolsa');
+    const pendingStudents = useMemo(() => {
+        return students
+            .filter(s => s.status === 'Ativo' && s.studentCondition !== 'Bolsa' && (s.monthlyFee || 0) > 0)
+            .map(student => {
+                const studentName = student.name.trim().toLowerCase();
+                
+                const studentTransactions = filteredByDate.filter(t => {
+                    if (t.type !== 'Entrada') return false;
+                    const txName = (t.name || '').trim().toLowerCase();
+                    return txName === studentName ||
+                           studentName.startsWith(txName) ||
+                           txName.startsWith(studentName);
+                });
 
-    const handleOpenForm = (student?: Student) => {
+                const totalPaid = studentTransactions.reduce((acc, t) => acc + t.value, 0);
+                const monthlyFee = student.monthlyFee || 0;
+                const remaining = Math.max(0, monthlyFee - totalPaid);
+                const isPaid = totalPaid >= monthlyFee;
+
+                return {
+                    ...student,
+                    totalPaid,
+                    remaining,
+                    isPaid
+                };
+            })
+            .filter(s => !s.isPaid);
+    }, [students, filteredByDate]);
+
+    const handleOpenForm = (student?: any) => {
         if (student) {
             setPrefilledData({
                 type: 'Entrada (Aluno)',
                 name: student.name,
-                value: student.monthlyFee || 0,
-                description: `Mensalidade ${months.find(m => m.value === currentMonth)?.label}`
+                value: student.remaining > 0 ? student.remaining : (student.monthlyFee || 0),
+                description: `Mensalidade ${months.find(m => m.value === currentMonth)?.label || ''}`
             });
         } else {
             setPrefilledData(undefined);
@@ -462,7 +493,12 @@ export default function FinancePage() {
                              <ul className="space-y-2 sm:space-y-4">
                                 {pendingStudents.map(student => (
                                     <li key={student.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 border">
-                                        <div className="min-w-0"><p className="font-bold text-[10px] sm:text-sm truncate">{student.name}</p><p className="text-[8px] sm:text-xs text-muted-foreground">Vence dia {student.dueDate}</p></div>
+                                        <div className="min-w-0">
+                                            <p className="font-bold text-[10px] sm:text-sm truncate">{student.name}</p>
+                                            <p className="text-[8px] sm:text-xs text-muted-foreground">
+                                                Vence dia {student.dueDate} {student.totalPaid > 0 ? `• Restante: ${formatCurrency(student.remaining)} (Pago: ${formatCurrency(student.totalPaid)})` : `• ${formatCurrency(student.monthlyFee)}`}
+                                            </p>
+                                        </div>
                                         <Button variant="outline" size="sm" className="h-7 text-[10px] px-2 rounded-lg" onClick={() => handleOpenForm(student)} disabled={!canEdit}>Pagar</Button>
                                     </li>
                                 ))}

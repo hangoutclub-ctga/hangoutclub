@@ -126,8 +126,24 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const updateStudent = async (id: string, student: Partial<Student>): Promise<Student> => {
+    const prevStudent = students.find(s => s.id === id);
     const updated = await services.updateStudent(id, student);
     setStudents(prev => prev.map(s => s.id === id ? updated : s));
+
+    if (student.name && prevStudent && student.name !== prevStudent.name) {
+      const matchingTxs = transactions.filter(t => t.name === prevStudent.name);
+      for (const tx of matchingTxs) {
+        try {
+          await services.updateTransaction(tx.id, { name: student.name });
+        } catch (e) {
+          console.error("Failed to sync transaction name:", e);
+        }
+      }
+      if (matchingTxs.length > 0) {
+        setTransactions(prev => prev.map(t => t.name === prevStudent.name ? { ...t, name: student.name! } : t));
+      }
+    }
+
     return updated;
   };
 
@@ -171,6 +187,12 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
     const created = await services.createTransaction(t);
     setTransactions(prev => [created, ...prev]);
     return created;
+  };
+
+  const updateTransaction = async (id: string, t: Partial<Transaction>): Promise<Transaction> => {
+    const updated = await services.updateTransaction(id, t);
+    setTransactions(prev => prev.map(item => item.id === id ? updated : item));
+    return updated;
   };
 
   const deleteTransaction = async (id: string): Promise<void> => {
@@ -315,6 +337,7 @@ export const DataProvider = ({ children }: { children: React.ReactNode }) => {
         updateClass,
         deleteClass,
         addTransaction,
+        updateTransaction,
         deleteTransaction,
         addFixedExpense,
         updateFixedExpense,
