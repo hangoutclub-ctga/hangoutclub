@@ -58,7 +58,7 @@ export default function LoginPage() {
             Hangout Club
           </CardTitle>
           <CardDescription className="text-xs">
-            Sistema de Gestão Escolar
+            Sistema de Gestão
           </CardDescription>
         </CardHeader>
 
