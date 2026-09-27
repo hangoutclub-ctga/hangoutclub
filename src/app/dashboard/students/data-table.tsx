@@ -37,7 +37,7 @@ interface DataTableProps<TData, TValue> {
   studentConditions: string[];
   onEdit: (student: TData) => void;
   onView: (student: TData) => void;
-  onDelete: (studentId: string) => void;
+  onDelete: (studentId: string, audit?: any) => void;
   onBulkUpdate: (selectedIds: string[], updates: Partial<TData>) => void;
   onBulkDelete: (selectedIds: string[]) => void;
   onNextPage: () => void;
@@ -119,7 +119,7 @@ export function DataTable<TData, TValue>({
     manualPagination: true,
     meta: {
         editStudent: (student: TData) => onEdit(student),
-        deleteStudent: (studentId: string) => onDelete(studentId),
+        deleteStudent: (studentId: string, audit?: any) => onDelete(studentId, audit),
         viewStudent: (student: TData) => onView(student)
     }
   })

@@ -88,7 +88,7 @@ export function toStudent(row: Tables['students']['Row']): Student {
     addressComplement: row.address_complement || undefined,
     medicalInfo: row.medical_info || undefined,
     studentCondition: row.student_condition || 'Integral',
-    class: row.class_name || '',
+    class: row.class_name || (row as any).class_id || '',
     paymentHistory: Array.isArray(row.payment_history) ? (row.payment_history as any) : [],
     grades: Array.isArray(row.grades) ? (row.grades as Grade[]) : [],
     attendance: Array.isArray(row.attendance) ? (row.attendance as Attendance[]) : [],

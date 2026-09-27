@@ -34,7 +34,7 @@ Rascunho para melhorar:
 
 const improveMessagePrompt = ai.definePrompt({
   name: 'improveMessagePrompt',
-  inputSchema: z.object({ prompt: ImproveMessageInputSchema }),
+  input: { schema: z.object({ prompt: ImproveMessageInputSchema }) },
   prompt: promptTemplate,
   config: {
     safetySettings: [

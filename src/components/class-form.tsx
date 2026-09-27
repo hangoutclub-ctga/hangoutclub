@@ -29,6 +29,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "./ui/scroll-area";
 import { Class, Student, User } from "@/types";
 import { DialogClose } from "./ui/dialog";
+import { TimePicker } from "@/components/ui/time-picker";
 
 const formSchema = z.object({
   name: z.string().min(3, "O nome da turma é muito curto."),
@@ -111,7 +112,7 @@ export function ClassForm({ classData, availableStudents, allUsers, classModalit
                     <FormLabel>Professor</FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
-                        <SelectTrigger>
+                        <SelectTrigger className="h-11">
                             <SelectValue placeholder="Selecione o professor" />
                         </SelectTrigger>
                         </FormControl>
@@ -132,7 +133,11 @@ export function ClassForm({ classData, availableStudents, allUsers, classModalit
                     <FormItem>
                     <FormLabel>Horário</FormLabel>
                     <FormControl>
-                        <Input type="time" {...field} />
+                        <TimePicker 
+                            value={field.value} 
+                            onChange={field.onChange} 
+                            placeholder="00:00"
+                        />
                     </FormControl>
                     <FormMessage />
                     </FormItem>
@@ -215,7 +220,9 @@ export function ClassForm({ classData, availableStudents, allUsers, classModalit
                 <FormItem>
                     <div className="mb-4">
                         <FormLabel>Alunos</FormLabel>
-                        <FormDescription className="text-[10px]">Selecione alunos que não estão em nenhuma turma.</FormDescription>
+                        <FormDescription className="text-[10px]">
+                            {classData ? "Alunos vinculados a esta turma e alunos disponíveis sem turma." : "Selecione alunos que não estão em nenhuma turma."}
+                        </FormDescription>
                     </div>
                     <ScrollArea className="h-40 w-full rounded-md border p-4">
                     {availableStudents.length > 0 ? (
@@ -241,7 +248,7 @@ export function ClassForm({ classData, availableStudents, allUsers, classModalit
                                             }}
                                         />
                                         </FormControl>
-                                        <FormLabel className="font-normal text-xs">{student.name}</FormLabel>
+                                        <FormLabel className="font-normal text-xs">{student.name || 'Aluno sem nome'}</FormLabel>
                                     </FormItem>
                                     )
                                 }}

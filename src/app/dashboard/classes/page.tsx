@@ -20,6 +20,7 @@ import { Class } from "@/types";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { useLoading } from "@/hooks/use-loading";
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 
 export default function ClassesPage() {
   const { user, hasPermission } = useAuth();
@@ -30,6 +31,7 @@ export default function ClassesPage() {
   const [editingClass, setEditingClass] = React.useState<Class | undefined>(undefined);
   const [viewingClass, setViewingClass] = React.useState<Class | null>(null);
   const [isFormOpen, setIsFormOpen] = React.useState(false);
+  const [bulkDeleteIds, setBulkDeleteIds] = React.useState<string[] | null>(null);
 
   const isAdmin = user?.role === 'Admin';
   const canCreate = hasPermission('classes:create');
@@ -38,13 +40,32 @@ export default function ClassesPage() {
     return classes.filter(c => c.status !== 'Apagado');
   }, [classes]);
 
-  const studentsWithoutClass = React.useMemo(() => {
-    return students.filter(s => (!s.class || s.class.trim() === "") && s.status !== 'Apagado');
-  }, [students]);
+  const availableStudentsForClass = React.useMemo(() => {
+    return students.filter(s => {
+      // Regra 1: Somente alunos ativos (inativos e apagados NÃO aparecem)
+      if (s.status !== 'Ativo') return false;
+
+      // Regra 2: Alunos sem turma sempre estão disponíveis para vinculação
+      const hasNoClass = !s.class || s.class.trim() === '';
+      if (hasNoClass) return true;
+
+      // Regra 3: Se estiver editando uma turma, os alunos que já pertencem a ESTA turma também aparecem
+      if (editingClass) {
+        return (
+          (editingClass.studentIds && editingClass.studentIds.includes(s.id)) ||
+          s.class === editingClass.name ||
+          s.class === editingClass.id ||
+          s.class.trim().toLowerCase() === editingClass.name.trim().toLowerCase()
+        );
+      }
+
+      return false;
+    });
+  }, [students, editingClass]);
 
   const filteredClasses = React.useMemo(() => {
-    if (isAdmin) return activeClasses;
-    return activeClasses.filter(c => c.teacher === user?.nickname);
+    if (isAdmin || user?.role === 'Secretaria' || user?.role !== 'Professor') return activeClasses;
+    return activeClasses.filter(c => c.teacher === user?.nickname || c.teacherId === user?.id);
   }, [activeClasses, isAdmin, user]);
 
   const handleOpenForm = (c?: Class) => {
@@ -87,10 +108,10 @@ export default function ClassesPage() {
     }
   };
 
-  const handleDeleteClass = async (id: string) => {
+  const handleDeleteClass = async (id: string, audit?: any) => {
     try {
-      await deleteClass(id, true);
-      toast({ title: "Turma Removida", description: "Turma desativada com sucesso." });
+      await deleteClass(id, true, audit);
+      toast({ title: "Turma Removida", description: "Turma movida para a Lixeira com sucesso." });
     } catch (err: any) {
       toast({ 
         title: "Erro ao excluir", 
@@ -111,15 +132,8 @@ export default function ClassesPage() {
     }
   };
 
-  const handleBulkDelete = async (selectedIds: string[]) => {
-    try {
-      for (const id of selectedIds) {
-        await deleteClass(id, true);
-      }
-      toast({ title: "Ação em Massa", description: `${selectedIds.length} turmas removidas.` });
-    } catch (err: any) {
-      toast({ title: "Erro na exclusão em massa", variant: "destructive" });
-    }
+  const handleBulkDelete = (selectedIds: string[]) => {
+    setBulkDeleteIds(selectedIds);
   };
 
   const handleBack = () => {
@@ -168,7 +182,7 @@ export default function ClassesPage() {
               </DialogHeader>
               <ClassForm 
                   classData={editingClass}
-                  availableStudents={editingClass ? students : studentsWithoutClass}
+                  availableStudents={availableStudentsForClass}
                   allUsers={users}
                   onSave={handleSaveClass}
                   onCancel={() => setIsFormOpen(false)}
@@ -205,6 +219,27 @@ export default function ClassesPage() {
               {viewingClass && <ClassProfile classId={viewingClass.id} />}
           </DialogContent>
       </Dialog>
+
+      <DeleteConfirmDialog
+        open={!!bulkDeleteIds && bulkDeleteIds.length > 0}
+        onOpenChange={(open) => !open && setBulkDeleteIds(null)}
+        title="Excluir Turmas em Massa"
+        itemName={`${bulkDeleteIds?.length || 0} turmas selecionadas`}
+        itemType="as turmas selecionadas"
+        onConfirm={async (audit) => {
+          if (!bulkDeleteIds) return;
+          try {
+            for (const id of bulkDeleteIds) {
+              await deleteClass(id, true, audit);
+            }
+            toast({ title: "Ação em Massa Concluída", description: `${bulkDeleteIds.length} turmas movidas para a lixeira.` });
+          } catch (err: any) {
+            toast({ title: "Erro na exclusão em massa", variant: "destructive" });
+          } finally {
+            setBulkDeleteIds(null);
+          }
+        }}
+      />
     </div>
   );
 }

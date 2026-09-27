@@ -69,6 +69,7 @@ export function PayFixedExpenseForm({ expense, onSave, onCancel }: PayFixedExpen
   
   const receiptUrl = form.watch("receiptUrl");
   const [manualDate, setManualDate] = React.useState<string>(format(new Date(), 'dd/MM/yyyy'));
+  const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
 
   const isPDF = receiptUrl?.startsWith('data:application/pdf');
 
@@ -254,7 +255,7 @@ export function PayFixedExpenseForm({ expense, onSave, onCancel }: PayFixedExpen
                                 className="h-11"
                             />
                         </FormControl>
-                        <Popover>
+                        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                             <PopoverTrigger asChild>
                                 <Button variant="ghost" size="icon" className="absolute right-1 top-1 h-9 w-9 text-muted-foreground">
                                     <CalendarIcon className="h-4 w-4" />
@@ -270,7 +271,12 @@ export function PayFixedExpenseForm({ expense, onSave, onCancel }: PayFixedExpen
                                             setManualDate(format(date, 'dd/MM/yyyy'));
                                         }
                                     }}
-                                    initialFocus
+                                    onOk={() => {
+                                        if (field.value) {
+                                            setManualDate(format(field.value, 'dd/MM/yyyy'));
+                                        }
+                                        setIsCalendarOpen(false);
+                                    }}
                                     locale={ptBR}
                                 />
                             </PopoverContent>

@@ -95,6 +95,7 @@ export function TransactionForm({ defaultValues, allowedTypes = allTypes, onSave
   const [manualDate, setManualDate] = React.useState<string>(
     defaultValues?.date ? format(new Date(defaultValues.date), 'dd/MM/yyyy') : format(new Date(), 'dd/MM/yyyy')
   );
+  const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
 
   const handleDateChange = (value: string) => {
     let v = value.replace(/\D/g, '');
@@ -116,6 +117,12 @@ export function TransactionForm({ defaultValues, allowedTypes = allTypes, onSave
     setIsSaving(false);
   };
 
+  const activeStudents = React.useMemo(() => {
+    return (students || [])
+      .filter(s => s && s.name && s.name.trim() !== '' && s.status !== 'Apagado')
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  }, [students]);
+
   const renderNameField = () => {
     switch (transactionType) {
         case 'Entrada (Aluno)':
@@ -133,9 +140,16 @@ export function TransactionForm({ defaultValues, allowedTypes = allTypes, onSave
                             </SelectTrigger>
                             </FormControl>
                             <SelectContent className="rounded-xl">
-                            {students.map(student => (
-                                <SelectItem key={student.id} value={student.name}>{student.name}</SelectItem>
-                            ))}
+                            {field.value && !activeStudents.some(s => s.name === field.value) && (
+                                <SelectItem value={field.value}>{field.value}</SelectItem>
+                            )}
+                            {activeStudents.length === 0 && !field.value ? (
+                                <SelectItem value="_sem_alunos" disabled>Nenhum aluno ativo encontrado</SelectItem>
+                            ) : (
+                                activeStudents.map(student => (
+                                    <SelectItem key={student.id} value={student.name}>{student.name}</SelectItem>
+                                ))
+                            )}
                             </SelectContent>
                         </Select>
                       <FormMessage />
@@ -256,7 +270,7 @@ export function TransactionForm({ defaultValues, allowedTypes = allTypes, onSave
                                     className="h-11"
                                 />
                             </FormControl>
-                            <Popover>
+                            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                                 <PopoverTrigger asChild>
                                     <Button variant="ghost" size="icon" className="absolute right-1 top-1 h-9 w-9 text-muted-foreground">
                                         <CalendarIcon className="h-4 w-4" />
@@ -272,7 +286,12 @@ export function TransactionForm({ defaultValues, allowedTypes = allTypes, onSave
                                                 setManualDate(format(date, 'dd/MM/yyyy'));
                                             }
                                         }}
-                                        initialFocus
+                                        onOk={() => {
+                                            if (field.value) {
+                                                setManualDate(format(field.value, 'dd/MM/yyyy'));
+                                            }
+                                            setIsCalendarOpen(false);
+                                        }}
                                         locale={ptBR}
                                     />
                                 </PopoverContent>

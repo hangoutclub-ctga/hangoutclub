@@ -20,6 +20,7 @@ import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { useLoading } from "@/hooks/use-loading";
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 
 export default function AgendaPage() {
   const { user, hasPermission } = useAuth();
@@ -38,6 +39,7 @@ export default function AgendaPage() {
   const [selectedEvent, setSelectedEvent] = useState<DisplayEvent | null>(null);
   const [editingEvent, setEditingEvent] = useState<Partial<ManualEvent> | undefined>(undefined);
   const [completedEventIds, setCompletedEventIds] = useState<string[]>([]);
+  const [eventToDelete, setEventToDelete] = useState<DisplayEvent | null>(null);
 
   const { events } = useAgenda(confirmedDate, user, 'week', staffFilter);
 
@@ -228,14 +230,7 @@ export default function AgendaPage() {
                         <Eye className="h-4 w-4" />
                       </Button>
                       <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => { setEditingEvent(evt as any); setIsFormOpen(true); }}><Edit className="h-4 w-4" /></Button>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={async () => {
-                        try {
-                          await deleteEvent(evt.id);
-                          toast({ title: "Evento Removido" });
-                        } catch (err: any) {
-                          toast({ variant: "destructive", title: "Erro ao remover", description: err.message });
-                        }
-                      }}><Trash2 className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10" onClick={() => setEventToDelete(evt)}><Trash2 className="h-4 w-4" /></Button>
                     </div>
                   )}
                 </div>
@@ -282,6 +277,24 @@ export default function AgendaPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      <DeleteConfirmDialog
+        open={!!eventToDelete}
+        onOpenChange={(open) => !open && setEventToDelete(null)}
+        itemName={eventToDelete?.task}
+        itemType="o evento"
+        title="Confirmar Exclusão de Evento"
+        onConfirm={async (audit) => {
+          if (!eventToDelete) return;
+          try {
+            await deleteEvent(eventToDelete.id, true, audit);
+            toast({ title: "Evento movido para a Lixeira" });
+            setEventToDelete(null);
+          } catch (err: any) {
+            toast({ variant: "destructive", title: "Erro ao remover", description: err.message });
+          }
+        }}
+      />
     </div>
   );
 }

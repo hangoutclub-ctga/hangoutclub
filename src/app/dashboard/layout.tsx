@@ -134,7 +134,7 @@ const LowStockAlert = ({
 };
 
 const MainContent = ({ children }: { children: React.ReactNode }) => {
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
   const { isOpen, setIsOpen } = useSidebar();
   const { handleLinkClick } = useLoading();
   const { openStockAlert, lowStockCount, canSeeAlert, isStockAlertOpen, setIsStockAlertOpen, lowStockItems } = useStockAlert();
@@ -237,7 +237,7 @@ const MainContent = ({ children }: { children: React.ReactNode }) => {
               <DropdownMenuItem onClick={() => handleNavigate('/dashboard/settings')}>
                 <Settings className="mr-2 h-4 w-4" /> Configurações
               </DropdownMenuItem>
-              {user?.role === 'Admin' && (
+              {(user?.role === 'Admin' || hasPermission('nav:trash')) && (
                 <DropdownMenuItem onClick={() => handleNavigate('/dashboard/trash')}>
                   <Trash2 className="mr-2 h-4 w-4" /> Lixeira
                 </DropdownMenuItem>
@@ -266,29 +266,21 @@ const MainContent = ({ children }: { children: React.ReactNode }) => {
 const DashboardInner = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
   const pathname = usePathname();
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { isOpen, setIsOpen } = useSidebar();
   const { lowStockCount } = useStockAlert();
-  const [navLoading, setNavLoading] = useState(false);
-
-  useEffect(() => {
-    setNavLoading(false);
-  }, [pathname]);
+  const { handleLinkClick } = useLoading();
 
   const handleNav = (href: string) => {
     setIsOpen(false);
     if (pathname !== href) {
-      setNavLoading(true);
+      handleLinkClick(href);
       router.push(href);
     }
   };
 
-  const isAdmin = user?.role === 'Admin';
-  const isSecretaria = user?.role === 'Secretaria';
-
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden relative">
-      {navLoading && <LoadingOverlay />}
       <NewSidebar className="no-print">
         <NewSidebarHeader 
           className="flex items-center justify-center py-4 cursor-pointer"
@@ -298,60 +290,70 @@ const DashboardInner = ({ children }: { children: React.ReactNode }) => {
         </NewSidebarHeader>
         <NewSidebarBody>
           <NewSidebarContent>
-            <NewSidebarItem href="/dashboard" onClick={(e) => { e.preventDefault(); handleNav('/dashboard'); }} className={cn(pathname === '/dashboard' && "bg-accent/10 text-accent font-bold")}>
-              <Home className="mr-2 h-4 w-4" />
-              <NewSidebarLabel>Início</NewSidebarLabel>
-            </NewSidebarItem>
-            <NewSidebarItem href="/dashboard/agenda" onClick={(e) => { e.preventDefault(); handleNav('/dashboard/agenda'); }} className={cn(pathname === '/dashboard/agenda' && "bg-accent/10 text-accent font-bold")}>
-              <Calendar className="mr-2 h-4 w-4" />
-              <NewSidebarLabel>Agenda</NewSidebarLabel>
-            </NewSidebarItem>
-            
-            {!isSecretaria && (
-              <>
-                <NewSidebarItem href="/dashboard/students" onClick={(e) => { e.preventDefault(); handleNav('/dashboard/students'); }} className={cn(pathname === '/dashboard/students' && "bg-accent/10 text-accent font-bold")}>
-                  <Users className="mr-2 h-4 w-4" />
-                  <NewSidebarLabel>Alunos</NewSidebarLabel>
-                </NewSidebarItem>
-                <NewSidebarItem href="/dashboard/classes" onClick={(e) => { e.preventDefault(); handleNav('/dashboard/classes'); }} className={cn(pathname === '/dashboard/classes' && "bg-accent/10 text-accent font-bold")}>
-                  <BookOpen className="mr-2 h-4 w-4" />
-                  <NewSidebarLabel>Turmas</NewSidebarLabel>
-                </NewSidebarItem>
-                <NewSidebarItem href="/dashboard/grades" onClick={(e) => { e.preventDefault(); handleNav('/dashboard/grades'); }} className={cn(pathname === '/dashboard/grades' && "bg-accent/10 text-accent font-bold")}>
-                  <Award className="mr-2 h-4 w-4" />
-                  <NewSidebarLabel>Notas</NewSidebarLabel>
-                </NewSidebarItem>
-              </>
+            {hasPermission('nav:dashboard') && (
+              <NewSidebarItem href="/dashboard" onClick={(e) => { e.preventDefault(); handleNav('/dashboard'); }} className={cn(pathname === '/dashboard' && "bg-accent/10 text-accent font-bold")}>
+                <Home className="mr-2 h-4 w-4" />
+                <NewSidebarLabel>Início</NewSidebarLabel>
+              </NewSidebarItem>
+            )}
+
+            {hasPermission('nav:agenda') && (
+              <NewSidebarItem href="/dashboard/agenda" onClick={(e) => { e.preventDefault(); handleNav('/dashboard/agenda'); }} className={cn(pathname === '/dashboard/agenda' && "bg-accent/10 text-accent font-bold")}>
+                <Calendar className="mr-2 h-4 w-4" />
+                <NewSidebarLabel>Agenda</NewSidebarLabel>
+              </NewSidebarItem>
             )}
             
-            {isAdmin && (
+            {hasPermission('nav:students') && (
+              <NewSidebarItem href="/dashboard/students" onClick={(e) => { e.preventDefault(); handleNav('/dashboard/students'); }} className={cn(pathname === '/dashboard/students' && "bg-accent/10 text-accent font-bold")}>
+                <Users className="mr-2 h-4 w-4" />
+                <NewSidebarLabel>Alunos</NewSidebarLabel>
+              </NewSidebarItem>
+            )}
+
+            {hasPermission('nav:classes') && (
+              <NewSidebarItem href="/dashboard/classes" onClick={(e) => { e.preventDefault(); handleNav('/dashboard/classes'); }} className={cn(pathname === '/dashboard/classes' && "bg-accent/10 text-accent font-bold")}>
+                <BookOpen className="mr-2 h-4 w-4" />
+                <NewSidebarLabel>Turmas</NewSidebarLabel>
+              </NewSidebarItem>
+            )}
+
+            {hasPermission('nav:grades') && (
+              <NewSidebarItem href="/dashboard/grades" onClick={(e) => { e.preventDefault(); handleNav('/dashboard/grades'); }} className={cn(pathname === '/dashboard/grades' && "bg-accent/10 text-accent font-bold")}>
+                <Award className="mr-2 h-4 w-4" />
+                <NewSidebarLabel>Notas</NewSidebarLabel>
+              </NewSidebarItem>
+            )}
+            
+            {hasPermission('nav:finance') && (
               <NewSidebarItem href="/dashboard/finance" onClick={(e) => { e.preventDefault(); handleNav('/dashboard/finance'); }} className={cn(pathname === '/dashboard/finance' && "bg-accent/10 text-accent font-bold")}>
                 <Wallet className="mr-2 h-4 w-4" />
                 <NewSidebarLabel>Financeiro</NewSidebarLabel>
               </NewSidebarItem>
             )}
 
-            {(isAdmin || isSecretaria) && (
-              <>
-                <NewSidebarItem href="/dashboard/inventory" onClick={(e) => { e.preventDefault(); handleNav('/dashboard/inventory'); }} className={cn(pathname === '/dashboard/inventory' && "bg-accent/10 text-accent font-bold", "relative")}>
-                  <Package className="mr-2 h-4 w-4" />
-                  <NewSidebarLabel>Inventário</NewSidebarLabel>
-                  {lowStockCount > 0 && (
-                    <>
-                      <span className={cn("ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full px-1.5 py-0.5", !isOpen && "hidden")}>
-                        {lowStockCount}
-                      </span>
-                      {!isOpen && (
-                        <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-600 ring-2 ring-card" />
-                      )}
-                    </>
-                  )}
-                </NewSidebarItem>
-                <NewSidebarItem href="/dashboard/communication" onClick={(e) => { e.preventDefault(); handleNav('/dashboard/communication'); }} className={cn(pathname === '/dashboard/communication' && "bg-accent/10 text-accent font-bold")}>
-                  <Send className="mr-2 h-4 w-4" />
-                  <NewSidebarLabel>Comunicação</NewSidebarLabel>
-                </NewSidebarItem>
-              </>
+            {hasPermission('nav:inventory') && (
+              <NewSidebarItem href="/dashboard/inventory" onClick={(e) => { e.preventDefault(); handleNav('/dashboard/inventory'); }} className={cn(pathname === '/dashboard/inventory' && "bg-accent/10 text-accent font-bold", "relative")}>
+                <Package className="mr-2 h-4 w-4" />
+                <NewSidebarLabel>Inventário</NewSidebarLabel>
+                {lowStockCount > 0 && (
+                  <>
+                    <span className={cn("ml-auto bg-red-600 text-white text-[9px] font-bold rounded-full px-1.5 py-0.5", !isOpen && "hidden")}>
+                      {lowStockCount}
+                    </span>
+                    {!isOpen && (
+                      <span className="absolute top-2 right-2 h-2 w-2 rounded-full bg-red-600 ring-2 ring-card" />
+                    )}
+                  </>
+                )}
+              </NewSidebarItem>
+            )}
+
+            {hasPermission('nav:communication') && (
+              <NewSidebarItem href="/dashboard/communication" onClick={(e) => { e.preventDefault(); handleNav('/dashboard/communication'); }} className={cn(pathname === '/dashboard/communication' && "bg-accent/10 text-accent font-bold")}>
+                <Send className="mr-2 h-4 w-4" />
+                <NewSidebarLabel>Comunicação</NewSidebarLabel>
+              </NewSidebarItem>
             )}
           </NewSidebarContent>
         </NewSidebarBody>
@@ -363,6 +365,7 @@ const DashboardInner = ({ children }: { children: React.ReactNode }) => {
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const { isAuthenticated, isLoading: authLoading } = useAuth();
   const [navLoading, setNavLoading] = useState(false);
 
@@ -370,8 +373,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!authLoading && !isAuthenticated) router.replace('/login');
   }, [authLoading, isAuthenticated, router]);
 
+  useEffect(() => {
+    setNavLoading(false);
+  }, [pathname]);
+
   const handleLinkClick = (href?: string) => {
-    if (!href) setNavLoading(true);
+    if (!href || href !== pathname) {
+      setNavLoading(true);
+      // Timeout de segurança para evitar travamento em caso de cancelamento de rota
+      const timer = setTimeout(() => {
+        setNavLoading(false);
+      }, 6000);
+      return () => clearTimeout(timer);
+    }
   };
 
   if (authLoading || !isAuthenticated) return <LoadingOverlay />;
@@ -379,6 +393,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <LoadingContext.Provider value={{ handleLinkClick }}>
       <StockAlertProvider>
+        {navLoading && <LoadingOverlay />}
         <DashboardInner>{children}</DashboardInner>
       </StockAlertProvider>
     </LoadingContext.Provider>

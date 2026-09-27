@@ -38,6 +38,7 @@ import { DialogClose } from "./ui/dialog";
 import { Checkbox } from "./ui/checkbox";
 import { ScrollArea } from "./ui/scroll-area";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
+import { TimePicker } from "@/components/ui/time-picker";
 
 const recurrenceWeekDays = [
   { id: 'seg', label: 'Seg' },
@@ -103,6 +104,7 @@ export function EventForm({ onSave, eventData, onCancel, isAllUsersView = false,
   });
   
   const [manualDate, setManualDate] = React.useState<string>(format(initialDate, 'dd/MM/yyyy'));
+  const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
   const [conflictError, setConflictError] = React.useState<string | null>(null);
 
   const watchDate = form.watch("date");
@@ -242,7 +244,7 @@ export function EventForm({ onSave, eventData, onCancel, isAllUsersView = false,
                                         onChange={(e) => handleDateChange(e.target.value)}
                                     />
                                 </FormControl>
-                                <Popover>
+                                <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                                     <PopoverTrigger asChild>
                                         <Button variant="ghost" size="icon" className="absolute right-1 top-1 h-8 w-8 text-muted-foreground">
                                             <CalendarIcon className="h-4 w-4" />
@@ -258,7 +260,12 @@ export function EventForm({ onSave, eventData, onCancel, isAllUsersView = false,
                                                     setManualDate(format(date, 'dd/MM/yyyy'));
                                                 }
                                             }}
-                                            initialFocus
+                                            onOk={() => {
+                                                if (field.value) {
+                                                    setManualDate(format(field.value, 'dd/MM/yyyy'));
+                                                }
+                                                setIsCalendarOpen(false);
+                                            }}
                                             locale={ptBR}
                                         />
                                     </PopoverContent>
@@ -275,7 +282,11 @@ export function EventForm({ onSave, eventData, onCancel, isAllUsersView = false,
                     <FormItem>
                     <FormLabel>Horário</FormLabel>
                     <FormControl>
-                        <Input type="time" {...field} />
+                        <TimePicker 
+                            value={field.value} 
+                            onChange={field.onChange} 
+                            placeholder="00:00"
+                        />
                     </FormControl>
                     <FormMessage />
                     </FormItem>

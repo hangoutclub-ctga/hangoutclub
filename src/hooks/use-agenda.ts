@@ -28,6 +28,7 @@ export const useAgenda = (date: Date | undefined, user: User | null, viewType: '
 
             const manual = manualEvents
                 .filter(e => {
+                    if (e.type === 'Apagado') return false;
                     const eventDate = e.date instanceof Date ? e.date : (typeof (e.date as any)?.toDate === 'function' ? (e.date as any).toDate() : new Date(e.date as any));
                     return isSameDay(eventDate, day);
                 })

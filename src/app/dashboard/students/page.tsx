@@ -20,6 +20,7 @@ import { useData } from "@/hooks/use-data";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { useLoading } from "@/hooks/use-loading";
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 
 export default function StudentsPage() {
     const { user, hasPermission } = useAuth();
@@ -38,6 +39,7 @@ export default function StudentsPage() {
     const [isFormOpen, setIsFormOpen] = React.useState(false);
     const [editingStudent, setEditingStudent] = React.useState<Student | undefined>(undefined);
     const [viewingStudent, setViewingStudent] = React.useState<Student | null>(null);
+    const [bulkDeleteIds, setBulkDeleteIds] = React.useState<string[] | null>(null);
 
     const isAdmin = user?.role === 'Admin';
 
@@ -46,7 +48,7 @@ export default function StudentsPage() {
     }, [students]);
 
     const filteredStudents = React.useMemo(() => {
-        if (isAdmin) return activeStudents;
+        if (isAdmin || user?.role === 'Secretaria' || user?.role !== 'Professor') return activeStudents;
         const myClasses = classes.filter(c => 
             (c.teacherId && c.teacherId === user?.id) || 
             (c.teacher && c.teacher === user?.nickname)
@@ -87,10 +89,10 @@ export default function StudentsPage() {
         }
     };
 
-    const handleDeleteStudent = async (id: string) => {
+    const handleDeleteStudent = async (id: string, audit?: any) => {
         try {
-            await deleteStudent(id, true);
-            toast({ title: "Removido", description: "Aluno removido com sucesso." });
+            await deleteStudent(id, true, audit);
+            toast({ title: "Removido", description: "Aluno movido para a Lixeira com sucesso." });
         } catch (err: any) {
             toast({ 
                 title: "Erro ao excluir", 
@@ -171,10 +173,8 @@ export default function StudentsPage() {
                         await updateStudent(id, updates);
                     }
                 }}
-                onBulkDelete={async (ids) => {
-                    for (const id of ids) {
-                        await deleteStudent(id, true);
-                    }
+                onBulkDelete={(ids) => {
+                    setBulkDeleteIds(ids);
                 }}
                 onNextPage={() => {}}
                 onPreviousPage={() => {}}
@@ -196,6 +196,27 @@ export default function StudentsPage() {
                     {viewingStudent && <StudentProfile student={viewingStudent} />}
                 </DialogContent>
             </Dialog>
+
+            <DeleteConfirmDialog
+                open={!!bulkDeleteIds && bulkDeleteIds.length > 0}
+                onOpenChange={(open) => !open && setBulkDeleteIds(null)}
+                title="Excluir Alunos em Massa"
+                itemName={`${bulkDeleteIds?.length || 0} alunos selecionados`}
+                itemType="os alunos selecionados"
+                onConfirm={async (audit) => {
+                    if (!bulkDeleteIds) return;
+                    try {
+                        for (const id of bulkDeleteIds) {
+                            await deleteStudent(id, true, audit);
+                        }
+                        toast({ title: "Ação em Massa Concluída", description: `${bulkDeleteIds.length} alunos movidos para a lixeira.` });
+                    } catch (err: any) {
+                        toast({ title: "Erro na exclusão em massa", variant: "destructive" });
+                    } finally {
+                        setBulkDeleteIds(null);
+                    }
+                }}
+            />
         </div>
     );
 }

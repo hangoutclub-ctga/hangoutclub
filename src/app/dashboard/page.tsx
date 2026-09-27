@@ -14,6 +14,7 @@ import { useAuth } from "@/hooks/use-auth";
 import { useAgenda } from "@/hooks/use-agenda";
 import { useData } from "@/hooks/use-data";
 import { useRouter } from "next/navigation";
+import { useLoading } from "@/hooks/use-loading";
 import { useStockAlert } from "@/hooks/use-stock-alert";
 import {
   Dialog,
@@ -29,9 +30,15 @@ import { DisplayEvent, ManualEvent } from "@/types";
 import { ClassProfile } from "@/components/class-profile";
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const router = useRouter();
+  const { handleLinkClick } = useLoading();
   const { openStockAlert } = useStockAlert();
+
+  const handleNavigate = (path: string) => {
+    handleLinkClick(path);
+    router.push(path);
+  };
   const { 
     students, 
     classes, 
@@ -55,9 +62,15 @@ export default function DashboardPage() {
   const [editingEvent, setEditingEvent] = useState<Partial<ManualEvent> | null>(null);
   const [completedEventIds, setCompletedEventIds] = useState<string[]>([]);
 
-  // Dashboard focado nos compromissos do usuário ou geral se admin/secretaria
+  // Permissões dinâmicas do usuário
   const isAdmin = user?.role === 'Admin';
   const isSecretaria = user?.role === 'Secretaria';
+  const canViewFinance = isAdmin || hasPermission('nav:finance');
+  const canViewStudents = isAdmin || hasPermission('nav:students');
+  const canViewClasses = isAdmin || hasPermission('nav:classes');
+  const canViewInventory = isAdmin || hasPermission('nav:inventory');
+
+  // Dashboard focado nos compromissos do usuário ou geral se admin/secretaria
   const { events } = useAgenda(confirmedDate, user, 'day', (isAdmin || isSecretaria) ? 'todos' : (user?.nickname || ""));
 
   // Dados filtrados em tempo real
@@ -89,32 +102,25 @@ export default function DashboardPage() {
   }, [transactions]);
 
   const stats = useMemo(() => {
-    if (isAdmin || isSecretaria) {
-      return {
-        students: enrolledActiveStudentsCount,
-        classes: activeClasses.length,
-        profit: financialSummary.displayProfit,
-        profitLabel: financialSummary.label
-      };
-    } else {
-      const teacherClasses = activeClasses.filter(c => 
-        (c.teacherId && c.teacherId === user?.id) || 
-        (c.teacher && c.teacher === user?.nickname)
-      );
-      const teacherStudentsCount = activeStudents.filter(s => 
-        teacherClasses.some(c => 
-          c.name === s.class || 
-          (c.studentIds && c.studentIds.includes(s.id))
-        )
-      ).length;
-      return {
-        students: teacherStudentsCount,
-        classes: teacherClasses.length,
-        profit: 0,
-        profitLabel: "Agenda"
-      };
-    }
-  }, [isAdmin, isSecretaria, user, enrolledActiveStudentsCount, activeClasses, activeStudents, financialSummary]);
+    const isTeacherOnly = user?.role === 'Professor' && !isAdmin;
+    const teacherClasses = activeClasses.filter(c => 
+      (c.teacherId && c.teacherId === user?.id) || 
+      (c.teacher && c.teacher === user?.nickname)
+    );
+    const teacherStudentsCount = activeStudents.filter(s => 
+      teacherClasses.some(c => 
+        c.name === s.class || 
+        (c.studentIds && c.studentIds.includes(s.id))
+      )
+    ).length;
+
+    return {
+      students: isTeacherOnly ? teacherStudentsCount : enrolledActiveStudentsCount,
+      classes: isTeacherOnly ? teacherClasses.length : activeClasses.length,
+      profit: canViewFinance ? financialSummary.displayProfit : 0,
+      profitLabel: canViewFinance ? financialSummary.label : "Agenda"
+    };
+  }, [isAdmin, user, enrolledActiveStudentsCount, activeClasses, activeStudents, financialSummary, canViewFinance]);
 
   const lowStockCount = useMemo(() => 
     inventoryItems.filter(item => item.status !== 'Apagado' && item.stock <= item.minStock).length
@@ -414,83 +420,130 @@ export default function DashboardPage() {
         </DialogContent>
       </Dialog>
 
-      {!isSecretaria && (
+      {(canViewStudents || canViewClasses || canViewFinance) && (
         <div className="grid gap-2 sm:gap-6 grid-cols-2 lg:grid-cols-4">
-          <Card className="hover:shadow-md transition-all border-l-4 border-l-primary/40">
+          <Card 
+            role="button"
+            tabIndex={0}
+            onClick={() => handleNavigate('/dashboard/students')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleNavigate('/dashboard/students'); } }}
+            className="group cursor-pointer select-none border-l-4 border-l-primary/40 hover:border-l-primary hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
             <CardHeader className="flex flex-row items-center justify-between p-2 pb-0.5 sm:p-3 sm:pb-2">
-              <CardTitle className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground">Alunos</CardTitle>
-              <Users className="h-3.5 w-3.5 text-primary/60" />
+              <CardTitle className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground group-hover:text-primary transition-colors">
+                Alunos
+              </CardTitle>
+              <Users className="h-3.5 w-3.5 text-primary/60 group-hover:text-primary group-hover:scale-110 transition-all" />
             </CardHeader>
             <CardContent className="px-2 pb-2 pt-0 sm:p-3 sm:pt-0">
               <div className="text-xl sm:text-3xl font-black">{stats.students}</div>
-              <p className="text-[9px] sm:text-xs text-muted-foreground mt-0">{(isAdmin || isSecretaria) ? "Alunos ativos" : "Seus alunos"}</p>
+              <p className="text-[9px] sm:text-xs text-muted-foreground mt-0">{(user?.role === 'Professor' && !isAdmin) ? "Seus alunos" : "Alunos ativos"}</p>
             </CardContent>
-            <CardFooter className="p-2 pt-1 sm:p-3 border-t bg-muted/5">
-              <Button variant="ghost" size="sm" className="h-5 sm:h-6 w-full justify-between text-[9px] sm:text-[10px] hover:bg-transparent p-0" onClick={() => router.push('/dashboard/students')}>
-                Ver todos <ArrowUpRight className="h-2.5 w-2.5 sm:h-3 w-3 text-accent" />
-              </Button>
+            <CardFooter className="p-2 pt-1 sm:p-3 border-t bg-muted/5 group-hover:bg-primary/5 transition-colors">
+              <div className="flex items-center justify-between w-full text-[9px] sm:text-[10px] font-medium text-muted-foreground group-hover:text-primary transition-colors">
+                <span>Ver todos</span>
+                <ArrowUpRight className="h-2.5 w-2.5 sm:h-3 w-3 text-accent group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+              </div>
             </CardFooter>
           </Card>
 
-          <Card className="hover:shadow-md transition-all border-l-4 border-l-primary/40">
+          <Card 
+            role="button"
+            tabIndex={0}
+            onClick={() => handleNavigate('/dashboard/classes')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleNavigate('/dashboard/classes'); } }}
+            className="group cursor-pointer select-none border-l-4 border-l-primary/40 hover:border-l-primary hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
             <CardHeader className="flex flex-row items-center justify-between p-2 pb-0.5 sm:p-3 sm:pb-2">
-              <CardTitle className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground">Turmas</CardTitle>
-              <BookOpen className="h-3.5 w-3.5 text-primary/60" />
+              <CardTitle className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground group-hover:text-primary transition-colors">
+                Turmas
+              </CardTitle>
+              <BookOpen className="h-3.5 w-3.5 text-primary/60 group-hover:text-primary group-hover:scale-110 transition-all" />
             </CardHeader>
             <CardContent className="px-2 pb-2 pt-0 sm:p-3 sm:pt-0">
               <div className="text-xl sm:text-3xl font-black">{stats.classes}</div>
-              <p className="text-[9px] sm:text-xs text-muted-foreground mt-0">{(isAdmin || isSecretaria) ? "Em andamento" : "Titularidade"}</p>
+              <p className="text-[9px] sm:text-xs text-muted-foreground mt-0">{(user?.role === 'Professor' && !isAdmin) ? "Titularidade" : "Em andamento"}</p>
             </CardContent>
-            <CardFooter className="p-2 pt-1 sm:p-3 border-t bg-muted/5">
-              <Button variant="ghost" size="sm" className="h-5 sm:h-6 w-full justify-between text-[9px] sm:text-[10px] hover:bg-transparent p-0" onClick={() => router.push('/dashboard/classes')}>
-                Ver todas <ArrowUpRight className="h-2.5 w-2.5 sm:h-3 w-3 text-accent" />
-              </Button>
+            <CardFooter className="p-2 pt-1 sm:p-3 border-t bg-muted/5 group-hover:bg-primary/5 transition-colors">
+              <div className="flex items-center justify-between w-full text-[9px] sm:text-[10px] font-medium text-muted-foreground group-hover:text-primary transition-colors">
+                <span>Ver todas</span>
+                <ArrowUpRight className="h-2.5 w-2.5 sm:h-3 w-3 text-accent group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+              </div>
             </CardFooter>
           </Card>
 
-          <Card className="hover:shadow-md transition-all border-l-4 border-l-primary/40">
+          <Card 
+            role="button"
+            tabIndex={0}
+            onClick={() => handleNavigate(canViewFinance ? '/dashboard/finance' : '/dashboard/agenda')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleNavigate(canViewFinance ? '/dashboard/finance' : '/dashboard/agenda'); } }}
+            className="group cursor-pointer select-none border-l-4 border-l-primary/40 hover:border-l-primary hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
             <CardHeader className="flex flex-row items-center justify-between p-2 pb-0.5 sm:p-3 sm:pb-2">
-              <CardTitle className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground">{(isAdmin || isSecretaria) ? "Faturamento" : "Agenda"}</CardTitle>
-              {(isAdmin || isSecretaria) ? <Wallet className="h-3.5 w-3.5 text-primary/60" /> : <CalendarIcon className="h-3.5 w-3.5 text-primary/60" />}
+              <CardTitle className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-muted-foreground group-hover:text-primary transition-colors">
+                {canViewFinance ? "Faturamento" : "Agenda"}
+              </CardTitle>
+              {canViewFinance ? (
+                <Wallet className="h-3.5 w-3.5 text-primary/60 group-hover:text-primary group-hover:scale-110 transition-all" />
+              ) : (
+                <CalendarIcon className="h-3.5 w-3.5 text-primary/60 group-hover:text-primary group-hover:scale-110 transition-all" />
+              )}
             </CardHeader>
             <CardContent className="px-2 pb-2 pt-0 sm:p-3 sm:pt-0">
-              <div className={cn("text-lg sm:text-3xl font-black truncate", (isAdmin || isSecretaria) && (stats.profit >= 0 ? "text-green-600" : "text-red-500"))}>
-                {(isAdmin || isSecretaria) ? formatCurrency(stats.profit) : events.length}
+              <div className={cn("text-lg sm:text-3xl font-black truncate", canViewFinance && (stats.profit >= 0 ? "text-green-600" : "text-red-500"))}>
+                {canViewFinance ? formatCurrency(stats.profit) : events.length}
               </div>
-              <p className="text-[9px] sm:text-xs text-muted-foreground mt-0">{(isAdmin || isSecretaria) ? stats.profitLabel : "Agendamentos hoje"}</p>
+              <p className="text-[9px] sm:text-xs text-muted-foreground mt-0">{canViewFinance ? stats.profitLabel : "Agendamentos hoje"}</p>
             </CardContent>
-            <CardFooter className="p-2 pt-1 sm:p-3 border-t bg-muted/5">
-              <Button variant="ghost" size="sm" className="h-5 sm:h-6 w-full justify-between text-[9px] sm:text-[10px] hover:bg-transparent p-0" onClick={() => router.push((isAdmin || isSecretaria) ? '/dashboard/finance' : '/dashboard/agenda')}>
-                Detalhes <ArrowUpRight className="h-2.5 w-2.5 sm:h-3 w-3 text-accent" />
-              </Button>
+            <CardFooter className="p-2 pt-1 sm:p-3 border-t bg-muted/5 group-hover:bg-primary/5 transition-colors">
+              <div className="flex items-center justify-between w-full text-[9px] sm:text-[10px] font-medium text-muted-foreground group-hover:text-primary transition-colors">
+                <span>Detalhes</span>
+                <ArrowUpRight className="h-2.5 w-2.5 sm:h-3 w-3 text-accent group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+              </div>
             </CardFooter>
           </Card>
 
-          <Card className="bg-accent/5 border-accent/20 shadow-accent/5 shadow-lg border-2">
+          <Card 
+            role="button"
+            tabIndex={0}
+            onClick={() => handleNavigate('/dashboard/grades')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleNavigate('/dashboard/grades'); } }}
+            className="group cursor-pointer select-none bg-accent/5 border-accent/20 shadow-accent/5 hover:border-accent/50 hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 border-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          >
             <CardHeader className="flex flex-row items-center justify-between p-2 pb-0.5 sm:p-3 sm:pb-2">
               <CardTitle className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-accent">Notas</CardTitle>
-              <Award className="h-4 w-4 text-accent animate-pulse" />
+              <Award className="h-4 w-4 text-accent animate-pulse group-hover:scale-110 transition-transform" />
             </CardHeader>
             <CardContent className="px-2 pb-2 pt-0 sm:p-3 sm:pt-0">
               <p className="text-[9px] sm:text-xs text-muted-foreground font-medium">Registro pedagógico.</p>
             </CardContent>
             <CardFooter className="p-2 pt-1 sm:p-3">
-              <Button className="h-6 sm:h-7 w-full justify-between bg-accent hover:bg-accent/90 text-white shadow-md text-[9px] sm:text-[10px]" onClick={() => router.push('/dashboard/grades')}>
-                Acessar <ArrowUpRight className="h-2.5 w-2.5 sm:h-3 w-3" />
-              </Button>
+              <div className="flex items-center justify-between w-full h-6 sm:h-7 px-3 rounded-md bg-accent group-hover:bg-accent/90 text-white shadow-md text-[9px] sm:text-[10px] font-medium transition-colors">
+                <span>Acessar</span>
+                <ArrowUpRight className="h-2.5 w-2.5 sm:h-3 w-3 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+              </div>
             </CardFooter>
           </Card>
         </div>
       )}
 
-      {(isAdmin || isSecretaria) && (
+      {canViewInventory && (
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-6">
-          <Card className={cn("border-2 transition-all", lowStockCount > 0 ? "border-red-500/50 bg-red-500/5" : "border-muted")}>
+          <Card 
+            role="button"
+            tabIndex={0}
+            onClick={() => openStockAlert()}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openStockAlert(); } }}
+            className={cn(
+              "group cursor-pointer select-none border-2 hover:shadow-lg hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary", 
+              lowStockCount > 0 ? "border-red-500/50 bg-red-500/5 hover:border-red-500/80" : "border-muted hover:border-primary/50"
+            )}
+          >
             <CardHeader className="flex flex-row items-center justify-between p-2 sm:p-3 pb-1 space-y-0">
-              <CardTitle className={cn("text-[10px] sm:text-xs font-bold uppercase", lowStockCount > 0 ? "text-red-600" : "text-muted-foreground")}>
+              <CardTitle className={cn("text-[10px] sm:text-xs font-bold uppercase transition-colors", lowStockCount > 0 ? "text-red-600 group-hover:text-red-700" : "text-muted-foreground group-hover:text-primary")}>
                 Estoque Baixo
               </CardTitle>
-              <AlertTriangle className={cn("h-3.5 w-3.5", lowStockCount > 0 ? "text-red-500" : "text-muted-foreground")} />
+              <AlertTriangle className={cn("h-3.5 w-3.5 group-hover:scale-110 transition-transform", lowStockCount > 0 ? "text-red-500" : "text-muted-foreground")} />
             </CardHeader>
             <CardContent className="px-2 sm:px-3 pb-1.5 pt-0">
               <div className="text-xl sm:text-3xl font-black">{lowStockCount}</div>
@@ -498,20 +551,29 @@ export default function DashboardPage() {
                 {lowStockCount > 0 ? "Reposição necessária." : "Tudo em dia."}
               </p>
             </CardContent>
-            <CardFooter className="px-2 sm:px-3 pb-3 flex gap-2">
-              <Button variant="outline" size="sm" className="h-6 text-[9px] sm:text-[10px] gap-1 px-2" onClick={openStockAlert}>
-                Alerta <AlertTriangle className="h-2.5 w-2.5 text-red-500" />
-              </Button>
-              <Button variant="ghost" size="sm" className="h-6 text-[9px] sm:text-[10px] gap-1 px-2" onClick={() => router.push('/dashboard/inventory')}>
-                Ver Estoque <ArrowRight className="h-2.5 w-2.5" />
-              </Button>
+            <CardFooter className="px-2 sm:px-3 pb-3 flex items-center justify-between">
+              <div className="flex items-center text-[9px] sm:text-[10px] gap-1 text-red-600 dark:text-red-400 font-bold group-hover:underline">
+                <AlertTriangle className="h-3 w-3" />
+                <span>Alerta de Compras</span>
+              </div>
+              <div className="flex items-center text-[9px] sm:text-[10px] text-muted-foreground group-hover:text-primary transition-colors font-medium">
+                <ArrowUpRight className="h-2.5 w-2.5 ml-1 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+              </div>
             </CardFooter>
           </Card>
 
-          <Card className="hover:shadow-md transition-all">
+          <Card 
+            role="button"
+            tabIndex={0}
+            onClick={() => handleNavigate('/dashboard/inventory')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleNavigate('/dashboard/inventory'); } }}
+            className="group cursor-pointer select-none hover:shadow-lg hover:border-primary/50 hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
             <CardHeader className="flex flex-row items-center justify-between p-2 sm:p-3 pb-1 space-y-0">
-              <CardTitle className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground">Populares</CardTitle>
-              <TrendingUp className="h-3.5 w-3.5 text-muted-foreground" />
+              <CardTitle className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground group-hover:text-primary transition-colors">
+                Populares
+              </CardTitle>
+              <TrendingUp className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary group-hover:scale-110 transition-all" />
             </CardHeader>
             <CardContent className="px-2 sm:px-3 pb-1.5 pt-0">
               <div className="text-xs sm:text-sm font-bold truncate">{popularItem ? popularItem.name : "Nenhum item"}</div>
@@ -520,16 +582,25 @@ export default function DashboardPage() {
               </p>
             </CardContent>
             <CardFooter className="px-2 sm:px-3 pb-3">
-              <Button variant="ghost" size="sm" className="h-6 text-[9px] sm:text-[10px] p-0 hover:bg-transparent" onClick={() => router.push('/dashboard/inventory')}>
-                Gerenciar <ArrowUpRight className="h-2.5 w-2.5 ml-1" />
-              </Button>
+              <div className="flex items-center text-[9px] sm:text-[10px] text-muted-foreground group-hover:text-primary transition-colors font-medium">
+                <span>Gerenciar</span>
+                <ArrowUpRight className="h-2.5 w-2.5 ml-1 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+              </div>
             </CardFooter>
           </Card>
 
-          <Card className="hover:shadow-md transition-all">
+          <Card 
+            role="button"
+            tabIndex={0}
+            onClick={() => handleNavigate('/dashboard/settings?tab=categories')}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleNavigate('/dashboard/settings?tab=categories'); } }}
+            className="group cursor-pointer select-none hover:shadow-lg hover:border-primary/50 hover:-translate-y-0.5 active:scale-[0.98] transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
             <CardHeader className="flex flex-row items-center justify-between p-2 sm:p-3 pb-1 space-y-0">
-              <CardTitle className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground">Categorias</CardTitle>
-              <Layers className="h-3.5 w-3.5 text-muted-foreground" />
+              <CardTitle className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground group-hover:text-primary transition-colors">
+                Categorias
+              </CardTitle>
+              <Layers className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary group-hover:scale-110 transition-all" />
             </CardHeader>
             <CardContent className="px-2 sm:px-3 pb-1.5 pt-0">
               <div className="text-xs sm:text-sm font-bold truncate">
@@ -540,9 +611,10 @@ export default function DashboardPage() {
               </p>
             </CardContent>
             <CardFooter className="px-2 sm:px-3 pb-3">
-              <Button variant="ghost" size="sm" className="h-6 text-[9px] sm:text-[10px] p-0 hover:bg-transparent" onClick={() => router.push('/dashboard/inventory')}>
-                Organizar <ArrowUpRight className="h-2.5 w-2.5 ml-1" />
-              </Button>
+              <div className="flex items-center text-[9px] sm:text-[10px] text-muted-foreground group-hover:text-primary transition-colors font-medium">
+                <span>Configurar Categorias</span>
+                <ArrowUpRight className="h-2.5 w-2.5 ml-1 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+              </div>
             </CardFooter>
           </Card>
         </div>

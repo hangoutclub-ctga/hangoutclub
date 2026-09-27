@@ -1,30 +1,55 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { NewLogo } from "@/components/new-logo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Eye, EyeOff, Lock, Mail } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "@/hooks/use-toast";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, isAuthenticated, isLoading: authLoading } = useAuth();
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [loading, setLoading] = useState(false);
   const [show, setShow] = useState(false);
+  const [keepLoggedIn, setKeepLoggedIn] = useState(true);
+
+  // Recupera preferências salvas (checkbox e e-mail)
+  useEffect(() => {
+    try {
+      const savedKeep = localStorage.getItem("hangout_keep_logged_in");
+      if (savedKeep !== null) {
+        setKeepLoggedIn(savedKeep === "true");
+      }
+      const savedEmail = localStorage.getItem("hangout_remembered_email");
+      if (savedEmail) {
+        setEmail(savedEmail);
+      }
+    } catch {
+      // Ignora erro caso localStorage esteja indisponível
+    }
+  }, []);
+
+  // Redireciona automaticamente se já estiver autenticado
+  useEffect(() => {
+    if (!authLoading && isAuthenticated) {
+      router.replace("/dashboard");
+    }
+  }, [authLoading, isAuthenticated, router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !pass || loading) return;
 
     setLoading(true);
-    const result = await login(email, pass);
+    const result = await login(email, pass, keepLoggedIn);
     if (result.success) {
       toast({
         title: "Login efetuado com sucesso!",
@@ -42,6 +67,25 @@ export default function LoginPage() {
       });
     }
   };
+
+  // Se já autenticado ou aguardando verificação da sessão, exibe tela de carregamento suave
+  if (authLoading || isAuthenticated) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-background p-4 relative overflow-hidden">
+        {/* Background glow effects */}
+        <div className="absolute top-1/4 -left-20 w-80 h-80 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-1/4 -right-20 w-80 h-80 bg-accent/10 rounded-full blur-3xl pointer-events-none" />
+
+        <div className="flex flex-col items-center space-y-4 relative z-10">
+          <NewLogo className="h-14 w-auto drop-shadow animate-pulse" />
+          <div className="flex items-center space-x-2 text-xs text-muted-foreground font-medium">
+            <Loader2 className="h-4 w-4 animate-spin text-accent" />
+            <span>Verificando sessão...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4 relative overflow-hidden">
@@ -104,7 +148,7 @@ export default function LoginPage() {
             </div>
           </CardContent>
 
-          <CardFooter className="pt-2">
+          <CardFooter className="pt-2 flex flex-col space-y-3">
             <Button
               type="submit"
               className="w-full bg-accent hover:bg-accent/90 text-white shadow-md font-medium"
@@ -113,6 +157,20 @@ export default function LoginPage() {
               {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {loading ? "Entrando..." : "Acessar Sistema"}
             </Button>
+
+            <div className="flex items-center justify-center space-x-2 w-full pt-1">
+              <Checkbox
+                id="remember"
+                checked={keepLoggedIn}
+                onCheckedChange={(checked) => setKeepLoggedIn(!!checked)}
+              />
+              <Label
+                htmlFor="remember"
+                className="text-xs text-muted-foreground cursor-pointer font-medium select-none hover:text-foreground transition-colors"
+              >
+                Manter conectado
+              </Label>
+            </div>
           </CardFooter>
         </form>
       </Card>

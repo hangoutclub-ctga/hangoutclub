@@ -81,7 +81,7 @@ export type Class = {
 
 export type Transaction = {
     id: string;
-    type: 'Entrada' | 'Saída';
+    type: 'Entrada' | 'Saída' | 'Apagado';
     description: string;
     category: 'Fornecedor' | 'Aluno' | 'Despesa Fixa' | 'Outros';
     name: string; // 'Fornecedor' or 'Cliente' name
@@ -95,7 +95,7 @@ export type FixedExpense = {
     id: string;
     description: string;
     value: number;
-    status: 'Pago' | 'Pendente';
+    status: 'Pago' | 'Pendente' | 'Apagado';
     month: number;
     year: number;
     dueDate: number; // Day of the month
@@ -137,7 +137,7 @@ export type SystemCategoryType = 'student_condition' | 'class_modality' | 'inven
 
 export type SystemCategory = {
   id: string;
-  type: SystemCategoryType;
+  type: SystemCategoryType | 'Apagado';
   name: string;
   color?: string;
   description?: string;
@@ -185,3 +185,9 @@ export type Attachment = {
   size: number;
   dataUri: string;
 };
+
+export interface DeletionAudit {
+  reason: string;
+  deletedBy: string;
+  deletedAt: string;
+}

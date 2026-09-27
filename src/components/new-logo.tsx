@@ -2,7 +2,7 @@ import { SVGProps } from "react";
 
 export function NewLogo(props: SVGProps<SVGSVGElement>) {
   return (
-<svg xmlns="http://www.w3.org/2000/svg" xmlSpace="preserve" version="1.1" style={{shapeRendering:'geometricPrecision', textRendering:'geometricPrecision', imageRendering:'optimizeQuality', fillRule:'evenodd', clipRule:'evenodd'}}
+<svg xmlns="http://www.w3.org/2000/svg" xmlSpace="preserve" version="1.1" style={{shapeRendering:'geometricPrecision', textRendering:'geometricPrecision', imageRendering:'auto', fillRule:'evenodd', clipRule:'evenodd'}}
 viewBox="0 0 250.76 250.76"
 preserveAspectRatio="xMidYMid meet"
  {...props}

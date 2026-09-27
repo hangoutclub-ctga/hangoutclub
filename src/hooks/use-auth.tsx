@@ -9,7 +9,7 @@ export interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, pass: string) => Promise<{ success: boolean; error?: string }>;
+  login: (email: string, pass: string, keepLoggedIn?: boolean) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   hasPermission: (permission: string) => boolean;
   refreshUser: () => Promise<void>;
@@ -27,8 +27,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     async function initializeAuth() {
       try {
+        const keepLoggedIn = typeof window !== 'undefined' ? localStorage.getItem('hangout_keep_logged_in') !== 'false' : true;
+        const sessionActive = typeof window !== 'undefined' && sessionStorage.getItem('hangout_session_active') === 'true';
+
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user && isMounted) {
+          // If the user previously chose NOT to keep logged in, and this is a new browser session (sessionStorage cleared)
+          if (!keepLoggedIn && !sessionActive) {
+            await supabase.auth.signOut();
+            if (isMounted) {
+              setUser(null);
+              setIsLoading(false);
+            }
+            return;
+          }
+
+          if (typeof window !== 'undefined') {
+            sessionStorage.setItem('hangout_session_active', 'true');
+          }
+
           const { data: profile } = await supabase
             .from('profiles')
             .select('*')
@@ -50,6 +67,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
+        const keepLoggedIn = typeof window !== 'undefined' ? localStorage.getItem('hangout_keep_logged_in') !== 'false' : true;
+        const sessionActive = typeof window !== 'undefined' && sessionStorage.getItem('hangout_session_active') === 'true';
+
+        if (!keepLoggedIn && !sessionActive && event !== 'SIGNED_IN') {
+          if (isMounted) setUser(null);
+          if (isMounted) setIsLoading(false);
+          return;
+        }
+
         const { data: profile } = await supabase
           .from('profiles')
           .select('*')
@@ -71,15 +97,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
   }, []);
 
-  const login = async (email: string, pass: string): Promise<{ success: boolean; error?: string }> => {
+  const login = async (email: string, pass: string, keepLoggedIn: boolean = true): Promise<{ success: boolean; error?: string }> => {
     setIsLoading(true);
     try {
+      if (typeof window !== 'undefined') {
+        if (keepLoggedIn) {
+          localStorage.setItem('hangout_keep_logged_in', 'true');
+          localStorage.setItem('hangout_remembered_email', email.trim());
+        } else {
+          localStorage.setItem('hangout_keep_logged_in', 'false');
+          localStorage.removeItem('hangout_remembered_email');
+        }
+        sessionStorage.setItem('hangout_session_active', 'true');
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password: pass
       });
 
       if (error) {
+        if (typeof window !== 'undefined') {
+          sessionStorage.removeItem('hangout_session_active');
+        }
         setIsLoading(false);
         return { success: false, error: error.message };
       }
@@ -101,6 +141,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       setIsLoading(false);
       return { success: true };
     } catch (err: any) {
+      if (typeof window !== 'undefined') {
+        sessionStorage.removeItem('hangout_session_active');
+      }
       setIsLoading(false);
       return { success: false, error: err.message || 'Erro inesperado ao realizar login.' };
     }
@@ -110,6 +153,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     try {
       if (typeof window !== 'undefined') {
         sessionStorage.removeItem('low_stock_alert_seen');
+        sessionStorage.removeItem('hangout_session_active');
+        localStorage.removeItem('hangout_keep_logged_in');
       }
       await supabase.auth.signOut();
     } catch (err) {

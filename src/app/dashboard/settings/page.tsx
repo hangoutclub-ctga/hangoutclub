@@ -11,11 +11,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
-import { ShieldCheck, User as UserIcon, Briefcase, PlusCircle, Edit, Trash2, Save, CalendarIcon, Menu, ChevronLeft, Home, Loader2, Tags } from "lucide-react";
+import { ShieldCheck, User as UserIcon, Briefcase, PlusCircle, Edit, Trash2, Save, CalendarIcon, Menu, ChevronLeft, Home, Loader2, Tags, RotateCcw, Users, Info, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { User } from "@/types";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { cn, getDisplayAvatarUrl } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -23,6 +24,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog"
 import { EmployeeForm } from "./employee-form";
 import { CategoryManager } from "./category-manager";
+import { ALL_PERMISSIONS, PERMISSION_CATEGORIES, DEFAULT_ROLE_PERMISSIONS, getDefaultPermissionsForRole } from "@/lib/permissions";
 import { useData } from "@/hooks/use-data";
 import { updateUser, createUser } from "@/services/users.service";
 import { ImagePicker } from "@/components/image-picker";
@@ -35,6 +37,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { useRouter } from "next/navigation";
 import { useLoading } from "@/hooks/use-loading";
 import { createClient } from "@/lib/supabase/client";
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 
 const profileSchema = z.object({
   nickname: z.string().min(2, "Nome obrigatório."),
@@ -60,151 +63,478 @@ type PasswordFormValues = z.infer<typeof passwordSchema>;
 
 const PermissionsManager = () => {
     const isMobile = useIsMobile();
-    const { users, refetchData } = useData();
-    const [selectedUserId, setSelectedUserId] = useState<string>('');
-    const [localUsers, setLocalUsers] = useState<User[]>(users);
-    const [isSaving, setIsSaving] = useState(false);
+    const { users, refetchData, categories } = useData();
+    const { user: authUser, refreshUser } = useAuth();
     
+    // Mode: 'role' (Por Cargo) | 'user' (Por Colaborador)
+    const [permMode, setPermMode] = useState<'role' | 'user'>('role');
+    
+    // State for Role Mode
+    const rolesList = React.useMemo(() => {
+        const defaultRoles = ["Admin", "Professor", "Secretaria"];
+        const custom = categories.userRoles || [];
+        return Array.from(new Set([...defaultRoles, ...custom]));
+    }, [categories.userRoles]);
+
+    const [selectedRole, setSelectedRole] = useState<string>("Professor");
+    const [rolePermsMap, setRolePermsMap] = useState<Record<string, string[]>>({});
+
+    // State for User Mode
+    const [selectedUserId, setSelectedUserId] = useState<string>('');
+    const [localUsers, setLocalUsers] = useState<User[]>([]);
+
+    const [isSaving, setIsSaving] = useState(false);
+
+    // Initialize state from existing users
     React.useEffect(() => {
-        setLocalUsers(users);
-    }, [users]);
+        const activeUsers = users.filter(u => u.role !== 'Apagado');
+        setLocalUsers(activeUsers);
+
+        // Build role permissions map: prefer what existing users of this role have, fallback to system defaults
+        const newMap: Record<string, string[]> = {};
+        rolesList.forEach(role => {
+            if (role === 'Admin') {
+                newMap[role] = ALL_PERMISSIONS.map(p => p.id);
+            } else {
+                const roleUsersWithPerms = activeUsers.filter(u => u.role === role && u.permissions && u.permissions.length > 0);
+                if (roleUsersWithPerms.length > 0) {
+                    newMap[role] = [...roleUsersWithPerms[0].permissions!];
+                } else {
+                    newMap[role] = getDefaultPermissionsForRole(role);
+                }
+            }
+        });
+        setRolePermsMap(prev => ({ ...newMap, ...prev }));
+    }, [users, rolesList]);
 
     const selectedUser = localUsers.find(u => u.id === selectedUserId);
+    const activeRolePerms = rolePermsMap[selectedRole] || getDefaultPermissionsForRole(selectedRole);
+    const targetUsersForRole = localUsers.filter(u => u.role === selectedRole);
 
-    const handlePermissionChange = (permission: string, value: boolean) => {
+    // Handlers for Role Mode
+    const handleRolePermChange = (permissionId: string, checked: boolean) => {
+        if (selectedRole === 'Admin') return;
+        setRolePermsMap(prev => {
+            const current = prev[selectedRole] || getDefaultPermissionsForRole(selectedRole);
+            const updated = checked 
+                ? Array.from(new Set([...current, permissionId])) 
+                : current.filter(p => p !== permissionId);
+            return { ...prev, [selectedRole]: updated };
+        });
+    };
+
+    const handleResetRoleDefaults = () => {
+        setRolePermsMap(prev => ({
+            ...prev,
+            [selectedRole]: getDefaultPermissionsForRole(selectedRole)
+        }));
+        toast({ title: "Padrão restaurado", description: `Permissões padrão de ${selectedRole} restauradas na tela.` });
+    };
+
+    const onSaveRolePermissions = async () => {
+        if (selectedRole === 'Admin') {
+            toast({ title: "Informação", description: "O perfil de Administrador possui todas as permissões permanentemente." });
+            return;
+        }
+        setIsSaving(true);
+        try {
+            const permsToApply = rolePermsMap[selectedRole] || getDefaultPermissionsForRole(selectedRole);
+            const targetUsers = localUsers.filter(u => u.role === selectedRole);
+
+            // Apply to all users with this role in Supabase
+            await Promise.all(
+                targetUsers.map(u => updateUser(u.id, { permissions: permsToApply }))
+            );
+
+            // Update local memory state
+            setLocalUsers(prev => prev.map(u => u.role === selectedRole ? { ...u, permissions: permsToApply } : u));
+
+            // Refresh current user session if affected
+            if (authUser?.role === selectedRole) {
+                await refreshUser();
+            }
+            await refetchData();
+
+            toast({ 
+                title: "Permissões de Cargo Salvas!", 
+                description: `Permissões atualizadas e propagadas para ${targetUsers.length} colaborador(es) com o cargo ${selectedRole}.` 
+            });
+        } catch (err: any) {
+            console.error("Erro ao salvar permissões do cargo:", err);
+            toast({ variant: 'destructive', title: "Erro ao salvar", description: err.message });
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    // Handlers for User Mode
+    const handleUserPermChange = (permissionId: string, checked: boolean) => {
         if (!selectedUser || selectedUser.role === 'Admin') return;
         setLocalUsers(prev => prev.map(u => {
             if (u.id === selectedUserId) {
-                const newPerms = value 
-                    ? [...(u.permissions || []), permission]
-                    : (u.permissions || []).filter(p => p !== permission);
-                return { ...u, permissions: newPerms };
+                const current = u.permissions || [];
+                const updated = checked
+                    ? Array.from(new Set([...current, permissionId]))
+                    : current.filter(p => p !== permissionId);
+                return { ...u, permissions: updated };
             }
             return u;
         }));
     };
 
-    const allPermissions = [
-        { id: 'nav:dashboard', label: 'Ver Dashboard' },
-        { id: 'nav:agenda', label: 'Ver Agenda' },
-        { id: 'nav:students', label: 'Ver Alunos' },
-        { id: 'nav:classes', label: 'Ver Turmas' },
-        { id: 'nav:grades', label: 'Ver Notas' },
-        { id: 'nav:finance', label: 'Ver Financeiro' },
-        { id: 'nav:inventory', label: 'Ver Inventário' },
-        { id: 'nav:communication', label: 'Ver Comunicação' },
-        { id: 'nav:trash', label: 'Ver Lixeira' },
-        { id: 'students:create', label: 'Criar Alunos' },
-        { id: 'classes:create', label: 'Criar Turmas' },
-        { id: 'permissions:edit', label: 'Editar Permissões' },
-    ];
+    const handleResetUserToRoleDefault = () => {
+        if (!selectedUser) return;
+        const roleDefault = rolePermsMap[selectedUser.role] || getDefaultPermissionsForRole(selectedUser.role);
+        setLocalUsers(prev => prev.map(u => u.id === selectedUserId ? { ...u, permissions: roleDefault } : u));
+        toast({ title: "Padrão aplicado", description: `Permissões de ${selectedUser.nickname} redefinidas para o padrão do cargo (${selectedUser.role}).` });
+    };
 
-    const onSavePermissions = async () => {
+    const onSaveUserPermissions = async () => {
         if (!selectedUser) return;
         setIsSaving(true);
         try {
             await updateUser(selectedUser.id, { permissions: selectedUser.permissions });
+            if (authUser?.id === selectedUser.id) {
+                await refreshUser();
+            }
             await refetchData();
-            toast({ title: "Permissões Salvas!", description: "Atualizadas com sucesso." });
+            toast({ title: "Permissões Salvas!", description: `Permissões de ${selectedUser.nickname} atualizadas com sucesso.` });
         } catch (err: any) {
+            console.error("Erro ao salvar permissões do usuário:", err);
             toast({ variant: 'destructive', title: "Erro ao salvar", description: err.message });
         } finally {
             setIsSaving(false);
         }
-    }
+    };
 
     return (
         <Card className="border-none shadow-none bg-transparent">
-            <CardHeader className="px-0">
+            <CardHeader className="px-0 pb-4">
                 <div className="flex items-center gap-2 text-primary">
-                    <ShieldCheck className="h-5 w-5"/>
+                    <ShieldCheck className="h-5 w-5 text-accent"/>
                     <CardTitle className="text-lg sm:text-xl">Gerenciamento de Permissões</CardTitle>
                 </div>
-                <CardDescription className="text-[10px] sm:text-sm">Configure o que cada colaborador pode acessar.</CardDescription>
+                <CardDescription className="text-xs sm:text-sm">
+                    Configure os acessos por tipo de funcionário (cargo) ou personalize perfis individuais.
+                </CardDescription>
             </CardHeader>
             <CardContent className="px-0 space-y-6">
-                <div className="max-w-sm">
-                    <Label htmlFor="user-select" className="text-[9px] sm:text-[10px] font-bold uppercase text-muted-foreground">Colaborador</Label>
-                    <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                        <SelectTrigger id="user-select" className="h-9 sm:h-11">
-                            <SelectValue placeholder="Selecione um perfil..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {localUsers.map((user) => (
-                                <SelectItem key={user.id} value={user.id}>{user.nickname} - {user.role}</SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                {/* Seletor de Modo: Por Cargo vs Por Colaborador */}
+                <div className="flex flex-wrap gap-2 p-1 bg-muted/60 rounded-xl max-w-md border">
+                    <Button
+                        type="button"
+                        variant={permMode === 'role' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setPermMode('role')}
+                        className={cn("flex-1 text-xs h-9 font-bold", permMode === 'role' && "bg-accent text-white shadow-sm")}
+                    >
+                        <Briefcase className="h-4 w-4 mr-2" /> Por Cargo (Tipo de Funcionário)
+                    </Button>
+                    <Button
+                        type="button"
+                        variant={permMode === 'user' ? 'default' : 'ghost'}
+                        size="sm"
+                        onClick={() => setPermMode('user')}
+                        className={cn("flex-1 text-xs h-9 font-bold", permMode === 'user' && "bg-accent text-white shadow-sm")}
+                    >
+                        <UserIcon className="h-4 w-4 mr-2" /> Por Colaborador
+                    </Button>
                 </div>
 
-                {selectedUser && (
-                     <div className="border rounded-xl p-4 sm:p-6 bg-card shadow-sm">
-                        <h3 className="font-bold mb-4 sm:mb-6 text-primary border-b pb-2 flex items-center gap-2 text-xs sm:text-base">
-                            <UserIcon className="h-4 w-4" /> Permissões: {selectedUser.nickname}
-                        </h3>
-                        <div className={cn("grid gap-3 sm:gap-6", isMobile ? "grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3")}>
-                            {allPermissions.map(p => {
-                                const isAdmin = selectedUser.role === 'Admin';
-                                const isChecked = isAdmin || (selectedUser.permissions?.includes(p.id) ?? false);
-                                return (
-                                <div key={p.id} className="flex items-center justify-between p-2 rounded-lg border bg-muted/5">
-                                    <Label htmlFor={`${selectedUser.id}-${p.id}`} className="text-[9px] sm:text-xs font-medium cursor-pointer flex-1 leading-tight">{p.label}</Label>
-                                    <Switch
-                                        id={`${selectedUser.id}-${p.id}`}
-                                        checked={isChecked}
-                                        onCheckedChange={(checked) => handlePermissionChange(p.id, checked)}
-                                        disabled={isAdmin}
-                                        className="scale-75 sm:scale-100"
-                                    />
+                {/* ============================================================== */}
+                {/* MODO 1: CONFIGURAÇÃO POR CARGO (TIPO DE FUNCIONÁRIO)           */}
+                {/* ============================================================== */}
+                {permMode === 'role' && (
+                    <div className="space-y-6 animate-in fade-in duration-300">
+                        {/* Seletor de Cargos */}
+                        <div className="space-y-2">
+                            <Label className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                Escolha o Tipo de Funcionário (Cargo)
+                            </Label>
+                            <div className="flex flex-wrap gap-2">
+                                {rolesList.map(role => {
+                                    const count = localUsers.filter(u => u.role === role).length;
+                                    const isSelected = selectedRole === role;
+                                    return (
+                                        <Button
+                                            key={role}
+                                            type="button"
+                                            variant={isSelected ? "default" : "outline"}
+                                            onClick={() => setSelectedRole(role)}
+                                            className={cn(
+                                                "h-10 text-xs sm:text-sm font-semibold transition-all",
+                                                isSelected && "bg-accent text-white ring-2 ring-accent/30 shadow-sm"
+                                            )}
+                                        >
+                                            {role}
+                                            <Badge variant={isSelected ? "secondary" : "outline"} className={cn("ml-2 text-[10px]", isSelected ? "bg-white/20 text-white border-none" : "text-muted-foreground")}>
+                                                {count} {count === 1 ? 'colaborador' : 'colaboradores'}
+                                            </Badge>
+                                        </Button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        {/* Bloco de Informações / Permissões do Cargo */}
+                        <div className="border rounded-2xl p-4 sm:p-6 bg-card shadow-sm space-y-6">
+                            <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b pb-4">
+                                <div>
+                                    <h3 className="font-bold text-base sm:text-lg text-primary flex items-center gap-2">
+                                        <Briefcase className="h-5 w-5 text-accent" /> Permissões do Cargo: {selectedRole}
+                                    </h3>
+                                    <p className="text-xs text-muted-foreground mt-0.5">
+                                        As alterações salvas aqui serão aplicadas a todos os {targetUsersForRole.length} colaborador(es) com o cargo <strong>{selectedRole}</strong>.
+                                    </p>
                                 </div>
-                            )})}
+                                {selectedRole !== 'Admin' && (
+                                    <Button 
+                                        type="button" 
+                                        variant="outline" 
+                                        size="sm" 
+                                        onClick={handleResetRoleDefaults}
+                                        className="h-8 text-xs text-muted-foreground hover:text-primary self-start sm:self-auto"
+                                    >
+                                        <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Restaurar Padrão do Cargo
+                                    </Button>
+                                )}
+                            </div>
+
+                            {selectedRole === 'Admin' && (
+                                <div className="p-3.5 rounded-xl bg-accent/10 border border-accent/20 flex items-center gap-3 text-xs sm:text-sm text-primary">
+                                    <Info className="h-5 w-5 text-accent shrink-0" />
+                                    <span>O cargo de <strong>Administrador</strong> possui acesso total e irrestrito a todas as funcionalidades do sistema por padrão.</span>
+                                </div>
+                            )}
+
+                            {/* Grupos de Permissões */}
+                            <div className="space-y-6">
+                                {PERMISSION_CATEGORIES.map(category => {
+                                    const permsInCategory = ALL_PERMISSIONS.filter(p => p.category === category.id);
+                                    if (permsInCategory.length === 0) return null;
+
+                                    return (
+                                        <div key={category.id} className="space-y-3">
+                                            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                                <span className="w-1.5 h-1.5 rounded-full bg-accent" /> {category.label}
+                                            </h4>
+                                            <div className="grid gap-2.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                                                {permsInCategory.map(p => {
+                                                    const isAdmin = selectedRole === 'Admin';
+                                                    const isChecked = isAdmin || activeRolePerms.includes(p.id);
+
+                                                    return (
+                                                        <div 
+                                                            key={p.id} 
+                                                            className={cn(
+                                                                "flex items-center justify-between p-3 rounded-xl border transition-colors",
+                                                                isChecked ? "bg-accent/5 border-accent/30" : "bg-muted/10 border-border/60 hover:bg-muted/20"
+                                                            )}
+                                                        >
+                                                            <Label 
+                                                                htmlFor={`role-${selectedRole}-${p.id}`} 
+                                                                className="text-xs font-medium cursor-pointer flex-1 leading-snug pr-2"
+                                                            >
+                                                                {p.label}
+                                                            </Label>
+                                                            <Switch
+                                                                id={`role-${selectedRole}-${p.id}`}
+                                                                checked={isChecked}
+                                                                onCheckedChange={(checked) => handleRolePermChange(p.id, checked)}
+                                                                disabled={isAdmin}
+                                                            />
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Ações do Cargo */}
+                            <div className="flex flex-col sm:flex-row justify-between items-center gap-3 pt-4 border-t">
+                                <div className="text-xs text-muted-foreground flex items-center gap-1.5">
+                                    <Users className="h-4 w-4 text-accent" />
+                                    <span>Impacta <strong>{targetUsersForRole.length}</strong> colaborador(es) no sistema.</span>
+                                </div>
+                                <Button 
+                                    size="lg" 
+                                    className="bg-accent hover:bg-accent/90 h-10 sm:h-12 px-6 sm:px-8 w-full sm:w-auto font-bold shadow-md shadow-accent/20"
+                                    onClick={onSaveRolePermissions} 
+                                    disabled={selectedRole === 'Admin' || isSaving}
+                                >
+                                    {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} 
+                                    Salvar e Aplicar a Todos os {selectedRole}s
+                                </Button>
+                            </div>
                         </div>
                     </div>
                 )}
-                 <div className="flex justify-end pt-4">
-                    <Button size="lg" className="bg-accent h-9 sm:h-12 px-6 sm:px-8 w-auto" onClick={onSavePermissions} disabled={!selectedUserId || isSaving}>
-                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} Salvar Permissões
-                    </Button>
-                 </div>
+
+                {/* ============================================================== */}
+                {/* MODO 2: CONFIGURAÇÃO POR COLABORADOR INDIVIDUAL                */}
+                {/* ============================================================== */}
+                {permMode === 'user' && (
+                    <div className="space-y-6 animate-in fade-in duration-300">
+                        <div className="max-w-md">
+                            <Label htmlFor="user-select" className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
+                                Selecione o Colaborador
+                            </Label>
+                            <Select value={selectedUserId} onValueChange={setSelectedUserId}>
+                                <SelectTrigger id="user-select" className="h-11">
+                                    <SelectValue placeholder="Escolha um colaborador para personalizar..." />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {localUsers.map((user) => (
+                                        <SelectItem key={user.id} value={user.id}>
+                                            {user.nickname} - Cargo: {user.role}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+
+                        {selectedUser ? (
+                            <div className="border rounded-2xl p-4 sm:p-6 bg-card shadow-sm space-y-6">
+                                <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-2 border-b pb-4">
+                                    <div>
+                                        <h3 className="font-bold text-base sm:text-lg text-primary flex items-center gap-2">
+                                            <UserIcon className="h-5 w-5 text-accent" /> Permissões Individuais: {selectedUser.nickname}
+                                        </h3>
+                                        <p className="text-xs text-muted-foreground mt-0.5">
+                                            Cargo Atual: <strong className="text-primary">{selectedUser.role}</strong> &bull; E-mail: {selectedUser.email}
+                                        </p>
+                                    </div>
+                                    {selectedUser.role !== 'Admin' && (
+                                        <Button 
+                                            type="button" 
+                                            variant="outline" 
+                                            size="sm" 
+                                            onClick={handleResetUserToRoleDefault}
+                                            className="h-8 text-xs text-muted-foreground hover:text-primary self-start sm:self-auto"
+                                        >
+                                            <RotateCcw className="h-3.5 w-3.5 mr-1.5" /> Restaurar Padrão do Cargo ({selectedUser.role})
+                                        </Button>
+                                    )}
+                                </div>
+
+                                {selectedUser.role === 'Admin' && (
+                                    <div className="p-3.5 rounded-xl bg-accent/10 border border-accent/20 flex items-center gap-3 text-xs sm:text-sm text-primary">
+                                        <Info className="h-5 w-5 text-accent shrink-0" />
+                                        <span>Este usuário é Administrador e possui acesso irrestrito a todo o sistema.</span>
+                                    </div>
+                                )}
+
+                                {/* Grupos de Permissões */}
+                                <div className="space-y-6">
+                                    {PERMISSION_CATEGORIES.map(category => {
+                                        const permsInCategory = ALL_PERMISSIONS.filter(p => p.category === category.id);
+                                        if (permsInCategory.length === 0) return null;
+
+                                        return (
+                                            <div key={category.id} className="space-y-3">
+                                                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                                                    <span className="w-1.5 h-1.5 rounded-full bg-accent" /> {category.label}
+                                                </h4>
+                                                <div className="grid gap-2.5 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                                                    {permsInCategory.map(p => {
+                                                        const isAdmin = selectedUser.role === 'Admin';
+                                                        const isChecked = isAdmin || (selectedUser.permissions?.includes(p.id) ?? false);
+
+                                                        return (
+                                                            <div 
+                                                                key={p.id} 
+                                                                className={cn(
+                                                                    "flex items-center justify-between p-3 rounded-xl border transition-colors",
+                                                                    isChecked ? "bg-accent/5 border-accent/30" : "bg-muted/10 border-border/60 hover:bg-muted/20"
+                                                                )}
+                                                            >
+                                                                <Label 
+                                                                    htmlFor={`user-${selectedUser.id}-${p.id}`} 
+                                                                    className="text-xs font-medium cursor-pointer flex-1 leading-snug pr-2"
+                                                                >
+                                                                    {p.label}
+                                                                </Label>
+                                                                <Switch
+                                                                    id={`user-${selectedUser.id}-${p.id}`}
+                                                                    checked={isChecked}
+                                                                    onCheckedChange={(checked) => handleUserPermChange(p.id, checked)}
+                                                                    disabled={isAdmin}
+                                                                />
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                <div className="flex justify-end pt-4 border-t">
+                                    <Button 
+                                        size="lg" 
+                                        className="bg-accent hover:bg-accent/90 h-10 sm:h-12 px-6 sm:px-8 w-full sm:w-auto font-bold shadow-md shadow-accent/20"
+                                        onClick={onSaveUserPermissions} 
+                                        disabled={selectedUser.role === 'Admin' || isSaving}
+                                    >
+                                        {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />} 
+                                        Salvar Permissões de {selectedUser.nickname}
+                                    </Button>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="p-8 text-center border rounded-2xl bg-muted/10 space-y-2">
+                                <UserIcon className="h-10 w-10 text-muted-foreground mx-auto opacity-40" />
+                                <p className="text-sm font-semibold text-primary">Nenhum colaborador selecionado</p>
+                                <p className="text-xs text-muted-foreground">Escolha um colaborador no seletor acima para ver e editar suas permissões específicas.</p>
+                            </div>
+                        )}
+                    </div>
+                )}
             </CardContent>
         </Card>
-    )
-}
+    );
+};
 
 const SystemManagementPanel = () => {
     const isMobile = useIsMobile();
     const { users, refetchData, deleteUser } = useData();
-    const [employees, setEmployees] = useState<User[]>(users);
+    const { user: authUser, refreshUser } = useAuth();
+    const [employees, setEmployees] = useState<User[]>([]);
     const [editingEmployee, setEditingEmployee] = useState<User | undefined>(undefined);
     const [isFormOpen, setIsFormOpen] = useState(false);
+    const [userToDelete, setUserToDelete] = useState<User | null>(null);
 
     React.useEffect(() => {
-        setEmployees(users);
+        setEmployees(users.filter(u => u.role !== 'Apagado'));
     }, [users]);
 
     const handleSaveEmployee = async (data: any) => {
         try {
             if (editingEmployee) {
-                await updateUser(editingEmployee.id, data);
+                const roleChanged = data.role && data.role !== editingEmployee.role;
+                const updatePayload: any = { ...data };
+                if (roleChanged) {
+                    updatePayload.permissions = getDefaultPermissionsForRole(data.role);
+                }
+                await updateUser(editingEmployee.id, updatePayload);
+                if (authUser?.id === editingEmployee.id) {
+                    await refreshUser();
+                }
                 toast({ title: "Funcionário Atualizado!", description: "Dados salvos com sucesso." });
             } else {
-                await createUser(data);
-                toast({ title: "Funcionário Cadastrado!", description: "Novo colaborador salvo com sucesso." });
+                const defaultPerms = getDefaultPermissionsForRole(data.role || 'Professor');
+                const created = await createUser({ ...data, permissions: defaultPerms });
+                if (created && created.id) {
+                    await updateUser(created.id, { permissions: defaultPerms });
+                }
+                toast({ title: "Funcionário Cadastrado!", description: "Novo colaborador salvo com permissões padrão do cargo." });
             }
             await refetchData();
             setIsFormOpen(false);
         } catch (err: any) {
             toast({ variant: 'destructive', title: "Erro ao salvar", description: err.message });
-        }
-    };
-
-    const handleDeleteEmployee = async (userToDelete: User) => {
-        if (!confirm(`Deseja realmente excluir o colaborador ${userToDelete.nickname}?`)) return;
-        try {
-            await deleteUser(userToDelete.id);
-            toast({ title: "Funcionário Removido!", description: "Removido com sucesso do sistema." });
-        } catch (err: any) {
-            toast({ variant: 'destructive', title: "Erro ao remover", description: err.message });
         }
     };
 
@@ -248,7 +578,7 @@ const SystemManagementPanel = () => {
                             <TableCell className="text-right p-2 sm:p-4">
                                 <div className="flex justify-end gap-0.5 sm:gap-1">
                                     <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 text-primary" onClick={() => { setEditingEmployee(user); setIsFormOpen(true); }}><Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4"/></Button>
-                                    <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 text-destructive" onClick={() => handleDeleteEmployee(user)}><Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4"/></Button>
+                                    <Button variant="ghost" size="icon" className="h-7 w-7 sm:h-8 sm:w-8 text-destructive" onClick={() => setUserToDelete(user)}><Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4"/></Button>
                                 </div>
                             </TableCell>
                         </TableRow>
@@ -262,6 +592,25 @@ const SystemManagementPanel = () => {
                 <EmployeeForm employee={editingEmployee} onSave={handleSaveEmployee} onCancel={() => setIsFormOpen(false)} />
             </DialogContent>
         </Dialog>
+
+        <DeleteConfirmDialog
+            open={!!userToDelete}
+            onOpenChange={(open) => !open && setUserToDelete(null)}
+            itemName={userToDelete?.nickname || userToDelete?.email}
+            itemType="o colaborador"
+            title="Confirmar Exclusão de Colaborador"
+            onConfirm={async (audit) => {
+                if (!userToDelete) return;
+                try {
+                    await deleteUser(userToDelete.id, true, audit);
+                    toast({ title: "Funcionário movido para a Lixeira!", description: "Você pode restaurá-lo ou excluí-lo definitivamente na Lixeira." });
+                    await refetchData();
+                    setUserToDelete(null);
+                } catch (err: any) {
+                    toast({ variant: 'destructive', title: "Erro ao remover", description: err.message });
+                }
+            }}
+        />
       </CardContent>
     </Card>
     )
@@ -274,6 +623,17 @@ export default function SettingsPage() {
   const router = useRouter();
   const { handleLinkClick } = useLoading();
   const [activeTab, setActiveTab] = useState("profile");
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      const tab = params.get("tab");
+      if (tab) {
+        setActiveTab(tab);
+      }
+    }
+  }, []);
+
   const [isPasswordModalOpen, setIsPasswordModalOpen] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSavingPassword, setIsSavingPassword] = useState(false);
@@ -315,6 +675,7 @@ export default function SettingsPage() {
 
   const canEditPermissions = hasPermission('permissions:edit');
   const [manualDate, setManualDate] = useState<string>(user?.dob ? format(new Date(user.dob), 'dd/MM/yyyy') : '');
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
   const handleManualDateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     let value = e.target.value.replace(/\D/g, '');
@@ -509,7 +870,7 @@ export default function SettingsPage() {
                                                 <FormLabel className="text-[9px] sm:text-[10px] font-bold uppercase text-muted-foreground tracking-widest mb-1 sm:mb-2">Data de Nascimento</FormLabel>
                                                 <div className="relative">
                                                     <FormControl><Input placeholder="DD/MM/AAAA" value={manualDate} onChange={handleManualDateChange} className="h-9 sm:h-11 pr-8 text-xs sm:text-sm"/></FormControl>
-                                                    <Popover>
+                                                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                                                         <PopoverTrigger asChild>
                                                             <Button variant="ghost" size="icon" className="absolute right-0.5 top-0.5 h-8 w-8 text-muted-foreground hover:bg-transparent" type="button">
                                                                 <CalendarIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
@@ -518,11 +879,15 @@ export default function SettingsPage() {
                                                         <PopoverContent className="w-auto p-0" align="end">
                                                             <Calendar 
                                                                 mode="single" 
-                                                                selected={field.value} 
+                                                                selected={field.value || undefined} 
                                                                 onSelect={(date) => { 
                                                                     field.onChange(date); 
                                                                     if (date) setManualDate(format(date, 'dd/MM/yyyy')); 
                                                                 }} 
+                                                                onOk={() => {
+                                                                    if (field.value) setManualDate(format(field.value, 'dd/MM/yyyy'));
+                                                                    setIsCalendarOpen(false);
+                                                                }}
                                                                 disabled={(date) => date > new Date()} 
                                                                 locale={ptBR}
                                                             />

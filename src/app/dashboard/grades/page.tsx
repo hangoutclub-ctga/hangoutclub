@@ -81,7 +81,7 @@ export default function GradesPage() {
     const isAdmin = user?.role === 'Admin';
     let accessibleStudentIds: string[] = [];
 
-    if (isAdmin) {
+    if (isAdmin || user?.role === 'Secretaria' || user?.role !== 'Professor') {
       accessibleStudentIds = allStudents.map(s => s.id);
     } else if (user?.role === 'Professor') {
       const teacherClasses = allClasses.filter(c => c.teacherId === user.id || c.teacher === user.nickname);

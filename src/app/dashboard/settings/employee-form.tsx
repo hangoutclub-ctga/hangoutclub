@@ -35,6 +35,7 @@ export const EmployeeForm = ({ employee, onSave, onCancel }: { employee?: User, 
     const { categories, isLoading } = useData();
     const initialDob = parseDobToDate(employee?.dob);
     const [manualDate, setManualDate] = useState<string>(initialDob ? format(initialDob, 'dd/MM/yyyy') : '');
+    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [showPassword, setShowPassword] = useState(false);
     
@@ -93,8 +94,8 @@ export const EmployeeForm = ({ employee, onSave, onCancel }: { employee?: User, 
                 )} />
                  <FormField control={form.control} name="dob" render={({ field }) => (
                     <FormItem><FormLabel className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Data de Nascimento</FormLabel><div className="relative"><FormControl><Input placeholder="DD/MM/AAAA" value={manualDate} onChange={handleManualDateChange} className="h-11"/></FormControl>
-                    <Popover><PopoverTrigger asChild><Button variant="ghost" size="icon" className="absolute right-1 top-1 h-9 w-9 text-muted-foreground"><CalendarIcon className="h-4 w-4" /></Button></PopoverTrigger>
-                    <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={(date) => { field.onChange(date); if (date) setManualDate(format(date, 'dd/MM/yyyy')); }} disabled={(date) => date > new Date()} locale={ptBR}/></PopoverContent></Popover></div><FormMessage /></FormItem>
+                    <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}><PopoverTrigger asChild><Button variant="ghost" size="icon" className="absolute right-1 top-1 h-9 w-9 text-muted-foreground"><CalendarIcon className="h-4 w-4" /></Button></PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start"><Calendar mode="single" selected={field.value} onSelect={(date) => { field.onChange(date); if (date) setManualDate(format(date, 'dd/MM/yyyy')); }} onOk={() => { if (field.value) setManualDate(format(field.value, 'dd/MM/yyyy')); setIsCalendarOpen(false); }} disabled={(date) => date > new Date()} locale={ptBR}/></PopoverContent></Popover></div><FormMessage /></FormItem>
                 )} />
                  <FormField control={form.control} name="role" render={({ field }) => (
                     <FormItem><FormLabel className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cargo</FormLabel><Select onValueChange={field.onChange} defaultValue={field.value}><FormControl><SelectTrigger className="h-11"><SelectValue placeholder="Selecione um cargo..." /></SelectTrigger></FormControl>

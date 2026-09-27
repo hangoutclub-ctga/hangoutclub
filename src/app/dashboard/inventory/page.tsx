@@ -31,7 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { PlusCircle, MoreHorizontal, ArrowDown, ArrowUp, Pencil, Trash2, Search, X, CircleX, Eye, ChevronLeft, Home } from "lucide-react"
+import { PlusCircle, MoreHorizontal, ArrowDown, ArrowUp, Pencil, Trash2, Search, X, CircleX, Eye, ChevronLeft, Home, ShieldAlert } from "lucide-react"
 import { InventoryItemForm } from "@/components/inventory-item-form";
 import { StockMovementForm } from "@/components/stock-movement-form";
 import { InventoryItemProfile } from "@/components/inventory-item-profile";
@@ -43,6 +43,7 @@ import { toast } from "@/hooks/use-toast";
 import { getDisplayAvatarUrl, cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useData } from "@/hooks/use-data";
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useRouter } from "next/navigation";
 import { useLoading } from "@/hooks/use-loading";
@@ -53,6 +54,7 @@ export default function InventoryPage() {
     const router = useRouter();
     const { handleLinkClick } = useLoading();
     const canEdit = hasPermission('inventory:edit');
+    const canView = hasPermission('nav:inventory');
     
     const { 
         inventoryItems, 
@@ -69,6 +71,7 @@ export default function InventoryPage() {
     const [editingItem, setEditingItem] = React.useState<InventoryItem | undefined>(undefined);
     const [selectedItemForProfile, setSelectedItemForProfile] = React.useState<InventoryItem | null>(null);
     const [activeMovement, setActiveMovement] = React.useState<{ item: InventoryItem, type: 'entrada' | 'saida' } | null>(null);
+    const [itemToDelete, setItemToDelete] = React.useState<InventoryItem | null>(null);
 
     const activeItems = React.useMemo(() => {
         return inventoryItems.filter(i => i.status !== 'Apagado');
@@ -141,6 +144,17 @@ export default function InventoryPage() {
         handleLinkClick('/dashboard');
         router.push('/dashboard');
     };
+
+    if (!canView) {
+        return (
+            <div className="flex flex-col items-center justify-center p-12 text-center border rounded-2xl bg-card">
+                <ShieldAlert className="h-12 w-12 text-muted-foreground/40 mb-3" />
+                <h2 className="text-xl font-bold text-primary">Acesso Restrito</h2>
+                <p className="text-sm text-muted-foreground mt-1 max-w-sm">Você não possui permissão para visualizar o módulo de Inventário. Solicite acesso ao administrador.</p>
+                <Button className="mt-4 bg-accent" onClick={() => router.push('/dashboard')}>Voltar ao Início</Button>
+            </div>
+        );
+    }
 
     return (
         <div className="flex flex-col gap-4 sm:gap-8">
@@ -310,7 +324,7 @@ export default function InventoryPage() {
                                                         <DropdownMenuItem onClick={() => { setEditingItem(item); setIsFormOpen(true); }}>
                                                             <Pencil className="mr-2 h-4 w-4" /> Editar
                                                         </DropdownMenuItem>
-                                                        <DropdownMenuItem className="text-destructive" onClick={() => handleDelete(item.id)}>
+                                                        <DropdownMenuItem className="text-destructive" onClick={() => setItemToDelete(item)}>
                                                             <Trash2 className="mr-2 h-4 w-4" /> Apagar
                                                         </DropdownMenuItem>
                                                     </DropdownMenuContent>
@@ -351,6 +365,24 @@ export default function InventoryPage() {
                     )}
                 </DialogContent>
             </Dialog>
+
+            <DeleteConfirmDialog
+                open={!!itemToDelete}
+                onOpenChange={(open) => !open && setItemToDelete(null)}
+                itemName={itemToDelete?.name}
+                itemType="o item de inventário"
+                title="Confirmar Exclusão de Item"
+                onConfirm={async (audit) => {
+                    if (!itemToDelete) return;
+                    try {
+                        await deleteInventoryItem(itemToDelete.id, true, audit);
+                        toast({ title: "Item Removido", description: "Item movido para a Lixeira com sucesso." });
+                        setItemToDelete(null);
+                    } catch (err: any) {
+                        toast({ variant: 'destructive', title: "Erro ao remover item", description: err.message });
+                    }
+                }}
+            />
         </div>
     )
 }

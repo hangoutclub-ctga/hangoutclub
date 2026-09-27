@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import {
   Card,
   CardContent,
@@ -120,7 +121,7 @@ export function CategoryManager() {
       unitLabel: "compromisso(s) na Agenda",
       typeKey: null as null,
       description: "Cadastre e edite os tipos de compromissos exibidos no formulário de criação de eventos da Agenda.",
-      items: eventTypes as GenericCategoryItem[],
+      items: eventTypes.filter(et => !et.name.startsWith('[Apagado]')) as GenericCategoryItem[],
     },
     {
       id: "student-conditions",
@@ -264,20 +265,19 @@ export function CategoryManager() {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDelete = async (audit: any) => {
     if (!itemToDelete) return;
 
-    setIsDeleting(true);
     try {
       if (selectedCategory === "event-types") {
-        await deleteEventType(itemToDelete.id);
+        await deleteEventType(itemToDelete.id, true, audit);
       } else {
-        await deleteSystemCategory(itemToDelete.id);
+        await deleteSystemCategory(itemToDelete.id, true, audit);
       }
 
       toast({
-        title: `${activeTab.entityName} Removido(a)`,
-        description: `"${itemToDelete.name}" foi excluído(a) com sucesso.`,
+        title: `${activeTab.entityName} movido(a) para a Lixeira`,
+        description: `"${itemToDelete.name}" foi movido(a) para a Lixeira.`,
       });
       setItemToDelete(null);
     } catch (err: any) {
@@ -286,8 +286,6 @@ export function CategoryManager() {
         title: "Erro ao excluir",
         description: err.message || "Não foi possível excluir o registro.",
       });
-    } finally {
-      setIsDeleting(false);
     }
   };
 
@@ -582,42 +580,20 @@ export function CategoryManager() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={!!itemToDelete} onOpenChange={(open) => !open && setItemToDelete(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-base font-bold">
-              Excluir {activeTab.entityName}
-            </AlertDialogTitle>
-            <AlertDialogDescription className="text-xs space-y-2">
-              <span>
-                Tem certeza que deseja excluir <strong>&quot;{itemToDelete?.name}&quot;</strong>?
-              </span>
-              {itemToDelete && getUsageCount(itemToDelete) > 0 && (
-                <div className="p-2.5 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-300 text-[11px] font-medium mt-2">
-                  Atenção: Existem {getUsageCount(itemToDelete)} {activeTab.unitLabel} vinculados a este registro.
-                </div>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDelete}
-              disabled={isDeleting}
-              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground font-semibold"
-            >
-              {isDeleting ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Excluindo...
-                </>
-              ) : (
-                "Excluir"
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      {/* Delete Confirmation Dialog com Justificativa Obrigatória */}
+      <DeleteConfirmDialog
+        open={!!itemToDelete}
+        onOpenChange={(open) => !open && setItemToDelete(null)}
+        itemName={itemToDelete?.name}
+        itemType={activeTab.entityName}
+        title={`Confirmar Exclusão de ${activeTab.entityName}`}
+        description={
+          itemToDelete && getUsageCount(itemToDelete) > 0
+            ? `Tem certeza que deseja apagar "${itemToDelete.name}"? Atenção: Existem ${getUsageCount(itemToDelete)} ${activeTab.unitLabel} vinculados a este registro.`
+            : undefined
+        }
+        onConfirm={handleDelete}
+      />
     </div>
   );
 }

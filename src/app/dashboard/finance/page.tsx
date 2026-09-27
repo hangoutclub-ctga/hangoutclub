@@ -25,10 +25,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 import { TransactionForm } from "@/components/transaction-form";
 import { FixedExpenseForm } from "@/components/fixed-expense-form";
 import { PayFixedExpenseForm } from "@/components/pay-fixed-expense-form";
-import { ArrowDownCircle, ArrowUpCircle, MinusCircle, Printer, AlertCircle, CheckCircle, Trash2, FilterX, Calendar as CalendarIcon, DollarSign, PlusCircle, Eye, CreditCard, ChevronLeft, Home } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, MinusCircle, Printer, AlertCircle, CheckCircle, Trash2, FilterX, Calendar as CalendarIcon, DollarSign, PlusCircle, Eye, CreditCard, ChevronLeft, Home, ShieldAlert, FileSpreadsheet } from 'lucide-react';
 import { Transaction, Student, FixedExpense } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
@@ -38,6 +42,8 @@ import { useData } from "@/hooks/use-data";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useLoading } from "@/hooks/use-loading";
+import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
+import { BankStatementImporter } from "@/components/bank-statement-importer";
 
 export default function FinancePage() {
     const { hasPermission } = useAuth();
@@ -50,11 +56,16 @@ export default function FinancePage() {
         addTransaction, 
         deleteTransaction, 
         addFixedExpense, 
-        updateFixedExpense 
+        updateFixedExpense,
+        deleteFixedExpense
     } = useData();
 
-    const [currentMonth, setCurrentMonth] = useState(new Date().getMonth() + 1);
-    const [currentYear, setCurrentYear] = useState(new Date().getFullYear());
+    const [confirmedDate, setConfirmedDate] = useState<Date>(new Date());
+    const [tempDate, setTempDate] = useState<Date>(new Date());
+    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+
+    const currentMonth = confirmedDate.getMonth() + 1;
+    const currentYear = confirmedDate.getFullYear();
     const [filter, setFilter] = useState<string>("Todos");
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isFixedFormOpen, setIsFixedFormOpen] = useState(false);
@@ -63,8 +74,12 @@ export default function FinancePage() {
     const [selectedReceipt, setSelectedReceipt] = useState<string | null>(null);
     const [payingExpense, setPayingExpense] = useState<FixedExpense | null>(null);
     const [prefilledData, setPrefilledData] = useState<any>(undefined);
+    const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
+    const [fixedExpenseToDelete, setFixedExpenseToDelete] = useState<FixedExpense | null>(null);
+    const [isImporterOpen, setIsImporterOpen] = useState(false);
 
     const canEdit = hasPermission('finance:edit');
+    const canView = hasPermission('nav:finance');
     
     const months = [
         { value: 1, label: 'Janeiro' }, { value: 2, label: 'Fevereiro' }, { value: 3, label: 'Março' },
@@ -79,8 +94,13 @@ export default function FinancePage() {
         return Array.from(yearSet).sort((a, b) => a - b);
     }, [currentSystemYear]);
 
+    const activeFixedExpenses = useMemo(() => {
+        return fixedExpenses.filter(fe => fe.status !== 'Apagado');
+    }, [fixedExpenses]);
+
     const filteredByDate = useMemo(() => {
         return transactions.filter(t => {
+            if (t.type === 'Apagado') return false;
             const d = new Date(t.date);
             return d.getUTCMonth() + 1 === currentMonth && d.getUTCFullYear() === currentYear;
         });
@@ -89,9 +109,9 @@ export default function FinancePage() {
     const totals = useMemo(() => {
         const income = filteredByDate.filter(t => t.type === 'Entrada').reduce((acc, t) => acc + t.value, 0);
         const outcome = filteredByDate.filter(t => t.type === 'Saída').reduce((acc, t) => acc + t.value, 0);
-        const pendingFixed = fixedExpenses.filter(f => f.status === 'Pendente').reduce((acc, f) => acc + f.value, 0);
+        const pendingFixed = activeFixedExpenses.filter(f => f.status === 'Pendente').reduce((acc, f) => acc + f.value, 0);
         return { income, outcome, fixed: pendingFixed, profit: income - outcome };
-    }, [filteredByDate, fixedExpenses]);
+    }, [filteredByDate, activeFixedExpenses]);
 
     const filteredTransactions = useMemo(() => {
         if (filter === "Todos") return filteredByDate;
@@ -166,14 +186,7 @@ export default function FinancePage() {
         }
     };
 
-    const handleDelete = async (id: string) => {
-        try {
-            await deleteTransaction(id);
-            toast({ title: "Removido", description: "Transação excluída com sucesso." });
-        } catch (err: any) {
-            toast({ variant: 'destructive', title: "Erro ao remover", description: err.message });
-        }
-    };
+
 
     const pendingStudents = useMemo(() => {
         return students
@@ -233,6 +246,17 @@ export default function FinancePage() {
         router.push('/dashboard');
     };
 
+    if (!canView) {
+        return (
+            <div className="flex flex-col items-center justify-center p-12 text-center border rounded-2xl bg-card">
+                <ShieldAlert className="h-12 w-12 text-muted-foreground/40 mb-3" />
+                <h2 className="text-xl font-bold text-primary">Acesso Restrito</h2>
+                <p className="text-sm text-muted-foreground mt-1 max-w-sm">Você não possui permissão para visualizar o módulo Financeiro. Solicite acesso ao administrador.</p>
+                <Button className="mt-4 bg-accent" onClick={() => router.push('/dashboard')}>Voltar ao Início</Button>
+            </div>
+        );
+    }
+
   return (
     <div className="flex flex-col gap-4 sm:gap-8 printable-area">
         <div className="flex flex-row items-center justify-between no-print gap-2">
@@ -251,6 +275,17 @@ export default function FinancePage() {
                 </div>
             </div>
              <div className="flex gap-2">
+                <Button 
+                    size="icon" 
+                    variant="outline" 
+                    className="h-10 w-10 border-emerald-600/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 shadow-sm" 
+                    disabled={!canEdit} 
+                    onClick={() => setIsImporterOpen(true)}
+                    title="Importar Extrato Bancário (Sicoob / Excel / OFX)"
+                >
+                    <FileSpreadsheet className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                </Button>
+
                 {filter === "Despesas Fixas" && (
                     <Dialog open={isFixedFormOpen} onOpenChange={setIsFixedFormOpen}>
                         <Button size="sm" variant="outline" className="h-10 border-accent text-accent hover:bg-accent/5 px-4 shadow-md" onClick={() => setIsFixedFormOpen(true)}>
@@ -282,6 +317,11 @@ export default function FinancePage() {
                         />
                     </DialogContent>
                 </Dialog>
+
+                <BankStatementImporter 
+                    isOpen={isImporterOpen} 
+                    onClose={() => setIsImporterOpen(false)} 
+                />
              </div>
         </div>
       
@@ -357,8 +397,8 @@ export default function FinancePage() {
                                     <CardTitle className="text-sm sm:text-lg">
                                         {filter === 'Despesas Fixas' ? 'Despesas Fixas' : 'Transações'}
                                     </CardTitle>
-                                    <CardDescription className="text-[10px] sm:text-xs">
-                                        Período: {months.find(m => m.value === currentMonth)?.label} / {currentYear}
+                                    <CardDescription className="text-[10px] sm:text-xs capitalize">
+                                        Período: {format(confirmedDate, "MMMM 'de' yyyy", { locale: ptBR })}
                                     </CardDescription>
                                 </div>
                                 {filter !== 'Todos' && (
@@ -368,19 +408,35 @@ export default function FinancePage() {
                                 )}
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5 no-print">
-                                <Select value={String(currentMonth)} onValueChange={(v) => setCurrentMonth(Number(v))}>
-                                    <SelectTrigger className="h-8 w-24 sm:w-32 border-accent/20 text-[10px] sm:text-sm">
-                                        <CalendarIcon className="h-3.5 w-3.5 text-accent mr-1.5" />
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent className="rounded-xl">{months.map(m => <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>)}</SelectContent>
-                                </Select>
-                                <Select value={String(currentYear)} onValueChange={(v) => setCurrentYear(Number(v))}>
-                                    <SelectTrigger className="h-8 w-20 sm:w-24 border-accent/20 text-[10px] sm:text-sm">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent className="rounded-xl">{years.map(y => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}</SelectContent>
-                                </Select>
+                                <Popover open={isCalendarOpen} onOpenChange={(open) => {
+                                    setIsCalendarOpen(open);
+                                    if (open) setTempDate(confirmedDate);
+                                }}>
+                                    <PopoverTrigger asChild>
+                                        <Button 
+                                            variant="outline" 
+                                            size="sm" 
+                                            className="h-8 border-accent/20 text-[10px] sm:text-xs px-2.5 sm:px-3 gap-1.5 rounded-xl hover:bg-accent/5 shadow-sm"
+                                        >
+                                            <CalendarIcon className="h-3.5 w-3.5 text-accent" />
+                                            <span className="capitalize font-medium">
+                                                {format(confirmedDate, "MMMM 'de' yyyy", { locale: ptBR })}
+                                            </span>
+                                        </Button>
+                                    </PopoverTrigger>
+                                    <PopoverContent className="w-auto p-0 rounded-2xl shadow-2xl border-none" align="end">
+                                        <Calendar 
+                                            mode="single" 
+                                            selected={tempDate} 
+                                            onSelect={(d) => d && setTempDate(d)} 
+                                            onOk={() => {
+                                                setConfirmedDate(tempDate);
+                                                setIsCalendarOpen(false);
+                                            }}
+                                            locale={ptBR} 
+                                        />
+                                    </PopoverContent>
+                                </Popover>
                                 <Button variant="outline" size="icon" className="h-8 w-8 rounded-xl" onClick={() => window.print()}><Printer className="h-3.5 w-3.5" /></Button>
                             </div>
                         </div>
@@ -397,7 +453,7 @@ export default function FinancePage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {fixedExpenses.length > 0 ? fixedExpenses.map((f) => (
+                                    {activeFixedExpenses.length > 0 ? activeFixedExpenses.map((f) => (
                                         <TableRow key={f.id}>
                                             <TableCell>
                                                 <div className="font-bold text-[10px] sm:text-sm">{f.description}</div>
@@ -426,6 +482,14 @@ export default function FinancePage() {
                                                             Pagar
                                                         </Button>
                                                     )}
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        className="h-7 w-7 text-destructive hover:bg-destructive/10" 
+                                                        onClick={() => setFixedExpenseToDelete(f)}
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </Button>
                                                 </div>
                                             </TableCell>
                                         </TableRow>
@@ -470,7 +534,7 @@ export default function FinancePage() {
                                                             <Eye className="h-3.5 w-3.5" />
                                                         </Button>
                                                     )}
-                                                    <Button variant="ghost" size="icon" className="text-destructive h-7 w-7" onClick={() => handleDelete(t.id)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                                                    <Button variant="ghost" size="icon" className="text-destructive h-7 w-7" onClick={() => setTransactionToDelete(t)}><Trash2 className="h-3.5 w-3.5" /></Button>
                                                 </div>
                                             </TableCell>
                                         </TableRow>
@@ -548,6 +612,42 @@ export default function FinancePage() {
                 )}
             </DialogContent>
         </Dialog>
+
+        <DeleteConfirmDialog
+            open={!!transactionToDelete}
+            onOpenChange={(open) => !open && setTransactionToDelete(null)}
+            itemName={transactionToDelete?.description}
+            itemType="a transação"
+            title="Confirmar Exclusão de Transação"
+            onConfirm={async (audit) => {
+                if (!transactionToDelete) return;
+                try {
+                    await deleteTransaction(transactionToDelete.id, true, audit);
+                    toast({ title: "Movido para a Lixeira", description: "Transação movida para a Lixeira com sucesso." });
+                    setTransactionToDelete(null);
+                } catch (err: any) {
+                    toast({ variant: 'destructive', title: "Erro ao remover", description: err.message });
+                }
+            }}
+        />
+
+        <DeleteConfirmDialog
+            open={!!fixedExpenseToDelete}
+            onOpenChange={(open) => !open && setFixedExpenseToDelete(null)}
+            itemName={fixedExpenseToDelete?.description}
+            itemType="a despesa fixa"
+            title="Confirmar Exclusão de Despesa Fixa"
+            onConfirm={async (audit) => {
+                if (!fixedExpenseToDelete) return;
+                try {
+                    await deleteFixedExpense(fixedExpenseToDelete.id, true, audit);
+                    toast({ title: "Movido para a Lixeira", description: "Despesa fixa movida para a Lixeira com sucesso." });
+                    setFixedExpenseToDelete(null);
+                } catch (err: any) {
+                    toast({ variant: 'destructive', title: "Erro ao remover", description: err.message });
+                }
+            }}
+        />
     </div>
   )
 }

@@ -38,6 +38,7 @@ import { Switch } from "./ui/switch";
 import { Dialog, DialogClose, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "./ui/dialog";
 import { ImagePicker } from "./image-picker";
 import { uploadFileToStorage } from "@/lib/supabase/storage";
+import { Student, Class, StudentDocument } from "@/types";
 
 const formSchema = z.object({
   name: z.string().min(2, "O nome deve ter pelo menos 2 caracteres."),
@@ -148,7 +149,7 @@ export function StudentForm({ student, onSave, onCancel, availableClasses, stude
       monthlyFee: student?.monthlyFee || 0,
       dueDate: student?.dueDate || 5,
       studentCondition: student?.studentCondition || 'Integral',
-      status: student?.status || "Ativo",
+      status: student?.status === 'Inativo' ? 'Inativo' : 'Ativo',
       documents: student?.documents || [],
     },
   });
@@ -159,6 +160,8 @@ export function StudentForm({ student, onSave, onCancel, availableClasses, stude
   const [manualPartialDate, setManualPartialDate] = React.useState<string>(
     student?.partialDate ? format(new Date(student.partialDate), 'dd/MM/yyyy') : ''
   );
+  const [isDobCalendarOpen, setIsDobCalendarOpen] = React.useState(false);
+  const [isPartialCalendarOpen, setIsPartialCalendarOpen] = React.useState(false);
   
   const paymentStatus = form.watch("paymentStatus");
   const studentCondition = form.watch("studentCondition");
@@ -366,7 +369,7 @@ export function StudentForm({ student, onSave, onCancel, availableClasses, stude
                                     onChange={(e) => handleDateChange(e.target.value, 'dob', setManualDob)}
                                 />
                             </FormControl>
-                            <Popover>
+                            <Popover open={isDobCalendarOpen} onOpenChange={setIsDobCalendarOpen}>
                                 <PopoverTrigger asChild>
                                     <Button variant="ghost" size="icon" className="absolute right-1 top-1 h-8 w-8 text-muted-foreground">
                                         <CalendarIcon className="h-4 w-4" />
@@ -383,8 +386,14 @@ export function StudentForm({ student, onSave, onCancel, availableClasses, stude
                                                 setIsMinor(differenceInYears(new Date(), date) < 18);
                                             }
                                         }}
+                                        onOk={() => {
+                                            if (field.value) {
+                                                setManualDob(format(field.value, 'dd/MM/yyyy'));
+                                                setIsMinor(differenceInYears(new Date(), field.value) < 18);
+                                            }
+                                            setIsDobCalendarOpen(false);
+                                        }}
                                         disabled={(date) => date > new Date() || date < new Date("1900-01-01")}
-                                        initialFocus
                                         locale={ptBR}
                                     />
                                 </PopoverContent>
@@ -693,7 +702,7 @@ export function StudentForm({ student, onSave, onCancel, availableClasses, stude
                                     onChange={(e) => handleDateChange(e.target.value, 'partialDate', setManualPartialDate)}
                                 />
                             </FormControl>
-                            <Popover>
+                            <Popover open={isPartialCalendarOpen} onOpenChange={setIsPartialCalendarOpen}>
                                 <PopoverTrigger asChild>
                                     <Button variant="ghost" size="icon" className="absolute right-1 top-1 h-8 w-8 text-muted-foreground">
                                         <CalendarIcon className="h-4 w-4" />
@@ -709,7 +718,12 @@ export function StudentForm({ student, onSave, onCancel, availableClasses, stude
                                                 setManualPartialDate(format(date, 'dd/MM/yyyy'));
                                             }
                                         }}
-                                        initialFocus
+                                        onOk={() => {
+                                            if (field.value) {
+                                                setManualPartialDate(format(field.value, 'dd/MM/yyyy'));
+                                            }
+                                            setIsPartialCalendarOpen(false);
+                                        }}
                                         locale={ptBR}
                                     />
                                 </PopoverContent>

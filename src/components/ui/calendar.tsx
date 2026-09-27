@@ -61,6 +61,7 @@ function Calendar({ className, classNames, showOutsideDays = true, onOk, ...prop
       />
       <div className="pt-4 mt-2 border-t border-slate-50 dark:border-slate-800 flex justify-end">
         <Button 
+          type="button"
           size="sm"
           className="bg-accent hover:bg-accent/90 text-white font-bold py-1.5 px-4 h-8 rounded-xl tracking-wider text-[10px] uppercase shadow-sm transition-all active:scale-95"
           onClick={() => {

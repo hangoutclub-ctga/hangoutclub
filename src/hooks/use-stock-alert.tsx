@@ -28,13 +28,11 @@ const StockAlertContext = createContext<StockAlertContextType>({
 export const useStockAlert = () => useContext(StockAlertContext);
 
 export const StockAlertProvider = ({ children }: { children: React.ReactNode }) => {
-  const { user } = useAuth();
+  const { user, hasPermission } = useAuth();
   const { inventoryItems } = useData();
   const [isStockAlertOpen, setIsStockAlertOpen] = useState(false);
 
-  const isAdmin = user?.role === 'Admin';
-  const isSecretaria = user?.role === 'Secretaria';
-  const canSeeAlert = isAdmin || isSecretaria;
+  const canSeeAlert = user?.role === 'Admin' || hasPermission('nav:inventory');
 
   const lowStockItems = React.useMemo(() => {
     return inventoryItems.filter(item => item.status !== 'Apagado' && item.stock <= item.minStock);

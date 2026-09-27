@@ -49,11 +49,13 @@ O manual indica funcionalidades restritas usando marcações como "(Admin/Secret
 
 const answerQuestionPrompt = ai.definePrompt({
   name: 'answerQuestionPrompt',
-  inputSchema: z.object({
-    question: z.string(),
-    userRole: z.string(),
-    manual: z.string() 
-  }),
+  input: {
+    schema: z.object({
+      question: z.string(),
+      userRole: z.string(),
+      manual: z.string() 
+    })
+  },
   prompt: promptTemplate,
   config: {
     temperature: 0.1, // Be more factual and stick to the instructions

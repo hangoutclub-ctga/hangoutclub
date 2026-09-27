@@ -54,6 +54,7 @@ export function PayExpenseForm({ expense, onSave }: PayExpenseFormProps) {
   });
 
   const [manualDate, setManualDate] = React.useState<string>(format(new Date(), 'dd/MM/yyyy'));
+  const [isCalendarOpen, setIsCalendarOpen] = React.useState(false);
 
   const handleDateChange = (value: string) => {
     let v = value.replace(/\D/g, '');
@@ -122,7 +123,7 @@ export function PayExpenseForm({ expense, onSave }: PayExpenseFormProps) {
                                 onChange={(e) => handleDateChange(e.target.value)}
                             />
                         </FormControl>
-                        <Popover>
+                        <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
                             <PopoverTrigger asChild>
                                 <Button variant="ghost" size="icon" className="absolute right-1 top-1 h-8 w-8 text-muted-foreground">
                                     <CalendarIcon className="h-4 w-4" />
@@ -138,7 +139,12 @@ export function PayExpenseForm({ expense, onSave }: PayExpenseFormProps) {
                                             setManualDate(format(date, 'dd/MM/yyyy'));
                                         }
                                     }}
-                                    initialFocus
+                                    onOk={() => {
+                                        if (field.value) {
+                                            setManualDate(format(field.value, 'dd/MM/yyyy'));
+                                        }
+                                        setIsCalendarOpen(false);
+                                    }}
                                     locale={ptBR}
                                 />
                             </PopoverContent>
