@@ -330,10 +330,10 @@ export function ClassProfile({ classId, defaultTab = "students", onAttendanceSav
                                             <TableCell className="text-right">
                                                <Dialog>
                                                     <DialogTrigger asChild><Button variant="outline" size="sm">Ver Ficha</Button></DialogTrigger>
-                                                    <DialogContent className="sm:max-w-[80vw] p-0">
-                                                        <DialogHeader className="p-6 flex flex-row justify-between items-center no-print">
-                                                            <DialogTitle>Ficha do Aluno: {student.name}</DialogTitle>
-                                                            <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-2 text-xs">
+                                                    <DialogContent className="w-[96vw] max-w-[96vw] sm:max-w-[85vw] md:max-w-4xl max-h-[92vh] flex flex-col p-0 overflow-hidden rounded-2xl">
+                                                        <DialogHeader className="p-4 sm:p-6 pb-3 sm:pb-4 flex flex-row justify-between items-center pr-12 sm:pr-14 shrink-0 no-print border-b border-border/40">
+                                                            <DialogTitle className="text-sm sm:text-lg font-bold truncate min-w-0 mr-2">Ficha do Aluno: {student.name}</DialogTitle>
+                                                            <Button variant="outline" size="sm" onClick={() => window.print()} className="gap-1.5 text-xs shrink-0 h-8 px-2.5 sm:px-3">
                                                                 <Printer className="h-4 w-4" />
                                                                 <span className="hidden sm:inline">Imprimir Ficha</span>
                                                             </Button>

@@ -501,28 +501,28 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
   return (
     <>
       {/* Visualização de Tela (Modal Interativo) */}
-      <div className="flex flex-col gap-6 p-6 pt-0 max-h-[85vh] overflow-y-auto print:hidden">
-        <div className="grid md:grid-cols-3 gap-6">
-          <div className="md:col-span-1 flex flex-col gap-6">
+      <div className="flex-1 flex flex-col gap-4 sm:gap-6 p-3 sm:p-6 pt-3 sm:pt-4 overflow-y-auto overflow-x-hidden min-h-0 w-full print:hidden">
+        <div className="grid md:grid-cols-3 gap-4 sm:gap-6 w-full min-w-0">
+          <div className="md:col-span-1 flex flex-col gap-4 sm:gap-6 min-w-0">
             <Card className="shadow-sm">
               <CardHeader className="flex flex-row items-center gap-2 pb-2">
-                <User className="h-4 w-4 text-accent"/>
-                <CardTitle className="text-lg">Dados Pessoais</CardTitle>
+                <User className="h-4 w-4 text-accent shrink-0"/>
+                <CardTitle className="text-base sm:text-lg">Dados Pessoais</CardTitle>
               </CardHeader>
                 <CardContent className="space-y-3 text-xs">
-                    <div className="flex items-center gap-3 bg-muted/20 p-2 rounded-lg">
-                         <Avatar className="h-12 w-12 border">
+                    <div className="flex items-center gap-3 bg-muted/20 p-2 rounded-lg min-w-0">
+                         <Avatar className="h-12 w-12 border shrink-0">
                             <AvatarImage src={displayAvatarUrl} alt={student.name} />
                             <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
                         </Avatar>
-                        <div>
-                             <p className="font-bold text-sm">{student.name}</p>
+                        <div className="min-w-0 flex-1">
+                             <p className="font-bold text-sm truncate">{student.name}</p>
                             <p className="text-muted-foreground">{new Date(student.dob).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</p>
                         </div>
                     </div>
                     <div className="space-y-2">
                         <div className="flex flex-col gap-1">
-                            <p><strong>Telefone:</strong> {student.phone}</p>
+                            <p className="break-words"><strong>Telefone:</strong> {student.phone}</p>
                             <WhatsAppButton 
                               phone={student.phone} 
                               studentName={student.name} 
@@ -530,7 +530,7 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
                               isGuardian={false} 
                             />
                         </div>
-                        <p><strong>Endereço:</strong> {fullAddress}</p>
+                        <p className="break-words"><strong>Endereço:</strong> {fullAddress}</p>
                         <div className="flex items-center gap-2 pt-1">
                             <strong>Status:</strong> 
                             <Badge className={cn("h-5 text-[10px]", student.status === 'Ativo' ? 'bg-green-500' : 'bg-red-500')}>
@@ -542,11 +542,11 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
                 {isMinor && (
                     <CardContent className="space-y-2 text-xs border-t pt-4">
                         <div className="flex items-center gap-2 mb-1">
-                            <Shield className="h-3 w-3 text-accent"/>
+                            <Shield className="h-3 w-3 text-accent shrink-0"/>
                             <span className="font-bold">Responsável</span>
                         </div>
-                        <p><strong>Nome:</strong> {student.guardianName}</p>
-                        <p><strong>CPF:</strong> {student.guardianCpf}</p>
+                        <p className="break-words"><strong>Nome:</strong> {student.guardianName}</p>
+                        <p className="break-words"><strong>CPF:</strong> {student.guardianCpf}</p>
                         <div className="pt-1">
                           <p className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider mb-1">Contato com Responsável:</p>
                           <WhatsAppButton 
@@ -562,12 +562,12 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
            
             <Card className="shadow-sm">
                 <CardHeader className="flex flex-row items-center gap-2 pb-2">
-                    <GraduationCap className="h-4 w-4 text-accent"/>
-                    <CardTitle className="text-lg">Matrícula</CardTitle>
+                    <GraduationCap className="h-4 w-4 text-accent shrink-0"/>
+                    <CardTitle className="text-base sm:text-lg">Matrícula</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2 text-xs">
-                    <p><strong>Turma:</strong> {student.class || 'Nenhuma'}</p>
-                    <div className="flex items-center gap-1">
+                    <p className="break-words"><strong>Turma:</strong> {student.class || 'Nenhuma'}</p>
+                    <div className="flex items-center gap-1 flex-wrap">
                         <strong>Condição:</strong> 
                         <Badge variant="outline" className="h-5 text-[10px]">{student.studentCondition}</Badge>
                     </div>
@@ -582,10 +582,10 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
             {student.medicalInfo && (
               <Card className="shadow-sm border-amber-300 bg-amber-50/40">
                 <CardHeader className="flex flex-row items-center gap-2 pb-2">
-                  <HeartPulse className="h-4 w-4 text-amber-700"/>
-                  <CardTitle className="text-base text-amber-950">Informações Médicas</CardTitle>
+                  <HeartPulse className="h-4 w-4 text-amber-700 shrink-0"/>
+                  <CardTitle className="text-base sm:text-lg text-amber-950">Informações Médicas</CardTitle>
                 </CardHeader>
-                <CardContent className="text-xs text-amber-900 whitespace-pre-line">
+                <CardContent className="text-xs text-amber-900 whitespace-pre-line break-words">
                   {student.medicalInfo}
                 </CardContent>
               </Card>
@@ -593,9 +593,9 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
 
             <Card className="shadow-sm border-accent/10">
                 <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2 bg-muted/5">
-                    <div className="flex items-center gap-2">
-                        <FileWarning className="h-4 w-4 text-accent"/>
-                        <CardTitle className="text-lg">Docs e Anexos</CardTitle>
+                    <div className="flex items-center gap-2 min-w-0">
+                        <FileWarning className="h-4 w-4 text-accent shrink-0"/>
+                        <CardTitle className="text-base sm:text-lg truncate">Docs e Anexos</CardTitle>
                     </div>
                     <Dialog open={isAddingDoc} onOpenChange={(open) => {
                         if (!open) {
@@ -814,59 +814,91 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
             </Card>
         </div>
 
-        <div className="md:col-span-2 flex flex-col gap-6">
+        <div className="md:col-span-2 flex flex-col gap-4 sm:gap-6 min-w-0">
             <Card className="shadow-sm overflow-hidden">
-                <CardHeader className="flex flex-row items-center justify-between gap-2 bg-muted/10 pb-3">
-                    <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-accent"/>
-                        <CardTitle className="text-lg">Desempenho Pedagógico</CardTitle>
+                <CardHeader className="flex flex-row items-center justify-between gap-2 bg-muted/10 p-3 sm:p-6 pb-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                        <FileText className="h-4 w-4 text-accent shrink-0"/>
+                        <CardTitle className="text-base sm:text-lg truncate">Desempenho Pedagógico</CardTitle>
                     </div>
-                    <Badge variant="secondary" className="font-mono">{student.grades.length} notas</Badge>
+                    <Badge variant="secondary" className="font-mono text-xs shrink-0">{student.grades.length} notas</Badge>
                 </CardHeader>
                 <CardContent className="p-0">
-                   <Table>
-                        <TableHeader>
-                            <TableRow className="bg-muted/5">
-                                <TableHead className="h-9 text-[10px] uppercase font-bold">Avaliação</TableHead>
-                                <TableHead className="h-9 text-[10px] uppercase font-bold">Período</TableHead>
-                                <TableHead className="h-9 text-[10px] uppercase font-bold text-right">Nota</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {student.grades && student.grades.length > 0 ? student.grades.map((grade: Grade, index: number) => (
-                                <TableRow key={index} className="hover:bg-muted/5">
-                                    <TableCell className="py-2 text-xs font-medium">{grade.subject}</TableCell>
-                                    <TableCell className="py-2 text-xs">{grade.periodNumber}º {grade.periodType}</TableCell>
-                                    <TableCell className={cn(
-                                        "py-2 text-xs text-right font-bold",
-                                        grade.grade >= 60 ? 'text-green-600' : 'text-red-600'
+                    {/* Visualização Mobile (Sem rolagem horizontal) */}
+                    <div className="sm:hidden divide-y divide-border/60">
+                        {student.grades && student.grades.length > 0 ? (
+                            student.grades.map((grade: Grade, index: number) => (
+                                <div key={index} className="p-3 flex items-center justify-between gap-2 hover:bg-muted/5 transition-colors">
+                                    <div className="min-w-0 flex-1">
+                                        <p className="text-xs font-semibold text-foreground truncate">{grade.subject}</p>
+                                        <p className="text-[11px] text-muted-foreground">{grade.periodNumber}º {grade.periodType}</p>
+                                    </div>
+                                    <div className={cn(
+                                        "px-2.5 py-1 rounded-md text-xs font-bold font-mono shrink-0",
+                                        grade.grade >= 60 ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-red-500/10 text-red-700 dark:text-red-400'
                                     )}>
                                         {grade.grade.toFixed(1)}
-                                    </TableCell>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="h-16 flex items-center justify-center text-xs text-muted-foreground italic">
+                                Nenhuma nota registrada.
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Visualização Desktop (Tabela Completa) */}
+                    <div className="hidden sm:block">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="bg-muted/5">
+                                    <TableHead className="h-9 text-[10px] uppercase font-bold">Avaliação</TableHead>
+                                    <TableHead className="h-9 text-[10px] uppercase font-bold">Período</TableHead>
+                                    <TableHead className="h-9 text-[10px] uppercase font-bold text-right">Nota</TableHead>
                                 </TableRow>
-                            )) : (
-                                <TableRow><TableCell colSpan={3} className="h-20 text-center text-xs text-muted-foreground italic">Nenhuma nota registrada.</TableCell></TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {student.grades && student.grades.length > 0 ? student.grades.map((grade: Grade, index: number) => (
+                                    <TableRow key={index} className="hover:bg-muted/5">
+                                        <TableCell className="py-2 text-xs font-medium">{grade.subject}</TableCell>
+                                        <TableCell className="py-2 text-xs">{grade.periodNumber}º {grade.periodType}</TableCell>
+                                        <TableCell className={cn(
+                                            "py-2 text-xs text-right font-bold",
+                                            grade.grade >= 60 ? 'text-green-600' : 'text-red-600'
+                                        )}>
+                                            {grade.grade.toFixed(1)}
+                                        </TableCell>
+                                    </TableRow>
+                                )) : (
+                                    <TableRow><TableCell colSpan={3} className="h-20 text-center text-xs text-muted-foreground italic">Nenhuma nota registrada.</TableCell></TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
 
              <Card className="shadow-sm overflow-hidden">
-                <CardHeader className="flex flex-row items-center justify-between gap-2 bg-muted/10 pb-3">
-                    <div className="flex items-center gap-2">
-                        <CalendarDays className="h-4 w-4 text-accent"/>
-                        <CardTitle className="text-lg">Registro de Frequência</CardTitle>
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 bg-muted/10 p-3 sm:p-6 pb-3">
+                    <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <CalendarDays className="h-4 w-4 text-accent shrink-0"/>
+                            <CardTitle className="text-base sm:text-lg truncate">Registro de Frequência</CardTitle>
+                        </div>
+                        <Badge variant="secondary" className="font-mono text-xs shrink-0 sm:hidden">
+                            {student.attendance && student.attendance.length > 0 ? Math.round((student.attendance.filter(a => a.status === 'present').length / student.attendance.length) * 100) : 0}%
+                        </Badge>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Badge variant="secondary" className="font-mono">
+                    <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+                        <Badge variant="secondary" className="font-mono hidden sm:inline-flex">
                             Frequência: {student.attendance && student.attendance.length > 0 ? Math.round((student.attendance.filter(a => a.status === 'present').length / student.attendance.length) * 100) : 0}%
                         </Badge>
                         {canEditAttendance && (
                             <Button 
                                 size="sm" 
                                 variant="outline" 
-                                className="h-7 text-xs border-accent/40 text-accent hover:bg-accent/10 rounded-lg px-2.5"
+                                className="h-8 text-xs border-accent/40 text-accent hover:bg-accent/10 rounded-lg px-2.5 w-full sm:w-auto justify-center"
                                 onClick={() => {
                                     setNewAttendanceDate(new Date().toISOString().split('T')[0]);
                                     setNewAttendanceStatus('present');
@@ -880,119 +912,217 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                   <Table>
-                        <TableHeader>
-                            <TableRow className="bg-muted/5">
-                                <TableHead className="h-9 text-[10px] uppercase font-bold">Data da Aula</TableHead>
-                                <TableHead className="h-9 text-[10px] uppercase font-bold">Status</TableHead>
-                                {canEditAttendance && (
-                                    <TableHead className="h-9 text-[10px] uppercase font-bold text-right w-24">Ações</TableHead>
-                                )}
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {student.attendance && student.attendance.length > 0 ? student.attendance.map((att: Attendance, index: number) => {
+                    {/* Visualização Mobile (Cards/Lista sem rolagem horizontal) */}
+                    <div className="sm:hidden divide-y divide-border/60">
+                        {student.attendance && student.attendance.length > 0 ? (
+                            student.attendance.map((att: Attendance, index: number) => {
                                 const {icon, text, color} = getAttendanceIcon(att.status);
                                 return (
-                                <TableRow key={index} className="hover:bg-muted/5">
-                                    <TableCell className="py-2 text-xs font-medium">
-                                        {new Date(att.date).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}
-                                    </TableCell>
-                                    <TableCell className="py-2">
-                                        {canEditAttendance ? (
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <button 
-                                                        type="button" 
-                                                        className={cn(
-                                                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold text-[10px] cursor-pointer hover:opacity-80 transition-opacity border border-transparent hover:border-current", 
-                                                            color
-                                                        )}
-                                                        title="Clique para alternar o status da chamada"
-                                                    >
+                                    <div key={index} className="p-3 flex items-center justify-between gap-2 hover:bg-muted/5 transition-colors">
+                                        <div className="flex flex-col min-w-0">
+                                            <span className="text-xs font-semibold text-foreground">
+                                                {new Date(att.date).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}
+                                            </span>
+                                            <div className="mt-1">
+                                                {canEditAttendance ? (
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <button 
+                                                                type="button" 
+                                                                className={cn(
+                                                                    "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-bold text-[10px] cursor-pointer hover:opacity-80 transition-opacity border border-transparent hover:border-current", 
+                                                                    color
+                                                                )}
+                                                                title="Clique para alternar o status da chamada"
+                                                            >
+                                                                {icon} {text}
+                                                                <ChevronDown className="h-3 w-3 opacity-60 ml-0.5" />
+                                                            </button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="start" className="w-40 text-xs">
+                                                            <DropdownMenuItem 
+                                                                onClick={() => handleQuickChangeAttendanceStatus(index, 'present')} 
+                                                                className="cursor-pointer gap-2 text-green-700 dark:text-green-400 font-medium"
+                                                            >
+                                                                <CheckCircle className="h-3.5 w-3.5 text-green-500" /> Presente
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem 
+                                                                onClick={() => handleQuickChangeAttendanceStatus(index, 'absent')} 
+                                                                className="cursor-pointer gap-2 text-red-700 dark:text-red-400 font-medium"
+                                                            >
+                                                                <XCircle className="h-3.5 w-3.5 text-red-500" /> Ausente
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem 
+                                                                onClick={() => handleQuickChangeAttendanceStatus(index, 'justified')} 
+                                                                className="cursor-pointer gap-2 text-yellow-700 dark:text-yellow-400 font-medium"
+                                                            >
+                                                                <Megaphone className="h-3.5 w-3.5 text-yellow-500" /> Justificado
+                                                            </DropdownMenuItem>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                ) : (
+                                                    <div className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-bold text-[10px]", color)}>
                                                         {icon} {text}
-                                                        <ChevronDown className="h-3 w-3 opacity-60 ml-0.5" />
-                                                    </button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="start" className="w-40 text-xs">
-                                                    <DropdownMenuItem 
-                                                        onClick={() => handleQuickChangeAttendanceStatus(index, 'present')} 
-                                                        className="cursor-pointer gap-2 text-green-700 dark:text-green-400 font-medium"
-                                                    >
-                                                        <CheckCircle className="h-3.5 w-3.5 text-green-500" /> Presente
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem 
-                                                        onClick={() => handleQuickChangeAttendanceStatus(index, 'absent')} 
-                                                        className="cursor-pointer gap-2 text-red-700 dark:text-red-400 font-medium"
-                                                    >
-                                                        <XCircle className="h-3.5 w-3.5 text-red-500" /> Ausente
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem 
-                                                        onClick={() => handleQuickChangeAttendanceStatus(index, 'justified')} 
-                                                        className="cursor-pointer gap-2 text-yellow-700 dark:text-yellow-400 font-medium"
-                                                    >
-                                                        <Megaphone className="h-3.5 w-3.5 text-yellow-500" /> Justificado
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        ) : (
-                                            <div className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-bold text-[10px]", color)}>
-                                                {icon} {text}
+                                                    </div>
+                                                )}
                                             </div>
-                                        )}
-                                    </TableCell>
-                                    {canEditAttendance && (
-                                        <TableCell className="py-2 text-right">
-                                            <div className="flex items-center justify-end gap-1">
+                                        </div>
+
+                                        {canEditAttendance && (
+                                            <div className="flex items-center gap-1 shrink-0">
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="h-7 w-7 text-muted-foreground hover:text-accent hover:bg-accent/10"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-accent hover:bg-accent/10"
                                                     onClick={() => handleOpenEditAttendance(index, att)}
                                                     title="Editar data ou status"
                                                 >
-                                                    <Edit className="h-3.5 w-3.5" />
+                                                    <Edit className="h-4 w-4" />
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
-                                                    className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                    className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
                                                     onClick={() => handleDeleteAttendance(index)}
                                                     title="Remover registro de frequência"
                                                 >
-                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                    <Trash2 className="h-4 w-4" />
                                                 </Button>
                                             </div>
-                                        </TableCell>
+                                        )}
+                                    </div>
+                                );
+                            })
+                        ) : (
+                            <div className="h-16 flex items-center justify-center text-xs text-muted-foreground italic">
+                                Nenhum registro de frequência.
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Visualização Desktop (Tabela Completa) */}
+                    <div className="hidden sm:block">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="bg-muted/5">
+                                    <TableHead className="h-9 text-[10px] uppercase font-bold">Data da Aula</TableHead>
+                                    <TableHead className="h-9 text-[10px] uppercase font-bold">Status</TableHead>
+                                    {canEditAttendance && (
+                                        <TableHead className="h-9 text-[10px] uppercase font-bold text-right w-24">Ações</TableHead>
                                     )}
                                 </TableRow>
-                                )
-                            }) : (
-                                <TableRow>
-                                    <TableCell colSpan={canEditAttendance ? 3 : 2} className="h-20 text-center text-xs text-muted-foreground italic">
-                                        Nenhum registro de frequência.
-                                    </TableCell>
-                                </TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {student.attendance && student.attendance.length > 0 ? student.attendance.map((att: Attendance, index: number) => {
+                                    const {icon, text, color} = getAttendanceIcon(att.status);
+                                    return (
+                                    <TableRow key={index} className="hover:bg-muted/5">
+                                        <TableCell className="py-2 text-xs font-medium">
+                                            {new Date(att.date).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}
+                                        </TableCell>
+                                        <TableCell className="py-2">
+                                            {canEditAttendance ? (
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <button 
+                                                            type="button" 
+                                                            className={cn(
+                                                                "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold text-[10px] cursor-pointer hover:opacity-80 transition-opacity border border-transparent hover:border-current", 
+                                                                color
+                                                            )}
+                                                            title="Clique para alternar o status da chamada"
+                                                        >
+                                                            {icon} {text}
+                                                            <ChevronDown className="h-3 w-3 opacity-60 ml-0.5" />
+                                                        </button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="start" className="w-40 text-xs">
+                                                        <DropdownMenuItem 
+                                                            onClick={() => handleQuickChangeAttendanceStatus(index, 'present')} 
+                                                            className="cursor-pointer gap-2 text-green-700 dark:text-green-400 font-medium"
+                                                        >
+                                                            <CheckCircle className="h-3.5 w-3.5 text-green-500" /> Presente
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem 
+                                                            onClick={() => handleQuickChangeAttendanceStatus(index, 'absent')} 
+                                                            className="cursor-pointer gap-2 text-red-700 dark:text-red-400 font-medium"
+                                                        >
+                                                            <XCircle className="h-3.5 w-3.5 text-red-500" /> Ausente
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem 
+                                                            onClick={() => handleQuickChangeAttendanceStatus(index, 'justified')} 
+                                                            className="cursor-pointer gap-2 text-yellow-700 dark:text-yellow-400 font-medium"
+                                                        >
+                                                            <Megaphone className="h-3.5 w-3.5 text-yellow-500" /> Justificado
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            ) : (
+                                                <div className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-bold text-[10px]", color)}>
+                                                    {icon} {text}
+                                                </div>
+                                            )}
+                                        </TableCell>
+                                        {canEditAttendance && (
+                                            <TableCell className="py-2 text-right">
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-7 w-7 text-muted-foreground hover:text-accent hover:bg-accent/10"
+                                                        onClick={() => handleOpenEditAttendance(index, att)}
+                                                        title="Editar data ou status"
+                                                    >
+                                                        <Edit className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                        onClick={() => handleDeleteAttendance(index)}
+                                                        title="Remover registro de frequência"
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        )}
+                                    </TableRow>
+                                    )
+                                }) : (
+                                    <TableRow>
+                                        <TableCell colSpan={canEditAttendance ? 3 : 2} className="h-20 text-center text-xs text-muted-foreground italic">
+                                            Nenhum registro de frequência.
+                                        </TableCell>
+                                    </TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
 
             {canViewFinance && (
              <Card className="shadow-sm overflow-hidden border-accent/20">
-                <CardHeader className="flex flex-row items-center justify-between gap-2 bg-accent/5 pb-3">
-                    <div className="flex items-center gap-2">
-                        <Wallet className="h-4 w-4 text-accent"/>
-                        <CardTitle className="text-lg">Histórico Financeiro</CardTitle>
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 bg-accent/5 p-3 sm:p-6 pb-3">
+                    <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <Wallet className="h-4 w-4 text-accent shrink-0"/>
+                            <CardTitle className="text-base sm:text-lg truncate">Histórico Financeiro</CardTitle>
+                        </div>
+                        <Badge className="bg-accent/10 text-accent border-accent/20 font-mono text-[10px] sm:hidden">
+                            {formatCurrency(student.monthlyFee)}
+                        </Badge>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <Badge className="bg-accent/10 text-accent border-accent/20 font-mono">Mensalidade: {formatCurrency(student.monthlyFee)}</Badge>
+                    <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+                        <Badge className="bg-accent/10 text-accent border-accent/20 font-mono hidden sm:inline-flex">
+                            Mensalidade: {formatCurrency(student.monthlyFee)}
+                        </Badge>
                         {canEditFinance && (
                             <Button 
                                 size="sm" 
                                 variant="outline" 
-                                className="h-7 text-xs border-accent/40 text-accent hover:bg-accent/10 rounded-lg px-2.5"
+                                className="h-8 text-xs border-accent/40 text-accent hover:bg-accent/10 rounded-lg px-2.5 w-full sm:w-auto justify-center"
                                 onClick={() => setIsPaymentDialogOpen(true)}
                             >
                                 <Plus className="h-3.5 w-3.5 mr-1" />
@@ -1002,53 +1132,105 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
                     </div>
                 </CardHeader>
                 <CardContent className="p-0">
-                   <Table>
-                        <TableHeader>
-                            <TableRow className="bg-muted/5">
-                                <TableHead className="h-9 text-[10px] uppercase font-bold">Data</TableHead>
-                                <TableHead className="h-9 text-[10px] uppercase font-bold">Descrição</TableHead>
-                                <TableHead className="h-9 text-[10px] uppercase font-bold hidden sm:table-cell">Forma</TableHead>
-                                <TableHead className="h-9 text-[10px] uppercase font-bold text-right">Valor</TableHead>
-                                <TableHead className="h-9 text-[10px] uppercase font-bold text-center w-14">Comp.</TableHead>
-                            </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                            {displayPayments.length > 0 ? displayPayments.map((payment) => (
-                                <TableRow key={payment.id} className="hover:bg-muted/5">
-                                    <TableCell className="py-2 text-xs font-mono">{new Date(payment.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</TableCell>
-                                    <TableCell className="py-2 text-xs font-medium">{payment.description}</TableCell>
-                                    <TableCell className="py-2 text-xs hidden sm:table-cell">
-                                        {payment.paymentMethod ? (
-                                            <Badge variant="outline" className="text-[9px] font-normal px-1.5 py-0 h-4">
-                                                {payment.paymentMethod}
-                                            </Badge>
-                                        ) : '-'}
-                                    </TableCell>
-                                    <TableCell className="py-2 text-xs text-right font-bold text-green-600 font-mono">{formatCurrency(payment.amount)}</TableCell>
-                                    <TableCell className="py-2 text-center p-1">
+                    {/* Visualização Mobile (Cards/Lista sem rolagem horizontal) */}
+                    <div className="sm:hidden divide-y divide-border/60">
+                        {displayPayments.length > 0 ? (
+                            displayPayments.map((payment) => (
+                                <div key={payment.id} className="p-3 flex items-center justify-between gap-2 hover:bg-muted/5 transition-colors">
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className="text-xs font-semibold text-foreground truncate max-w-[170px]">{payment.description}</span>
+                                            {payment.paymentMethod && (
+                                                <Badge variant="outline" className="text-[9px] font-normal px-1 py-0 h-4 shrink-0">
+                                                    {payment.paymentMethod}
+                                                </Badge>
+                                            )}
+                                        </div>
+                                        <p className="text-[11px] font-mono text-muted-foreground mt-0.5">
+                                            {new Date(payment.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}
+                                        </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <span className="text-xs font-bold text-green-600 font-mono">
+                                            {formatCurrency(payment.amount)}
+                                        </span>
                                         {payment.receiptUrl ? (
                                             <Button 
                                                 variant="ghost" 
                                                 size="icon" 
-                                                className="h-6 w-6 text-accent hover:bg-accent/10" 
+                                                className="h-8 w-8 text-accent hover:bg-accent/10" 
                                                 onClick={() => {
                                                     setSelectedReceipt(payment.receiptUrl!);
                                                     setIsReceiptOpen(true);
                                                 }}
                                                 title="Ver Comprovante"
                                             >
-                                                <Eye className="h-3.5 w-3.5" />
+                                                <Eye className="h-4 w-4" />
                                             </Button>
                                         ) : (
-                                            <span className="text-muted-foreground/30 text-xs">-</span>
+                                            <div className="w-8" />
                                         )}
-                                    </TableCell>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="h-16 flex items-center justify-center text-xs text-muted-foreground italic">
+                                Nenhum pagamento registrado.
+                            </div>
+                        )}
+                    </div>
+
+                    {/* Visualização Desktop (Tabela Completa) */}
+                    <div className="hidden sm:block">
+                        <Table>
+                            <TableHeader>
+                                <TableRow className="bg-muted/5">
+                                    <TableHead className="h-9 text-[10px] uppercase font-bold">Data</TableHead>
+                                    <TableHead className="h-9 text-[10px] uppercase font-bold">Descrição</TableHead>
+                                    <TableHead className="h-9 text-[10px] uppercase font-bold hidden sm:table-cell">Forma</TableHead>
+                                    <TableHead className="h-9 text-[10px] uppercase font-bold text-right">Valor</TableHead>
+                                    <TableHead className="h-9 text-[10px] uppercase font-bold text-center w-14">Comp.</TableHead>
                                 </TableRow>
-                            )) : (
-                                <TableRow><TableCell colSpan={5} className="h-20 text-center text-xs text-muted-foreground italic">Nenhum pagamento registrado.</TableCell></TableRow>
-                            )}
-                        </TableBody>
-                    </Table>
+                            </TableHeader>
+                            <TableBody>
+                                {displayPayments.length > 0 ? displayPayments.map((payment) => (
+                                    <TableRow key={payment.id} className="hover:bg-muted/5">
+                                        <TableCell className="py-2 text-xs font-mono">{new Date(payment.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</TableCell>
+                                        <TableCell className="py-2 text-xs font-medium">{payment.description}</TableCell>
+                                        <TableCell className="py-2 text-xs hidden sm:table-cell">
+                                            {payment.paymentMethod ? (
+                                                <Badge variant="outline" className="text-[9px] font-normal px-1.5 py-0 h-4">
+                                                    {payment.paymentMethod}
+                                                </Badge>
+                                            ) : '-'}
+                                        </TableCell>
+                                        <TableCell className="py-2 text-xs text-right font-bold text-green-600 font-mono">{formatCurrency(payment.amount)}</TableCell>
+                                        <TableCell className="py-2 text-center p-1">
+                                            {payment.receiptUrl ? (
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    className="h-6 w-6 text-accent hover:bg-accent/10" 
+                                                    onClick={() => {
+                                                        setSelectedReceipt(payment.receiptUrl!);
+                                                        setIsReceiptOpen(true);
+                                                    }}
+                                                    title="Ver Comprovante"
+                                                >
+                                                    <Eye className="h-3.5 w-3.5" />
+                                                </Button>
+                                            ) : (
+                                                <span className="text-muted-foreground/30 text-xs">-</span>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                )) : (
+                                    <TableRow><TableCell colSpan={5} className="h-20 text-center text-xs text-muted-foreground italic">Nenhum pagamento registrado.</TableCell></TableRow>
+                                )}
+                            </TableBody>
+                        </Table>
+                    </div>
                 </CardContent>
             </Card>
             )}
@@ -1154,39 +1336,39 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
                         <Label className="text-xs font-semibold">
                             Status da Frequência <span className="text-destructive">*</span>
                         </Label>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                             <Button
                                 type="button"
                                 variant={editingAttendanceStatus === 'present' ? 'default' : 'outline'}
                                 className={cn(
-                                    "text-xs h-9 justify-center gap-1.5",
+                                    "text-[11px] sm:text-xs h-9 justify-center gap-1 px-1 sm:px-2",
                                     editingAttendanceStatus === 'present' && "bg-green-600 hover:bg-green-700 text-white"
                                 )}
                                 onClick={() => setEditingAttendanceStatus('present')}
                             >
-                                <CheckCircle className="h-3.5 w-3.5" /> Presente
+                                <CheckCircle className="h-3.5 w-3.5 shrink-0" /> Presente
                             </Button>
                             <Button
                                 type="button"
                                 variant={editingAttendanceStatus === 'absent' ? 'default' : 'outline'}
                                 className={cn(
-                                    "text-xs h-9 justify-center gap-1.5",
+                                    "text-[11px] sm:text-xs h-9 justify-center gap-1 px-1 sm:px-2",
                                     editingAttendanceStatus === 'absent' && "bg-red-600 hover:bg-red-700 text-white"
                                 )}
                                 onClick={() => setEditingAttendanceStatus('absent')}
                             >
-                                <XCircle className="h-3.5 w-3.5" /> Ausente
+                                <XCircle className="h-3.5 w-3.5 shrink-0" /> Ausente
                             </Button>
                             <Button
                                 type="button"
                                 variant={editingAttendanceStatus === 'justified' ? 'default' : 'outline'}
                                 className={cn(
-                                    "text-xs h-9 justify-center gap-1.5",
+                                    "text-[11px] sm:text-xs h-9 justify-center gap-1 px-1 sm:px-2",
                                     editingAttendanceStatus === 'justified' && "bg-amber-600 hover:bg-amber-700 text-white"
                                 )}
                                 onClick={() => setEditingAttendanceStatus('justified')}
                             >
-                                <Megaphone className="h-3.5 w-3.5" /> Justificado
+                                <Megaphone className="h-3.5 w-3.5 shrink-0" /> Justificado
                             </Button>
                         </div>
                     </div>
@@ -1266,39 +1448,39 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
                         <Label className="text-xs font-semibold">
                             Status da Frequência <span className="text-destructive">*</span>
                         </Label>
-                        <div className="grid grid-cols-3 gap-2">
+                        <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                             <Button
                                 type="button"
                                 variant={newAttendanceStatus === 'present' ? 'default' : 'outline'}
                                 className={cn(
-                                    "text-xs h-9 justify-center gap-1.5",
+                                    "text-[11px] sm:text-xs h-9 justify-center gap-1 px-1 sm:px-2",
                                     newAttendanceStatus === 'present' && "bg-green-600 hover:bg-green-700 text-white"
                                 )}
                                 onClick={() => setNewAttendanceStatus('present')}
                             >
-                                <CheckCircle className="h-3.5 w-3.5" /> Presente
+                                <CheckCircle className="h-3.5 w-3.5 shrink-0" /> Presente
                             </Button>
                             <Button
                                 type="button"
                                 variant={newAttendanceStatus === 'absent' ? 'default' : 'outline'}
                                 className={cn(
-                                    "text-xs h-9 justify-center gap-1.5",
+                                    "text-[11px] sm:text-xs h-9 justify-center gap-1 px-1 sm:px-2",
                                     newAttendanceStatus === 'absent' && "bg-red-600 hover:bg-red-700 text-white"
                                 )}
                                 onClick={() => setNewAttendanceStatus('absent')}
                             >
-                                <XCircle className="h-3.5 w-3.5" /> Ausente
+                                <XCircle className="h-3.5 w-3.5 shrink-0" /> Ausente
                             </Button>
                             <Button
                                 type="button"
                                 variant={newAttendanceStatus === 'justified' ? 'default' : 'outline'}
                                 className={cn(
-                                    "text-xs h-9 justify-center gap-1.5",
+                                    "text-[11px] sm:text-xs h-9 justify-center gap-1 px-1 sm:px-2",
                                     newAttendanceStatus === 'justified' && "bg-amber-600 hover:bg-amber-700 text-white"
                                 )}
                                 onClick={() => setNewAttendanceStatus('justified')}
                             >
-                                <Megaphone className="h-3.5 w-3.5" /> Justificado
+                                <Megaphone className="h-3.5 w-3.5 shrink-0" /> Justificado
                             </Button>
                         </div>
                     </div>
