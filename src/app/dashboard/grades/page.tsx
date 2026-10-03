@@ -20,6 +20,7 @@ import {
 import {
   Dialog,
   DialogContent,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -27,7 +28,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { Award, Frown, Smile, History, BookCopy, Loader2, Star, Users, Edit, MoreHorizontal, ChevronLeft, Home } from "lucide-react";
+import { Award, Frown, Smile, History, BookCopy, Loader2, Star, Users, Edit, MoreHorizontal, ChevronLeft, Home, Trash2 } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -76,6 +77,11 @@ export default function GradesPage() {
   const [latestGrades, setLatestGrades] = React.useState<GradeWithStudentInfo[]>([]);
   const [isLoading, setIsLoading] = React.useState(false);
   const [isStudentSelectorOpen, setIsStudentSelectorOpen] = React.useState(false);
+
+  const [editingGrade, setEditingGrade] = React.useState<Grade | null>(null);
+  const [editGradeValue, setEditGradeValue] = React.useState("");
+  const [editGradeDate, setEditGradeDate] = React.useState("");
+  const [isSavingEditGrade, setIsSavingEditGrade] = React.useState(false);
 
   React.useEffect(() => {
     const isAdmin = user?.role === 'Admin';
@@ -186,6 +192,83 @@ export default function GradesPage() {
       toast({ variant: 'destructive', title: "Erro ao salvar notas", description: err.message });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleOpenEditGrade = (grade: Grade) => {
+    setEditingGrade(grade);
+    setEditGradeValue(grade.grade.toString());
+    setEditGradeDate(grade.evaluationDate || new Date().toISOString().split('T')[0]);
+  };
+
+  const handleSaveEditedGrade = async () => {
+    if (!selectedStudent || !editingGrade) return;
+    const numValue = parseFloat(editGradeValue);
+    if (isNaN(numValue) || numValue < 0 || numValue > 100) {
+      toast({ variant: 'destructive', title: "Nota inválida", description: "Informe um valor numérico entre 0 e 100." });
+      return;
+    }
+
+    setIsSavingEditGrade(true);
+    try {
+      const existingGrades = selectedStudent.grades || [];
+      let matched = false;
+      const updatedGrades = existingGrades.map(g => {
+        if (
+          !matched &&
+          g.subject === editingGrade.subject &&
+          g.periodNumber === editingGrade.periodNumber &&
+          g.periodType === editingGrade.periodType &&
+          (g.evaluationDate === editingGrade.evaluationDate || (!g.evaluationDate && !editingGrade.evaluationDate))
+        ) {
+          matched = true;
+          return {
+            ...g,
+            grade: numValue,
+            evaluationDate: editGradeDate,
+          };
+        }
+        return g;
+      });
+
+      await updateStudent(selectedStudent.id, { grades: updatedGrades });
+      toast({ title: "Nota Atualizada!", description: `A nota de ${editingGrade.subject} foi alterada para ${numValue.toFixed(2)}.` });
+      setEditingGrade(null);
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: "Erro ao atualizar", description: err.message || "Falha ao salvar nota." });
+    } finally {
+      setIsSavingEditGrade(false);
+    }
+  };
+
+  const handleDeleteGrade = async () => {
+    if (!selectedStudent || !editingGrade) return;
+
+    setIsSavingEditGrade(true);
+    try {
+      const existingGrades = selectedStudent.grades || [];
+      let removed = false;
+      const updatedGrades = existingGrades.filter(g => {
+        if (
+          !removed &&
+          g.subject === editingGrade.subject &&
+          g.periodNumber === editingGrade.periodNumber &&
+          g.periodType === editingGrade.periodType &&
+          (g.evaluationDate === editingGrade.evaluationDate || (!g.evaluationDate && !editingGrade.evaluationDate))
+        ) {
+          removed = true;
+          return false;
+        }
+        return true;
+      });
+
+      await updateStudent(selectedStudent.id, { grades: updatedGrades });
+      toast({ title: "Nota Removida", description: `A avaliação ${editingGrade.subject} foi excluída com sucesso.` });
+      setEditingGrade(null);
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: "Erro ao excluir", description: err.message || "Falha ao remover nota." });
+    } finally {
+      setIsSavingEditGrade(false);
     }
   };
 
@@ -379,7 +462,15 @@ export default function GradesPage() {
                                                     {grade.grade.toFixed(2)}
                                                 </TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8"><Edit className="h-4 w-4"/></Button>
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        className="h-8 w-8 text-muted-foreground hover:text-accent hover:bg-accent/10"
+                                                        onClick={() => handleOpenEditGrade(grade)}
+                                                        title="Editar nota da avaliação"
+                                                    >
+                                                        <Edit className="h-4 w-4"/>
+                                                    </Button>
                                                 </TableCell>
                                             </TableRow>
                                         ))}
@@ -435,6 +526,103 @@ export default function GradesPage() {
                 )}
             </CardContent>
         </Card>
+
+        {/* Diálogo de Edição de Nota Individual */}
+        <Dialog open={!!editingGrade} onOpenChange={(open) => !open && setEditingGrade(null)}>
+            <DialogContent className="sm:max-w-[420px]">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <Edit className="h-5 w-5 text-accent" />
+                        Editar Nota da Avaliação
+                    </DialogTitle>
+                </DialogHeader>
+
+                {editingGrade && selectedStudent && (
+                    <div className="space-y-4 py-2">
+                        <div className="bg-muted/50 rounded-lg p-3 space-y-1.5 text-xs border">
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground font-semibold">Aluno:</span>
+                                <span className="font-bold text-foreground">{selectedStudent.name}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground font-semibold">Avaliação:</span>
+                                <span className="font-bold text-accent">{editingGrade.subject}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-muted-foreground font-semibold">Período:</span>
+                                <span className="font-bold text-foreground">{editingGrade.periodNumber}º {editingGrade.periodType}</span>
+                            </div>
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-grade-value" className="text-xs font-semibold">
+                                Nota / Pontuação (0 a 100) <span className="text-destructive">*</span>
+                            </Label>
+                            <Input 
+                                id="edit-grade-value"
+                                type="number"
+                                min="0"
+                                max="100"
+                                step="0.1"
+                                value={editGradeValue}
+                                onChange={(e) => setEditGradeValue(e.target.value)}
+                                placeholder="0 a 100"
+                                autoFocus
+                                className="font-mono text-base"
+                            />
+                        </div>
+
+                        <div className="space-y-2">
+                            <Label htmlFor="edit-grade-date" className="text-xs font-semibold">
+                                Data da Avaliação
+                            </Label>
+                            <Input 
+                                id="edit-grade-date"
+                                type="date"
+                                value={editGradeDate}
+                                onChange={(e) => setEditGradeDate(e.target.value)}
+                                className="text-xs"
+                            />
+                        </div>
+                    </div>
+                )}
+
+                <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:justify-between items-center pt-2">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="text-destructive hover:bg-destructive/10 text-xs w-full sm:w-auto"
+                        onClick={handleDeleteGrade}
+                        disabled={isSavingEditGrade}
+                    >
+                        <Trash2 className="h-3.5 w-3.5 mr-1" /> Excluir Nota
+                    </Button>
+                    <div className="flex gap-2 w-full sm:w-auto justify-end">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setEditingGrade(null)}
+                            disabled={isSavingEditGrade}
+                            className="text-xs"
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            className="bg-accent hover:bg-accent/90 text-xs font-semibold"
+                            onClick={handleSaveEditedGrade}
+                            disabled={isSavingEditGrade}
+                        >
+                            {isSavingEditGrade && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Salvar Alteração
+                        </Button>
+                    </div>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
     </div>
   );
 }

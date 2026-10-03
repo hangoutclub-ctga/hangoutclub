@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { User, Shield, GraduationCap, BookOpen, Wallet, FileText, CheckCircle, XCircle, Clock, Printer, Megaphone, CalendarDays, ExternalLink, ImageIcon, FileWarning, Eye, Plus, FileUp, X, Loader2, HeartPulse, Camera, Upload, Link as LinkIcon, Check, Trash2, ChevronDown } from "lucide-react";
+import { User, Shield, GraduationCap, BookOpen, Wallet, FileText, CheckCircle, XCircle, Clock, Printer, Megaphone, CalendarDays, ExternalLink, ImageIcon, FileWarning, Eye, Plus, FileUp, X, Loader2, HeartPulse, Camera, Upload, Link as LinkIcon, Check, Trash2, ChevronDown, Edit } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -116,10 +116,12 @@ const WhatsAppButton = ({
 
 export function StudentProfile({ student: initialStudent }: { student: Student }) {
   const { handleLinkClick } = useLoading();
-  const { hasPermission } = useAuth();
+  const { hasPermission, user } = useAuth();
   const { students, transactions, addTransaction, updateStudent } = useData();
+  const isAdmin = user?.role === 'Admin';
   const canViewFinance = hasPermission('finance:view');
   const canEditFinance = hasPermission('finance:edit');
+  const canEditAttendance = isAdmin || user?.role === 'Professor' || user?.role === 'Secretaria' || hasPermission('students:edit');
 
   const student = students.find(s => s.id === initialStudent.id) || initialStudent;
   
@@ -139,6 +141,17 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
   const [isReceiptOpen, setIsReceiptOpen] = React.useState(false);
   const [selectedReceipt, setSelectedReceipt] = React.useState<string | null>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = React.useState(false);
+
+  // Attendance editing state
+  const [editingAttendanceIndex, setEditingAttendanceIndex] = React.useState<number | null>(null);
+  const [editingAttendanceDate, setEditingAttendanceDate] = React.useState("");
+  const [editingAttendanceStatus, setEditingAttendanceStatus] = React.useState<'present' | 'absent' | 'justified'>('present');
+  const [isAttendanceModalOpen, setIsAttendanceModalOpen] = React.useState(false);
+
+  const [isNewAttendanceModalOpen, setIsNewAttendanceModalOpen] = React.useState(false);
+  const [newAttendanceDate, setNewAttendanceDate] = React.useState(new Date().toISOString().split('T')[0]);
+  const [newAttendanceStatus, setNewAttendanceStatus] = React.useState<'present' | 'absent' | 'justified'>('present');
+  const [isSavingAttendance, setIsSavingAttendance] = React.useState(false);
 
   // Real transactions for this student
   const studentTransactions = React.useMemo(() => {
@@ -390,6 +403,98 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
       toast({ variant: 'destructive', title: "Erro ao anexar", description: err.message || "Falha ao salvar documento." });
     } finally {
       setIsSavingDoc(false);
+    }
+  };
+
+  const handleQuickChangeAttendanceStatus = async (index: number, newStatus: 'present' | 'absent' | 'justified') => {
+    const currentList = student.attendance || [];
+    if (!currentList[index]) return;
+    const updated = [...currentList];
+    updated[index] = { ...updated[index], status: newStatus };
+    try {
+      await updateStudent(student.id, { attendance: updated });
+      toast({ 
+        title: "Frequência Atualizada", 
+        description: `Status alterado para ${newStatus === 'present' ? 'Presente' : newStatus === 'absent' ? 'Ausente' : 'Justificado'}.` 
+      });
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: "Erro ao atualizar frequência", description: err.message });
+    }
+  };
+
+  const handleOpenEditAttendance = (index: number, att: Attendance) => {
+    setEditingAttendanceIndex(index);
+    setEditingAttendanceDate(att.date);
+    setEditingAttendanceStatus(att.status);
+    setIsAttendanceModalOpen(true);
+  };
+
+  const handleSaveEditAttendance = async () => {
+    if (editingAttendanceIndex === null) return;
+    const currentList = student.attendance || [];
+    const updated = [...currentList];
+    updated[editingAttendanceIndex] = {
+      date: editingAttendanceDate,
+      status: editingAttendanceStatus,
+    };
+    updated.sort((a, b) => b.date.localeCompare(a.date));
+
+    setIsSavingAttendance(true);
+    try {
+      await updateStudent(student.id, { attendance: updated });
+      toast({ title: "Frequência Atualizada!", description: "O registro de frequência foi atualizado com sucesso." });
+      setIsAttendanceModalOpen(false);
+      setEditingAttendanceIndex(null);
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: "Erro ao atualizar", description: err.message });
+    } finally {
+      setIsSavingAttendance(false);
+    }
+  };
+
+  const handleDeleteAttendance = async (index: number) => {
+    const currentList = student.attendance || [];
+    const target = currentList[index];
+    const updated = currentList.filter((_, i) => i !== index);
+
+    try {
+      await updateStudent(student.id, { attendance: updated });
+      toast({ 
+        title: "Registro Removido", 
+        description: `Frequência de ${new Date(target.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} removida com sucesso.` 
+      });
+      if (editingAttendanceIndex === index) {
+        setIsAttendanceModalOpen(false);
+        setEditingAttendanceIndex(null);
+      }
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: "Erro ao remover registro", description: err.message });
+    }
+  };
+
+  const handleCreateAttendance = async () => {
+    if (!newAttendanceDate) {
+      toast({ variant: 'destructive', title: "Data obrigatória", description: "Selecione a data da aula." });
+      return;
+    }
+
+    const currentList = student.attendance || [];
+    const filtered = currentList.filter(a => a.date !== newAttendanceDate);
+    const updated = [{ date: newAttendanceDate, status: newAttendanceStatus }, ...filtered];
+    updated.sort((a, b) => b.date.localeCompare(a.date));
+
+    setIsSavingAttendance(true);
+    try {
+      await updateStudent(student.id, { attendance: updated });
+      toast({ 
+        title: "Frequência Registrada!", 
+        description: `Presença/falta para ${new Date(newAttendanceDate).toLocaleDateString('pt-BR', { timeZone: 'UTC' })} salva com sucesso.` 
+      });
+      setIsNewAttendanceModalOpen(false);
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: "Erro ao salvar frequência", description: err.message });
+    } finally {
+      setIsSavingAttendance(false);
     }
   };
 
@@ -753,14 +858,36 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
                         <CalendarDays className="h-4 w-4 text-accent"/>
                         <CardTitle className="text-lg">Registro de Frequência</CardTitle>
                     </div>
-                    <Badge variant="secondary" className="font-mono">Frequência: {student.attendance.length > 0 ? Math.round((student.attendance.filter(a => a.status === 'present').length / student.attendance.length) * 100) : 0}%</Badge>
+                    <div className="flex items-center gap-2">
+                        <Badge variant="secondary" className="font-mono">
+                            Frequência: {student.attendance && student.attendance.length > 0 ? Math.round((student.attendance.filter(a => a.status === 'present').length / student.attendance.length) * 100) : 0}%
+                        </Badge>
+                        {canEditAttendance && (
+                            <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="h-7 text-xs border-accent/40 text-accent hover:bg-accent/10 rounded-lg px-2.5"
+                                onClick={() => {
+                                    setNewAttendanceDate(new Date().toISOString().split('T')[0]);
+                                    setNewAttendanceStatus('present');
+                                    setIsNewAttendanceModalOpen(true);
+                                }}
+                            >
+                                <Plus className="h-3.5 w-3.5 mr-1" />
+                                Lançar Frequência
+                            </Button>
+                        )}
+                    </div>
                 </CardHeader>
                 <CardContent className="p-0">
                    <Table>
                         <TableHeader>
                             <TableRow className="bg-muted/5">
                                 <TableHead className="h-9 text-[10px] uppercase font-bold">Data da Aula</TableHead>
-                                <TableHead className="h-9 text-[10px] uppercase font-bold text-right">Status</TableHead>
+                                <TableHead className="h-9 text-[10px] uppercase font-bold">Status</TableHead>
+                                {canEditAttendance && (
+                                    <TableHead className="h-9 text-[10px] uppercase font-bold text-right w-24">Ações</TableHead>
+                                )}
                             </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -768,16 +895,84 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
                                 const {icon, text, color} = getAttendanceIcon(att.status);
                                 return (
                                 <TableRow key={index} className="hover:bg-muted/5">
-                                    <TableCell className="py-2 text-xs">{new Date(att.date).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}</TableCell>
-                                    <TableCell className="py-2 text-right">
-                                        <div className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-bold text-[10px]", color)}>
-                                            {icon} {text}
-                                        </div>
+                                    <TableCell className="py-2 text-xs font-medium">
+                                        {new Date(att.date).toLocaleDateString('pt-BR', {timeZone: 'UTC'})}
                                     </TableCell>
+                                    <TableCell className="py-2">
+                                        {canEditAttendance ? (
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <button 
+                                                        type="button" 
+                                                        className={cn(
+                                                            "inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full font-bold text-[10px] cursor-pointer hover:opacity-80 transition-opacity border border-transparent hover:border-current", 
+                                                            color
+                                                        )}
+                                                        title="Clique para alternar o status da chamada"
+                                                    >
+                                                        {icon} {text}
+                                                        <ChevronDown className="h-3 w-3 opacity-60 ml-0.5" />
+                                                    </button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="start" className="w-40 text-xs">
+                                                    <DropdownMenuItem 
+                                                        onClick={() => handleQuickChangeAttendanceStatus(index, 'present')} 
+                                                        className="cursor-pointer gap-2 text-green-700 dark:text-green-400 font-medium"
+                                                    >
+                                                        <CheckCircle className="h-3.5 w-3.5 text-green-500" /> Presente
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem 
+                                                        onClick={() => handleQuickChangeAttendanceStatus(index, 'absent')} 
+                                                        className="cursor-pointer gap-2 text-red-700 dark:text-red-400 font-medium"
+                                                    >
+                                                        <XCircle className="h-3.5 w-3.5 text-red-500" /> Ausente
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem 
+                                                        onClick={() => handleQuickChangeAttendanceStatus(index, 'justified')} 
+                                                        className="cursor-pointer gap-2 text-yellow-700 dark:text-yellow-400 font-medium"
+                                                    >
+                                                        <Megaphone className="h-3.5 w-3.5 text-yellow-500" /> Justificado
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
+                                        ) : (
+                                            <div className={cn("inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-bold text-[10px]", color)}>
+                                                {icon} {text}
+                                            </div>
+                                        )}
+                                    </TableCell>
+                                    {canEditAttendance && (
+                                        <TableCell className="py-2 text-right">
+                                            <div className="flex items-center justify-end gap-1">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-7 w-7 text-muted-foreground hover:text-accent hover:bg-accent/10"
+                                                    onClick={() => handleOpenEditAttendance(index, att)}
+                                                    title="Editar data ou status"
+                                                >
+                                                    <Edit className="h-3.5 w-3.5" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                    onClick={() => handleDeleteAttendance(index)}
+                                                    title="Remover registro de frequência"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    )}
                                 </TableRow>
                                 )
                             }) : (
-                                <TableRow><TableCell colSpan={2} className="h-20 text-center text-xs text-muted-foreground italic">Nenhum registro de frequência.</TableCell></TableRow>
+                                <TableRow>
+                                    <TableCell colSpan={canEditAttendance ? 3 : 2} className="h-20 text-center text-xs text-muted-foreground italic">
+                                        Nenhum registro de frequência.
+                                    </TableCell>
+                                </TableRow>
                             )}
                         </TableBody>
                     </Table>
@@ -923,6 +1118,216 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
               />
           </DialogContent>
       </Dialog>
+
+       {/* Modal de Edição de Frequência Concluída */}
+       <Dialog open={isAttendanceModalOpen} onOpenChange={setIsAttendanceModalOpen}>
+            <DialogContent className="sm:max-w-[420px]">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <CalendarDays className="h-5 w-5 text-accent" />
+                        Editar Registro de Frequência
+                    </DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-4 py-2">
+                    <div className="bg-muted/50 rounded-lg p-3 space-y-1 text-xs border">
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground font-semibold">Aluno:</span>
+                            <span className="font-bold text-foreground">{student.name}</span>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="edit-attendance-date" className="text-xs font-semibold">
+                            Data da Aula <span className="text-destructive">*</span>
+                        </Label>
+                        <Input 
+                            id="edit-attendance-date"
+                            type="date"
+                            value={editingAttendanceDate}
+                            onChange={(e) => setEditingAttendanceDate(e.target.value)}
+                            className="text-xs"
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label className="text-xs font-semibold">
+                            Status da Frequência <span className="text-destructive">*</span>
+                        </Label>
+                        <div className="grid grid-cols-3 gap-2">
+                            <Button
+                                type="button"
+                                variant={editingAttendanceStatus === 'present' ? 'default' : 'outline'}
+                                className={cn(
+                                    "text-xs h-9 justify-center gap-1.5",
+                                    editingAttendanceStatus === 'present' && "bg-green-600 hover:bg-green-700 text-white"
+                                )}
+                                onClick={() => setEditingAttendanceStatus('present')}
+                            >
+                                <CheckCircle className="h-3.5 w-3.5" /> Presente
+                            </Button>
+                            <Button
+                                type="button"
+                                variant={editingAttendanceStatus === 'absent' ? 'default' : 'outline'}
+                                className={cn(
+                                    "text-xs h-9 justify-center gap-1.5",
+                                    editingAttendanceStatus === 'absent' && "bg-red-600 hover:bg-red-700 text-white"
+                                )}
+                                onClick={() => setEditingAttendanceStatus('absent')}
+                            >
+                                <XCircle className="h-3.5 w-3.5" /> Ausente
+                            </Button>
+                            <Button
+                                type="button"
+                                variant={editingAttendanceStatus === 'justified' ? 'default' : 'outline'}
+                                className={cn(
+                                    "text-xs h-9 justify-center gap-1.5",
+                                    editingAttendanceStatus === 'justified' && "bg-amber-600 hover:bg-amber-700 text-white"
+                                )}
+                                onClick={() => setEditingAttendanceStatus('justified')}
+                            >
+                                <Megaphone className="h-3.5 w-3.5" /> Justificado
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex justify-between items-center pt-2">
+                    {editingAttendanceIndex !== null && (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-destructive hover:bg-destructive/10 text-xs"
+                            onClick={() => handleDeleteAttendance(editingAttendanceIndex)}
+                            disabled={isSavingAttendance}
+                        >
+                            <Trash2 className="h-3.5 w-3.5 mr-1" /> Excluir
+                        </Button>
+                    )}
+                    <div className="flex gap-2 ml-auto">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setIsAttendanceModalOpen(false)}
+                            disabled={isSavingAttendance}
+                            className="text-xs"
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            type="button"
+                            size="sm"
+                            className="bg-accent hover:bg-accent/90 text-xs font-semibold"
+                            onClick={handleSaveEditAttendance}
+                            disabled={isSavingAttendance}
+                        >
+                            {isSavingAttendance && <Loader2 className="mr-2 h-4 w-4 animate-spin mr-1" />}
+                            Salvar Alteração
+                        </Button>
+                    </div>
+                </div>
+            </DialogContent>
+        </Dialog>
+
+        {/* Modal de Lançamento Manual de Frequência */}
+        <Dialog open={isNewAttendanceModalOpen} onOpenChange={setIsNewAttendanceModalOpen}>
+            <DialogContent className="sm:max-w-[420px]">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <Plus className="h-5 w-5 text-accent" />
+                        Lançar Registro de Frequência
+                    </DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-4 py-2">
+                    <div className="bg-muted/50 rounded-lg p-3 space-y-1 text-xs border">
+                        <div className="flex justify-between">
+                            <span className="text-muted-foreground font-semibold">Aluno:</span>
+                            <span className="font-bold text-foreground">{student.name}</span>
+                        </div>
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label htmlFor="new-attendance-date" className="text-xs font-semibold">
+                            Data da Aula <span className="text-destructive">*</span>
+                        </Label>
+                        <Input 
+                            id="new-attendance-date"
+                            type="date"
+                            value={newAttendanceDate}
+                            onChange={(e) => setNewAttendanceDate(e.target.value)}
+                            className="text-xs"
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label className="text-xs font-semibold">
+                            Status da Frequência <span className="text-destructive">*</span>
+                        </Label>
+                        <div className="grid grid-cols-3 gap-2">
+                            <Button
+                                type="button"
+                                variant={newAttendanceStatus === 'present' ? 'default' : 'outline'}
+                                className={cn(
+                                    "text-xs h-9 justify-center gap-1.5",
+                                    newAttendanceStatus === 'present' && "bg-green-600 hover:bg-green-700 text-white"
+                                )}
+                                onClick={() => setNewAttendanceStatus('present')}
+                            >
+                                <CheckCircle className="h-3.5 w-3.5" /> Presente
+                            </Button>
+                            <Button
+                                type="button"
+                                variant={newAttendanceStatus === 'absent' ? 'default' : 'outline'}
+                                className={cn(
+                                    "text-xs h-9 justify-center gap-1.5",
+                                    newAttendanceStatus === 'absent' && "bg-red-600 hover:bg-red-700 text-white"
+                                )}
+                                onClick={() => setNewAttendanceStatus('absent')}
+                            >
+                                <XCircle className="h-3.5 w-3.5" /> Ausente
+                            </Button>
+                            <Button
+                                type="button"
+                                variant={newAttendanceStatus === 'justified' ? 'default' : 'outline'}
+                                className={cn(
+                                    "text-xs h-9 justify-center gap-1.5",
+                                    newAttendanceStatus === 'justified' && "bg-amber-600 hover:bg-amber-700 text-white"
+                                )}
+                                onClick={() => setNewAttendanceStatus('justified')}
+                            >
+                                <Megaphone className="h-3.5 w-3.5" /> Justificado
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setIsNewAttendanceModalOpen(false)}
+                        disabled={isSavingAttendance}
+                        className="text-xs"
+                    >
+                        Cancelar
+                    </Button>
+                    <Button
+                        type="button"
+                        size="sm"
+                        className="bg-accent hover:bg-accent/90 text-xs font-semibold"
+                        onClick={handleCreateAttendance}
+                        disabled={isSavingAttendance}
+                    >
+                        {isSavingAttendance && <Loader2 className="mr-2 h-4 w-4 animate-spin mr-1" />}
+                        Registrar Frequência
+                    </Button>
+                </div>
+            </DialogContent>
+        </Dialog>
 
       {/* Modelo Oficial Formatado para Impressão A4 (Aparece apenas na impressão) */}
       <div className="hidden print:block w-full">
