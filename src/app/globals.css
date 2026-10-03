@@ -129,10 +129,10 @@
   }
 
   /* When printing, isolate the printable content tree and hide everything else.
-     The shopping-print-sheet is rendered via createPortal as a direct body child,
-     so it needs to survive ALL isolation rules. */
-  body:has([role="dialog"]) > *:not(:has([role="dialog"])):not(.shopping-print-sheet):not(:has(.shopping-print-sheet)),
-  body:has(.student-print-sheet) > *:not(:has(.student-print-sheet)),
+     The shopping-print-sheet and student-print-sheet are rendered via createPortal as direct body children,
+     so they need to survive ALL isolation rules. */
+  body:has([role="dialog"]) > *:not(:has([role="dialog"])):not(.shopping-print-sheet):not(:has(.shopping-print-sheet)):not(.student-print-sheet):not(:has(.student-print-sheet)),
+  body:has(.student-print-sheet) > *:not(.student-print-sheet):not(:has(.student-print-sheet)),
   body:has(.shopping-print-sheet) > *:not(.shopping-print-sheet):not(:has(.shopping-print-sheet)),
   body:has(.printable-area) > *:not(:has(.printable-area)) {
     display: none !important;
@@ -155,6 +155,21 @@
     color: #0f172a !important;
     visibility: visible !important;
     opacity: 1 !important;
+  }
+
+  /* When a print sheet is active, hide any open modals, dialogs and backdrops completely */
+  body:has(.student-print-sheet) [data-radix-portal],
+  body:has(.student-print-sheet) div[role="dialog"],
+  body:has(.shopping-print-sheet) [data-radix-portal],
+  body:has(.shopping-print-sheet) div[role="dialog"] {
+    display: none !important;
+  }
+
+  /* Ensure body with Radix scroll lock expands naturally for print */
+  body[data-scroll-locked] {
+    overflow: visible !important;
+    position: static !important;
+    margin-right: 0 !important;
   }
 
   /* Hide sidebar, headers, navigation, notifications and non-printable elements */

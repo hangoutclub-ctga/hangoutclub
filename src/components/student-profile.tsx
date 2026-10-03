@@ -15,6 +15,7 @@ import { Grade, Attendance, Student, StudentDocument } from "@/types";
 import { cn, getDisplayAvatarUrl, formatCurrency } from "@/lib/utils";
 import { uploadFileToStorage, uploadDataUrlToStorage } from "@/lib/supabase/storage";
 import React from "react";
+import ReactDOM from "react-dom";
 import { differenceInYears, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useData } from "@/hooks/use-data";
@@ -125,6 +126,11 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
 
   const student = students.find(s => s.id === initialStudent.id) || initialStudent;
   
+  const [mounted, setMounted] = React.useState(false);
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const [localDocuments, setLocalDocuments] = React.useState<StudentDocument[]>(student.documents || []);
   const [isAddingDoc, setIsAddingDoc] = React.useState(false);
   const [newDocName, setNewDocName] = React.useState("");
@@ -1511,10 +1517,13 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
             </DialogContent>
         </Dialog>
 
-      {/* Modelo Oficial Formatado para Impressão A4 (Aparece apenas na impressão) */}
-      <div className="hidden print:block w-full">
-        <StudentPrintSheet student={student} canViewFinance={canViewFinance} payments={displayPayments} />
-      </div>
+      {/* Modelo Oficial Formatado para Impressão A4 (Renderizado via Portal diretamente no body) */}
+      {mounted && typeof document !== "undefined" && ReactDOM.createPortal(
+        <div className="student-print-sheet print-only">
+          <StudentPrintSheet student={student} canViewFinance={canViewFinance} payments={displayPayments} />
+        </div>,
+        document.body
+      )}
     </>
   );
 }
