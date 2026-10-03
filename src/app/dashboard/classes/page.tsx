@@ -30,6 +30,7 @@ export default function ClassesPage() {
   
   const [editingClass, setEditingClass] = React.useState<Class | undefined>(undefined);
   const [viewingClass, setViewingClass] = React.useState<Class | null>(null);
+  const [deletingClass, setDeletingClass] = React.useState<Class | null>(null);
   const [isFormOpen, setIsFormOpen] = React.useState(false);
   const [bulkDeleteIds, setBulkDeleteIds] = React.useState<string[] | null>(null);
 
@@ -200,6 +201,7 @@ export default function ClassesPage() {
           classModalities={categories.classModalities}
           onEdit={handleOpenForm}
           onView={(c) => setViewingClass(c)}
+          onRequestDelete={(c) => setDeletingClass(c)}
           onDelete={handleDeleteClass}
           onBulkUpdate={handleBulkUpdate}
           onBulkDelete={handleBulkDelete}
@@ -219,6 +221,19 @@ export default function ClassesPage() {
               {viewingClass && <ClassProfile classId={viewingClass.id} />}
           </DialogContent>
       </Dialog>
+
+      <DeleteConfirmDialog
+        open={!!deletingClass}
+        onOpenChange={(open) => !open && setDeletingClass(null)}
+        itemName={deletingClass?.name}
+        itemType="a turma"
+        title="Confirmar Exclusão de Turma"
+        onConfirm={async (audit) => {
+          if (!deletingClass) return;
+          await handleDeleteClass(deletingClass.id, audit);
+          setDeletingClass(null);
+        }}
+      />
 
       <DeleteConfirmDialog
         open={!!bulkDeleteIds && bulkDeleteIds.length > 0}

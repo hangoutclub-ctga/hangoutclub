@@ -37,7 +37,8 @@ interface DataTableProps<TData, TValue> {
   studentConditions: string[];
   onEdit: (student: TData) => void;
   onView: (student: TData) => void;
-  onDelete: (studentId: string, audit?: any) => void;
+  onRequestDelete?: (student: TData) => void;
+  onDelete?: (studentId: string, audit?: any) => void;
   onBulkUpdate: (selectedIds: string[], updates: Partial<TData>) => void;
   onBulkDelete: (selectedIds: string[]) => void;
   onNextPage: () => void;
@@ -62,6 +63,7 @@ export function DataTable<TData, TValue>({
   studentConditions,
   onEdit,
   onView,
+  onRequestDelete,
   onDelete,
   onBulkUpdate,
   onBulkDelete,
@@ -119,7 +121,14 @@ export function DataTable<TData, TValue>({
     manualPagination: true,
     meta: {
         editStudent: (student: TData) => onEdit(student),
-        deleteStudent: (studentId: string, audit?: any) => onDelete(studentId, audit),
+        requestDeleteStudent: (student: TData) => {
+            if (onRequestDelete) {
+                onRequestDelete(student);
+            } else if (onDelete) {
+                onDelete((student as any).id);
+            }
+        },
+        deleteStudent: (studentId: string, audit?: any) => onDelete?.(studentId, audit),
         viewStudent: (student: TData) => onView(student)
     }
   })
@@ -128,7 +137,20 @@ export function DataTable<TData, TValue>({
     table.resetRowSelection();
   }, [data, table]);
 
-  const handlePointerDown = (row: any) => {
+  const handlePointerDown = (row: any, e?: React.PointerEvent) => {
+    const target = e?.target as HTMLElement | null;
+    if (
+      !target ||
+      (e && !e.currentTarget.contains(target)) ||
+      target.closest('button') || 
+      target.closest('[role="button"]') || 
+      target.closest('[role="checkbox"]') || 
+      target.closest('[role="dialog"]') ||
+      target.closest('[data-radix-portal]') ||
+      target.closest('[data-no-row-click]')
+    ) {
+      return;
+    }
     const id = row.id;
     longPressTimers.current[id] = setTimeout(() => {
         row.toggleSelected();
@@ -143,7 +165,16 @@ export function DataTable<TData, TValue>({
         clearTimeout(longPressTimers.current[id]);
         delete longPressTimers.current[id];
         const target = e?.target as HTMLElement | null;
-        if (target?.closest('button') || target?.closest('[role="button"]') || target?.closest('[role="checkbox"]') || target?.closest('[data-no-row-click]')) {
+        if (
+          !target ||
+          (e && !e.currentTarget.contains(target)) ||
+          target.closest('button') || 
+          target.closest('[role="button"]') || 
+          target.closest('[role="checkbox"]') || 
+          target.closest('[role="dialog"]') ||
+          target.closest('[data-radix-portal]') ||
+          target.closest('[data-no-row-click]')
+        ) {
             return;
         }
         // Foi um clique simples -> Visualizar Ficha
@@ -200,7 +231,7 @@ export function DataTable<TData, TValue>({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  onPointerDown={() => handlePointerDown(row)}
+                  onPointerDown={(e) => handlePointerDown(row, e)}
                   onPointerUp={(e) => handlePointerUp(row, row.original, e)}
                   onPointerLeave={() => handlePointerLeave(row)}
                   className="cursor-pointer hover:bg-muted/50 transition-colors select-none"

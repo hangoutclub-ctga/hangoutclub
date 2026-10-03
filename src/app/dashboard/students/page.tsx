@@ -39,6 +39,7 @@ export default function StudentsPage() {
     const [isFormOpen, setIsFormOpen] = React.useState(false);
     const [editingStudent, setEditingStudent] = React.useState<Student | undefined>(undefined);
     const [viewingStudent, setViewingStudent] = React.useState<Student | null>(null);
+    const [deletingStudent, setDeletingStudent] = React.useState<Student | null>(null);
     const [bulkDeleteIds, setBulkDeleteIds] = React.useState<string[] | null>(null);
 
     const isAdmin = user?.role === 'Admin';
@@ -167,6 +168,7 @@ export default function StudentsPage() {
                 studentConditions={categories.studentConditions}
                 onEdit={handleOpenForm}
                 onView={(student) => setViewingStudent(student)}
+                onRequestDelete={(student) => setDeletingStudent(student)}
                 onDelete={handleDeleteStudent}
                 onBulkUpdate={async (ids, updates) => {
                     for (const id of ids) {
@@ -196,6 +198,19 @@ export default function StudentsPage() {
                     {viewingStudent && <StudentProfile student={viewingStudent} />}
                 </DialogContent>
             </Dialog>
+
+            <DeleteConfirmDialog
+                open={!!deletingStudent}
+                onOpenChange={(open) => !open && setDeletingStudent(null)}
+                itemName={deletingStudent?.name}
+                itemType="o aluno"
+                title="Confirmar Exclusão de Aluno"
+                onConfirm={async (audit) => {
+                    if (!deletingStudent) return;
+                    await handleDeleteStudent(deletingStudent.id, audit);
+                    setDeletingStudent(null);
+                }}
+            />
 
             <DeleteConfirmDialog
                 open={!!bulkDeleteIds && bulkDeleteIds.length > 0}

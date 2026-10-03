@@ -123,7 +123,11 @@ export const columns: ColumnDef<Student>[] = [
   {
     id: "actions",
     cell: ({ row, table }) => (
-      <div onClick={(e) => e.stopPropagation()}>
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+        onPointerUp={(e) => e.stopPropagation()}
+      >
         <DataTableRowActions row={row} table={table} />
       </div>
     ),

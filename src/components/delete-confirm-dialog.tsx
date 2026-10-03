@@ -70,7 +70,12 @@ export function DeleteConfirmDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[480px]">
+      <DialogContent 
+        className="sm:max-w-[480px]"
+        onPointerDown={(e) => e.stopPropagation()}
+        onPointerUp={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2 text-destructive text-lg font-bold">
             <Trash2 className="h-5 w-5" />
