@@ -380,7 +380,7 @@ export default function FinancePage() {
                         )}
                     >
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 p-2 sm:p-3 sm:pb-2">
-                            <CardTitle className="text-[10px] sm:text-sm font-bold">Lucro</CardTitle>
+                            <CardTitle className="text-[10px] sm:text-sm font-bold">Líquido</CardTitle>
                             <div className={cn("text-[10px] font-bold", totals.profit > 0 ? "text-green-500" : "text-red-500")}>$</div>
                         </CardHeader>
                         <CardContent className="p-2 sm:p-3 pt-0">

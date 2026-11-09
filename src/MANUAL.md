@@ -80,7 +80,7 @@ Realize o lançamento e a consulta de notas.
 
 Controle todas as finanças.
 
--   **Resumo Mensal**: Cards mostram o total de entradas, saídas variáveis, despesas fixas e o lucro do período.
+-   **Resumo Mensal**: Cards mostram o total de entradas, saídas variáveis, despesas fixas e o valor líquido do período.
 -   **Filtros**: Selecione mês e ano para visualizar o resumo financeiro correspondente. É possível também filtrar a tabela por tipo de transação (Entradas, Saídas, Despesas Fixas).
 -   **Pendências do Mês**: Lista de alunos com mensalidades em aberto, com atalho para "Registrar Pagamento".
 -   **Transações Detalhadas**: Tabela unificada com todas as movimentações.
