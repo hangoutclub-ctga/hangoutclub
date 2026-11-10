@@ -195,19 +195,11 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
     }
 
     // 2. Custos Operacionais / Pessoal Direto -> CUSTO
-    // - Marketing (Pagamentos Marketing, Meta, Instagram, Google Ads, Nina Turbinar)
     // - Pró-labore dos sócios (Transferência Intercredis, Sidney Xisto, Patrícia Lara)
     // - Professores (Maisa, Gabriela, etc.)
     // - Secretaria (Célia)
+    // (Nota: Marketing é classificado como DESPESA)
     const isCusto = (
-      text.includes("MARKETING") ||
-      text.includes("META PLATFORMS") ||
-      text.includes("FACEBOOK") ||
-      text.includes("INSTAGRAM") ||
-      text.includes("GOOGLE ADS") ||
-      text.includes("TURBINAR REDE") ||
-      text.includes("ANA CAROLINA") ||
-      text.includes("NINA") ||
       text.includes("INTERCREDIS") ||
       text.includes("SIDNEY") ||
       text.includes("PATRICIA") ||
