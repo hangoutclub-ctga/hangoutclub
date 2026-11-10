@@ -847,14 +847,28 @@ export default function FinancePage() {
 
                 <Dialog open={isInfographicModalOpen} onOpenChange={setIsInfographicModalOpen}>
                     <DialogContent className="sm:max-w-[950px] w-[96vw] max-h-[92vh] overflow-y-auto p-3 sm:p-5 rounded-2xl">
-                        <DialogHeader className="pb-2 border-b">
-                            <DialogTitle className="flex items-center gap-2 text-sm sm:text-base font-bold font-headline">
-                                <PieChart className="h-4 w-4 text-accent" />
-                                Infográfico Gerencial de Desempenho
-                            </DialogTitle>
-                            <DialogDescription className="text-[11px] sm:text-xs text-muted-foreground">
-                                Período: <strong className="text-foreground capitalize">{periodLabel}</strong> • Análise orçamentária detalhada das 5 categorias
-                            </DialogDescription>
+                        <DialogHeader className="pb-3 border-b">
+                            <div className="flex items-center justify-between pr-8">
+                                <div>
+                                    <DialogTitle className="flex items-center gap-2 text-sm sm:text-base font-bold font-headline print:text-lg">
+                                        <PieChart className="h-4 w-4 text-accent print:hidden" />
+                                        Infográfico Gerencial de Desempenho
+                                    </DialogTitle>
+                                    <DialogDescription className="text-[11px] sm:text-xs text-muted-foreground mt-0.5 print:text-[10px] print:text-slate-600">
+                                        Período: <strong className="text-foreground capitalize">{periodLabel}</strong> • Análise orçamentária detalhada das 5 categorias
+                                    </DialogDescription>
+                                </div>
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="h-8 px-2.5 rounded-xl border-accent/30 text-accent hover:bg-accent/10 gap-1.5 text-xs font-semibold no-print shadow-xs"
+                                    onClick={() => window.print()}
+                                    title="Imprimir este Infográfico"
+                                >
+                                    <Printer className="h-3.5 w-3.5" />
+                                    <span className="hidden sm:inline">Imprimir</span>
+                                </Button>
+                            </div>
                         </DialogHeader>
                         <div className="pt-2">
                             <FinanceInfographic 

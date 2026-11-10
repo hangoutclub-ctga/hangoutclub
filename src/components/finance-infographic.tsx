@@ -2,27 +2,14 @@
 
 import React, { useState } from "react";
 import { formatCurrency, cn } from "@/lib/utils";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { 
-  PieChart as PieIcon, 
-  TrendingUp, 
-  TrendingDown, 
-  ChevronDown, 
-  ChevronUp, 
   ShieldCheck, 
-  AlertTriangle, 
   Sparkles,
-  Layers,
-  Cpu,
   Activity,
   Zap,
   Target,
   Crosshair,
-  ArrowUpRight,
-  ArrowDownRight,
-  HelpCircle,
   RotateCcw
 } from "lucide-react";
 
@@ -159,78 +146,9 @@ export function FinanceInfographic({ categoryTotals, totals, periodLabel, hideCo
   const currentInspect = segments.find(s => s.id === activeCategory);
 
   return (
-    <Card className="card-print border border-accent/20 bg-card/60 backdrop-blur-md overflow-hidden shadow-lg transition-all print:border-none print:shadow-none print:m-0 relative">
-      {/* Detalhes de cantos cibernéticos (estilo viewfinder HUD) */}
-      <div className="absolute top-0 left-0 w-2.5 h-2.5 border-t-2 border-l-2 border-accent/60 pointer-events-none no-print" />
-      <div className="absolute top-0 right-0 w-2.5 h-2.5 border-t-2 border-r-2 border-accent/60 pointer-events-none no-print" />
-      <div className="absolute bottom-0 left-0 w-2.5 h-2.5 border-b-2 border-l-2 border-accent/60 pointer-events-none no-print" />
-      <div className="absolute bottom-0 right-0 w-2.5 h-2.5 border-b-2 border-r-2 border-accent/60 pointer-events-none no-print" />
-
-      {/* Header do HUD */}
-      <CardHeader className="p-3 sm:p-4 pb-2.5 border-b bg-muted/30 flex flex-row items-center justify-between no-print">
-        <div className="flex items-center gap-2.5">
-          <div className="relative p-2 rounded-xl bg-accent/10 text-accent border border-accent/20 shadow-xs">
-            <Cpu className="h-4 w-4 animate-pulse" />
-            <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
-            </span>
-          </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <CardTitle className="text-xs sm:text-sm font-black tracking-tight flex items-center gap-1.5 font-headline">
-                Infográfico Gerencial Futurista
-              </CardTitle>
-              <Badge variant="outline" className="text-[9px] h-4 px-1.5 font-mono uppercase bg-accent/5 border-accent/30 text-accent">
-                HUD v2.5
-              </Badge>
-              <span className="text-[10px] font-mono text-muted-foreground">({periodLabel})</span>
-            </div>
-            <CardDescription className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
-              <span>Radar holográfico das 5 categorias e telemetria de saúde de caixa</span>
-            </CardDescription>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-1.5">
-          {activeCategory && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-[10px] px-2 gap-1 text-muted-foreground hover:text-foreground"
-              onClick={() => setActiveCategory(null)}
-              title="Voltar ao Resumo Geral"
-            >
-              <RotateCcw className="h-3 w-3" />
-              <span className="hidden sm:inline">Visão Geral</span>
-            </Button>
-          )}
-
-          {!hideCollapseButton && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-[10px] sm:text-xs gap-1 text-muted-foreground hover:text-foreground border border-border/50 rounded-lg px-2"
-              onClick={() => setIsOpen(!isOpen)}
-            >
-              {isOpen ? (
-                <>
-                  <span>Recolher</span>
-                  <ChevronUp className="h-3.5 w-3.5" />
-                </>
-              ) : (
-                <>
-                  <span>Expandir</span>
-                  <ChevronDown className="h-3.5 w-3.5" />
-                </>
-              )}
-            </Button>
-          )}
-        </div>
-      </CardHeader>
-
-      {/* Corpo do Infográfico (Visível na tela com toggle; sempre impresso no papel) */}
-      <div className={cn("p-3 sm:p-5 space-y-4 print:p-2 print:space-y-3", !isOpen && "hidden print:block")}>
+    <div className="card-print overflow-hidden print:m-0 relative">
+      {/* Corpo do Infográfico */}
+      <div className="space-y-4 print:p-2 print:space-y-3">
         
         {/* SEÇÃO PRINCIPAL: DONUT HOLOGRÁFICO + PAINEL DE TELEMETRIA DAS 5 CATEGORIAS */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
@@ -390,10 +308,22 @@ export function FinanceInfographic({ categoryTotals, totals, periodLabel, hideCo
               </div>
             </div>
 
-            {/* Subtítulo auxiliar do Donut */}
-            <p className="text-[9.5px] font-mono text-muted-foreground mt-1 text-center no-print">
-              Passe o mouse ou toque nos arcos para inspecionar
-            </p>
+            {/* Subtítulo auxiliar do Donut / Reset */}
+            <div className="mt-1 text-center no-print">
+              {activeCategory ? (
+                <button
+                  type="button"
+                  onClick={() => setActiveCategory(null)}
+                  className="inline-flex items-center gap-1 text-[9.5px] font-mono text-accent hover:underline px-2 py-0.5 rounded-full bg-accent/10 border border-accent/20 cursor-pointer"
+                >
+                  <RotateCcw className="h-2.5 w-2.5" /> Voltar à visão geral
+                </button>
+              ) : (
+                <p className="text-[9.5px] font-mono text-muted-foreground">
+                  Passe o mouse ou toque nos arcos para inspecionar
+                </p>
+              )}
+            </div>
           </div>
 
           {/* COLUNA 2: PAINEL HOLOGRÁFICO DETALHADO DAS 5 CATEGORIAS */}
@@ -576,6 +506,6 @@ export function FinanceInfographic({ categoryTotals, totals, periodLabel, hideCo
         </div>
 
       </div>
-    </Card>
+    </div>
   );
 }
