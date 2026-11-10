@@ -32,9 +32,10 @@ import { ptBR } from "date-fns/locale";
 import { TransactionForm } from "@/components/transaction-form";
 import { FixedExpenseForm } from "@/components/fixed-expense-form";
 import { PayFixedExpenseForm } from "@/components/pay-fixed-expense-form";
-import { ArrowDownCircle, ArrowUpCircle, MinusCircle, Printer, AlertCircle, CheckCircle, Trash2, FilterX, Calendar as CalendarIcon, DollarSign, PlusCircle, Eye, CreditCard, ChevronLeft, Home, ShieldAlert, FileSpreadsheet, Paperclip, Download, Pencil, Check, CheckCheck, Loader2, Users } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, MinusCircle, Printer, AlertCircle, CheckCircle, Trash2, FilterX, Calendar as CalendarIcon, DollarSign, PlusCircle, Eye, CreditCard, ChevronLeft, Home, ShieldAlert, FileSpreadsheet, Paperclip, Download, Pencil, Check, CheckCheck, Loader2, Users, Search, X } from 'lucide-react';
 import { Transaction, Student, FixedExpense, normalizeTransactionCategory, TransactionCategory } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "@/hooks/use-toast";
 import { cn, formatCurrency, getDisplayAvatarUrl, isTransactionInMonth } from "@/lib/utils";
@@ -84,6 +85,7 @@ export default function FinancePage() {
     const [fixedExpenseToDelete, setFixedExpenseToDelete] = useState<FixedExpense | null>(null);
     const [isImporterOpen, setIsImporterOpen] = useState(false);
     const [isPendingModalOpen, setIsPendingModalOpen] = useState(false);
+    const [pendingSearchTerm, setPendingSearchTerm] = useState("");
 
     const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
     const [viewingTransaction, setViewingTransaction] = useState<Transaction | null>(null);
@@ -348,6 +350,16 @@ export default function FinancePage() {
             })
             .filter(s => !s.isPaid);
     }, [students, filteredByDate, currentMonth, currentYear, months]);
+
+    const filteredPendingStudents = useMemo(() => {
+        const term = pendingSearchTerm.trim().toLowerCase();
+        if (!term) return pendingStudents;
+        return pendingStudents.filter(s => 
+            (s.name || '').toLowerCase().includes(term) ||
+            (s.email || '').toLowerCase().includes(term) ||
+            (s.phone || '').includes(term)
+        );
+    }, [pendingStudents, pendingSearchTerm]);
 
     const handleSettleBoleto = async (student: any) => {
         setIsQuittingStudent(true);
@@ -1277,7 +1289,13 @@ export default function FinancePage() {
         />
 
         {/* Modal / Popup de Pendências de Alunos */}
-        <Dialog open={isPendingModalOpen} onOpenChange={setIsPendingModalOpen}>
+        <Dialog 
+            open={isPendingModalOpen} 
+            onOpenChange={(open) => {
+                setIsPendingModalOpen(open);
+                if (!open) setPendingSearchTerm("");
+            }}
+        >
             <DialogContent className="sm:max-w-xl max-h-[85vh] flex flex-col p-4 sm:p-6 rounded-2xl w-[94vw]">
                 <DialogHeader className="pb-3 border-b shrink-0">
                     <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -1311,12 +1329,42 @@ export default function FinancePage() {
                             )}
                         </div>
                     </div>
+
+                    {/* Barra de Busca de Alunos Pendentes */}
+                    {pendingStudents.length > 0 && (
+                        <div className="relative pt-2 shrink-0">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none mt-1" />
+                            <Input
+                                placeholder="Buscar aluno por nome, e-mail ou telefone..."
+                                value={pendingSearchTerm}
+                                onChange={(e) => setPendingSearchTerm(e.target.value)}
+                                className="pl-9 pr-8 h-9 text-xs rounded-xl bg-muted/40 focus-visible:bg-background border-muted-foreground/20"
+                            />
+                            {pendingSearchTerm && (
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7 text-muted-foreground hover:text-foreground mt-1"
+                                    onClick={() => setPendingSearchTerm("")}
+                                    title="Limpar busca"
+                                >
+                                    <X className="h-3.5 w-3.5" />
+                                </Button>
+                            )}
+                        </div>
+                    )}
                 </DialogHeader>
 
                 <div className="flex-1 overflow-y-auto py-2 pr-1 min-h-0">
-                    {pendingStudents.length > 0 ? (
+                    {pendingStudents.length === 0 ? (
+                        <div className="text-center text-xs sm:text-sm text-muted-foreground py-12">
+                            <CheckCircle className="h-10 w-10 mx-auto text-green-500 mb-2" />
+                            <p className="font-semibold text-foreground">Tudo em dia!</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Nenhum aluno com mensalidade pendente para este mês.</p>
+                        </div>
+                    ) : filteredPendingStudents.length > 0 ? (
                         <ul className="space-y-2">
-                            {pendingStudents.map(student => (
+                            {filteredPendingStudents.map(student => (
                                 <li key={student.id} className="flex items-center justify-between gap-2 sm:gap-4 p-2.5 sm:p-3 rounded-xl hover:bg-muted/50 border bg-card/60 transition-colors">
                                     <div className="min-w-0 flex-1">
                                         <p className="font-bold text-xs sm:text-sm truncate" title={student.name}>{student.name}</p>
@@ -1353,10 +1401,20 @@ export default function FinancePage() {
                             ))}
                         </ul>
                     ) : (
-                        <div className="text-center text-xs sm:text-sm text-muted-foreground py-12">
-                            <CheckCircle className="h-10 w-10 mx-auto text-green-500 mb-2" />
-                            <p className="font-semibold text-foreground">Tudo em dia!</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">Nenhum aluno com mensalidade pendente para este mês.</p>
+                        <div className="text-center text-xs sm:text-sm text-muted-foreground py-10">
+                            <Search className="h-8 w-8 mx-auto text-muted-foreground/40 mb-2" />
+                            <p className="font-medium text-foreground">Nenhum aluno encontrado</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">
+                                Não encontramos pendências correspondentes a &ldquo;{pendingSearchTerm}&rdquo;.
+                            </p>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                className="mt-3 h-8 text-xs rounded-xl"
+                                onClick={() => setPendingSearchTerm("")}
+                            >
+                                Limpar busca
+                            </Button>
                         </div>
                     )}
                 </div>
