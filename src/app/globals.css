@@ -131,10 +131,10 @@
   /* When printing, isolate the printable content tree and hide everything else.
      The shopping-print-sheet and student-print-sheet are rendered via createPortal as direct body children,
      so they need to survive ALL isolation rules. */
-  body:has([role="dialog"]) > *:not(:has([role="dialog"])):not(.shopping-print-sheet):not(:has(.shopping-print-sheet)):not(.student-print-sheet):not(:has(.student-print-sheet)),
+  body:has([role="dialog"]) > *:not(:has([role="dialog"])):not([data-radix-portal]):not(:has([data-radix-portal])):not(.shopping-print-sheet):not(.student-print-sheet),
   body:has(.student-print-sheet) > *:not(.student-print-sheet):not(:has(.student-print-sheet)),
   body:has(.shopping-print-sheet) > *:not(.shopping-print-sheet):not(:has(.shopping-print-sheet)),
-  body:has(.printable-area) > *:not(:has(.printable-area)) {
+  body:not(:has([role="dialog"])):not(:has(.student-print-sheet)):not(:has(.shopping-print-sheet)):has(.printable-area) > *:not(:has(.printable-area)) {
     display: none !important;
     height: 0 !important;
     max-height: 0 !important;
@@ -190,10 +190,16 @@
 
   /* Radix UI Dialog Reset for Print */
   [data-radix-portal],
-  div:has(> [role="dialog"]) {
+  div:has(> [role="dialog"]),
+  body:has([role="dialog"]) [data-radix-portal] {
     position: static !important;
     display: block !important;
     width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    visibility: visible !important;
+    opacity: 1 !important;
     padding: 0 !important;
     margin: 0 !important;
   }
@@ -223,7 +229,8 @@
     gap: 0 !important;
     border: none !important;
     box-shadow: none !important;
-    background: transparent !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
     opacity: 1 !important;
     visibility: visible !important;
   }

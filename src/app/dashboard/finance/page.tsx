@@ -846,7 +846,7 @@ export default function FinancePage() {
                 />
 
                 <Dialog open={isInfographicModalOpen} onOpenChange={setIsInfographicModalOpen}>
-                    <DialogContent className="sm:max-w-[950px] w-[96vw] max-h-[92vh] overflow-y-auto p-3 sm:p-5 rounded-2xl">
+                    <DialogContent className="sm:max-w-[950px] w-[96vw] max-h-[92vh] overflow-y-auto p-3 sm:p-5 rounded-2xl print:max-h-none print:overflow-visible print:w-full print:p-0 print:border-none print:shadow-none print:bg-white print:static print:transform-none printable-area">
                         <DialogHeader className="pb-3 border-b">
                             <div className="flex items-center justify-between pr-8">
                                 <div>
@@ -862,7 +862,11 @@ export default function FinancePage() {
                                     variant="outline" 
                                     size="sm" 
                                     className="h-8 px-2.5 rounded-xl border-accent/30 text-accent hover:bg-accent/10 gap-1.5 text-xs font-semibold no-print shadow-xs"
-                                    onClick={() => window.print()}
+                                    onClick={() => {
+                                        setTimeout(() => {
+                                            window.print();
+                                        }, 50);
+                                    }}
                                     title="Imprimir este Infográfico"
                                 >
                                     <Printer className="h-3.5 w-3.5" />
