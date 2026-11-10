@@ -3,7 +3,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { User, Shield, GraduationCap, BookOpen, Wallet, FileText, CheckCircle, XCircle, Clock, Printer, Megaphone, CalendarDays, ExternalLink, ImageIcon, FileWarning, Eye, Plus, FileUp, X, Loader2, HeartPulse, Camera, Upload, Link as LinkIcon, Check, Trash2, ChevronDown, Edit } from "lucide-react";
+import { User, Shield, GraduationCap, BookOpen, Wallet, FileText, CheckCircle, XCircle, Clock, Printer, Megaphone, CalendarDays, ExternalLink, ImageIcon, FileWarning, Eye, Plus, FileUp, X, Loader2, HeartPulse, Camera, Upload, Link as LinkIcon, Check, Trash2, ChevronDown, Edit, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -19,9 +19,16 @@ import ReactDOM from "react-dom";
 import { differenceInYears, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useData } from "@/hooks/use-data";
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogClose } from "./ui/dialog";
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from "./ui/dialog";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { toast } from "@/hooks/use-toast";
 import { StudentPrintSheet } from "./student-print-sheet";
 import { TransactionForm } from "./transaction-form";
@@ -118,11 +125,12 @@ const WhatsAppButton = ({
 export function StudentProfile({ student: initialStudent }: { student: Student }) {
   const { handleLinkClick } = useLoading();
   const { hasPermission, user } = useAuth();
-  const { students, transactions, addTransaction, updateStudent } = useData();
+  const { students, transactions, addTransaction, updateTransaction, deleteTransaction, updateStudent } = useData();
   const isAdmin = user?.role === 'Admin';
   const canViewFinance = hasPermission('finance:view');
   const canEditFinance = hasPermission('finance:edit');
   const canEditAttendance = isAdmin || user?.role === 'Professor' || user?.role === 'Secretaria' || hasPermission('students:edit');
+  const canEditGrades = isAdmin || user?.role === 'Professor' || user?.role === 'Secretaria' || hasPermission('students:edit');
 
   const student = students.find(s => s.id === initialStudent.id) || initialStudent;
   
@@ -147,6 +155,40 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
   const [isReceiptOpen, setIsReceiptOpen] = React.useState(false);
   const [selectedReceipt, setSelectedReceipt] = React.useState<string | null>(null);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = React.useState(false);
+
+  // Grades state
+  const [isNewGradeModalOpen, setIsNewGradeModalOpen] = React.useState(false);
+  const [isEditGradeModalOpen, setIsEditGradeModalOpen] = React.useState(false);
+  const [editingGradeIndex, setEditingGradeIndex] = React.useState<number | null>(null);
+  const [gradeSubject, setGradeSubject] = React.useState("");
+  const [gradePeriodNumber, setGradePeriodNumber] = React.useState<number>(1);
+  const [gradeValue, setGradeValue] = React.useState<string>("");
+  const [gradeDate, setGradeDate] = React.useState<string>("");
+  const [isSavingGrade, setIsSavingGrade] = React.useState(false);
+
+  // Payment item type & state
+  type PaymentItem = {
+    id: string;
+    source: 'transaction' | 'history';
+    originalIndex?: number;
+    date: string;
+    description: string;
+    amount: number;
+    paymentMethod: string;
+    receiptUrl?: string;
+    status: 'Pago' | 'Parcial' | 'Não Pago';
+  };
+
+  const [editingPayment, setEditingPayment] = React.useState<PaymentItem | null>(null);
+  const [isEditPaymentModalOpen, setIsEditPaymentModalOpen] = React.useState(false);
+  const [editPaymentDate, setEditPaymentDate] = React.useState("");
+  const [editPaymentDesc, setEditPaymentDesc] = React.useState("");
+  const [editPaymentAmount, setEditPaymentAmount] = React.useState("");
+  const [editPaymentMethod, setEditPaymentMethod] = React.useState("Boleto Sicoob");
+  const [isSavingPaymentEdit, setIsSavingPaymentEdit] = React.useState(false);
+
+  const [paymentToDelete, setPaymentToDelete] = React.useState<PaymentItem | null>(null);
+  const [isDeletingPayment, setIsDeletingPayment] = React.useState(false);
 
   // Attendance editing state
   const [editingAttendanceIndex, setEditingAttendanceIndex] = React.useState<number | null>(null);
@@ -175,14 +217,16 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
 
   const mock2023Dates = ['2023-08-05', '2023-09-05', '2023-10-05', '2023-09-10', '2023-10-10'];
   const legacyPayments = React.useMemo(() => {
-    return (student.paymentHistory || []).filter(
-      p => !mock2023Dates.includes(p.date)
-    );
+    return (student.paymentHistory || [])
+      .map((p, originalIndex) => ({ ...p, originalIndex }))
+      .filter(p => !mock2023Dates.includes(p.date));
   }, [student.paymentHistory]);
 
-  const displayPayments = React.useMemo(() => {
-    const fromTx = studentTransactions.map(t => ({
+  const displayPayments = React.useMemo<PaymentItem[]>(() => {
+    const fromTx: PaymentItem[] = studentTransactions.map(t => ({
       id: t.id,
+      source: 'transaction' as const,
+      originalIndex: undefined,
       date: t.date,
       description: t.description,
       amount: t.value,
@@ -191,8 +235,10 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
       status: 'Pago' as const
     }));
 
-    const fromHistory = legacyPayments.map((p, idx) => ({
-      id: `history-${idx}-${p.date}`,
+    const fromHistory: PaymentItem[] = legacyPayments.map(p => ({
+      id: `history-${p.originalIndex}-${p.date}`,
+      source: 'history' as const,
+      originalIndex: p.originalIndex,
       date: p.date,
       description: p.description,
       amount: p.amount,
@@ -519,6 +565,217 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
     }
   };
 
+  // Grade Handlers
+  const handleOpenNewGrade = () => {
+    setGradeSubject("");
+    setGradePeriodNumber(1);
+    setGradeValue("");
+    setGradeDate(new Date().toISOString().split('T')[0]);
+    setIsNewGradeModalOpen(true);
+  };
+
+  const handleCreateGrade = async () => {
+    const cleanSubject = gradeSubject.trim();
+    if (!cleanSubject) {
+      toast({ variant: 'destructive', title: "Disciplina obrigatória", description: "Informe o nome da disciplina ou avaliação." });
+      return;
+    }
+    const numGrade = parseFloat(gradeValue.replace(',', '.'));
+    if (isNaN(numGrade) || numGrade < 0 || numGrade > 100) {
+      toast({ variant: 'destructive', title: "Nota inválida", description: "A nota deve ser um número entre 0 e 100." });
+      return;
+    }
+
+    setIsSavingGrade(true);
+    try {
+      const newGrade: Grade = {
+        subject: cleanSubject,
+        periodType: 'Semestre',
+        periodNumber: Number(gradePeriodNumber) || 1,
+        grade: numGrade,
+        evaluationDate: gradeDate || undefined,
+      };
+      const updatedGrades = [...(student.grades || []), newGrade];
+      await updateStudent(student.id, { grades: updatedGrades });
+      toast({ title: "Nota Lançada!", description: `Nota de ${cleanSubject} cadastrada com sucesso.` });
+      setIsNewGradeModalOpen(false);
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: "Erro ao lançar nota", description: err.message || "Falha ao salvar nota." });
+    } finally {
+      setIsSavingGrade(false);
+    }
+  };
+
+  const handleOpenEditGrade = (index: number, g: Grade) => {
+    setEditingGradeIndex(index);
+    setGradeSubject(g.subject);
+    setGradePeriodNumber(g.periodNumber || 1);
+    setGradeValue(String(g.grade));
+    setGradeDate(g.evaluationDate || "");
+    setIsEditGradeModalOpen(true);
+  };
+
+  const handleSaveEditGrade = async () => {
+    if (editingGradeIndex === null) return;
+    const cleanSubject = gradeSubject.trim();
+    if (!cleanSubject) {
+      toast({ variant: 'destructive', title: "Disciplina obrigatória", description: "Informe o nome da disciplina ou avaliação." });
+      return;
+    }
+    const numGrade = parseFloat(gradeValue.replace(',', '.'));
+    if (isNaN(numGrade) || numGrade < 0 || numGrade > 100) {
+      toast({ variant: 'destructive', title: "Nota inválida", description: "A nota deve ser um número entre 0 e 100." });
+      return;
+    }
+
+    setIsSavingGrade(true);
+    try {
+      const updatedGrades = [...(student.grades || [])];
+      updatedGrades[editingGradeIndex] = {
+        subject: cleanSubject,
+        periodType: 'Semestre',
+        periodNumber: Number(gradePeriodNumber) || 1,
+        grade: numGrade,
+        evaluationDate: gradeDate || undefined,
+      };
+      await updateStudent(student.id, { grades: updatedGrades });
+      toast({ title: "Nota Atualizada!", description: "A avaliação foi atualizada com sucesso." });
+      setIsEditGradeModalOpen(false);
+      setEditingGradeIndex(null);
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: "Erro ao atualizar nota", description: err.message || "Falha ao atualizar nota." });
+    } finally {
+      setIsSavingGrade(false);
+    }
+  };
+
+  const handleDeleteGrade = async (index: number) => {
+    const currentGrades = student.grades || [];
+    const target = currentGrades[index];
+    const updatedGrades = currentGrades.filter((_, i) => i !== index);
+
+    try {
+      await updateStudent(student.id, { grades: updatedGrades });
+      toast({ 
+        title: "Nota Removida", 
+        description: `Avaliação de ${target?.subject || 'disciplina'} foi removida com sucesso.` 
+      });
+      if (editingGradeIndex === index) {
+        setIsEditGradeModalOpen(false);
+        setEditingGradeIndex(null);
+      }
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: "Erro ao remover nota", description: err.message });
+    }
+  };
+
+  // Payment Handlers
+  const handleOpenEditPayment = (payment: PaymentItem) => {
+    setEditingPayment(payment);
+    setEditPaymentDate(payment.date ? payment.date.slice(0, 10) : "");
+    setEditPaymentDesc(payment.description || "");
+    setEditPaymentAmount(String(payment.amount || 0));
+    setEditPaymentMethod(payment.paymentMethod || "Boleto Sicoob");
+    setIsEditPaymentModalOpen(true);
+  };
+
+  const handleSaveEditPayment = async () => {
+    if (!editingPayment) return;
+    const cleanDesc = editPaymentDesc.trim();
+    const numAmount = parseFloat(editPaymentAmount.replace(',', '.'));
+    if (isNaN(numAmount) || numAmount <= 0) {
+      toast({ variant: 'destructive', title: "Valor inválido", description: "Informe um valor numérico maior que zero." });
+      return;
+    }
+    if (!editPaymentDate) {
+      toast({ variant: 'destructive', title: "Data obrigatória", description: "Informe a data do pagamento." });
+      return;
+    }
+
+    setIsSavingPaymentEdit(true);
+    try {
+      if (editingPayment.source === 'transaction') {
+        await updateTransaction(editingPayment.id, {
+          date: editPaymentDate,
+          description: cleanDesc || `Mensalidade ${student.name}`,
+          value: numAmount,
+          paymentMethod: editPaymentMethod,
+        });
+      } else {
+        const historyList = [...(student.paymentHistory || [])];
+        const targetIdx = editingPayment.originalIndex;
+        if (targetIdx !== undefined && historyList[targetIdx]) {
+          historyList[targetIdx] = {
+            ...historyList[targetIdx],
+            date: editPaymentDate,
+            description: cleanDesc || `Mensalidade ${student.name}`,
+            amount: numAmount,
+            method: editPaymentMethod,
+          } as any;
+          await updateStudent(student.id, { paymentHistory: historyList });
+        } else {
+          const updated = historyList.map(p => {
+            if (p.date === editingPayment.date && Math.abs(p.amount - editingPayment.amount) < 0.01) {
+              return {
+                ...p,
+                date: editPaymentDate,
+                description: cleanDesc || `Mensalidade ${student.name}`,
+                amount: numAmount,
+                method: editPaymentMethod,
+              };
+            }
+            return p;
+          });
+          await updateStudent(student.id, { paymentHistory: updated });
+        }
+      }
+      toast({ title: "Pagamento Atualizado!", description: "As alterações foram salvas com sucesso." });
+      setIsEditPaymentModalOpen(false);
+      setEditingPayment(null);
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: "Erro ao atualizar", description: err.message || "Falha ao salvar alterações." });
+    } finally {
+      setIsSavingPaymentEdit(false);
+    }
+  };
+
+  const handleDeletePayment = async () => {
+    if (!paymentToDelete) return;
+
+    setIsDeletingPayment(true);
+    try {
+      if (paymentToDelete.source === 'transaction') {
+        await deleteTransaction(paymentToDelete.id, true, {
+          deletedAt: new Date().toISOString(),
+          deletedBy: user?.nickname || user?.email || 'Usuário',
+          reason: 'Estorno de pagamento realizado pela ficha do aluno'
+        });
+      } else {
+        const historyList = [...(student.paymentHistory || [])];
+        const targetIdx = paymentToDelete.originalIndex;
+        let updatedHistory: typeof historyList;
+        if (targetIdx !== undefined && historyList[targetIdx]) {
+          updatedHistory = historyList.filter((_, idx) => idx !== targetIdx);
+        } else {
+          updatedHistory = historyList.filter(
+            p => !(p.date === paymentToDelete.date && Math.abs(p.amount - paymentToDelete.amount) < 0.01)
+          );
+        }
+        await updateStudent(student.id, { paymentHistory: updatedHistory });
+      }
+
+      toast({ 
+        title: "Pagamento Estornado com Sucesso!", 
+        description: "O registro foi removido. Caso haja mensalidade em aberto para o mês, o aluno retornará automaticamente para a lista de pendências." 
+      });
+      setPaymentToDelete(null);
+    } catch (err: any) {
+      toast({ variant: 'destructive', title: "Erro ao estornar pagamento", description: err.message || "Falha ao estornar." });
+    } finally {
+      setIsDeletingPayment(false);
+    }
+  };
+
   return (
     <>
       {/* Visualização de Tela (Modal Interativo) */}
@@ -837,12 +1094,32 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
 
         <div className="md:col-span-2 flex flex-col gap-4 sm:gap-6 min-w-0">
             <Card className="shadow-sm overflow-hidden">
-                <CardHeader className="flex flex-row items-center justify-between gap-2 bg-muted/10 p-3 sm:p-6 pb-3">
-                    <div className="flex items-center gap-2 min-w-0">
-                        <FileText className="h-4 w-4 text-accent shrink-0"/>
-                        <CardTitle className="text-base sm:text-lg truncate">Desempenho Pedagógico</CardTitle>
+                <CardHeader className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 bg-muted/10 p-3 sm:p-6 pb-3">
+                    <div className="flex items-center justify-between sm:justify-start gap-2 w-full sm:w-auto">
+                        <div className="flex items-center gap-2 min-w-0">
+                            <FileText className="h-4 w-4 text-accent shrink-0"/>
+                            <CardTitle className="text-base sm:text-lg truncate">Desempenho Pedagógico</CardTitle>
+                        </div>
+                        <Badge variant="secondary" className="font-mono text-xs shrink-0 sm:hidden">
+                            {(student.grades || []).length} notas
+                        </Badge>
                     </div>
-                    <Badge variant="secondary" className="font-mono text-xs shrink-0">{student.grades.length} notas</Badge>
+                    <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+                        <Badge variant="secondary" className="font-mono text-xs shrink-0 hidden sm:inline-flex">
+                            {(student.grades || []).length} notas
+                        </Badge>
+                        {canEditGrades && (
+                            <Button 
+                                size="sm" 
+                                variant="outline" 
+                                className="h-8 text-xs border-accent/40 text-accent hover:bg-accent/10 rounded-lg px-2.5 font-medium gap-1"
+                                onClick={handleOpenNewGrade}
+                            >
+                                <Plus className="h-3.5 w-3.5" />
+                                Lançar Nota
+                            </Button>
+                        )}
+                    </div>
                 </CardHeader>
                 <CardContent className="p-0">
                     {/* Visualização Mobile (Sem rolagem horizontal) */}
@@ -854,11 +1131,35 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
                                         <p className="text-xs font-semibold text-foreground truncate">{grade.subject}</p>
                                         <p className="text-[11px] text-muted-foreground">{grade.periodNumber}º {grade.periodType}</p>
                                     </div>
-                                    <div className={cn(
-                                        "px-2.5 py-1 rounded-md text-xs font-bold font-mono shrink-0",
-                                        grade.grade >= 60 ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-red-500/10 text-red-700 dark:text-red-400'
-                                    )}>
-                                        {grade.grade.toFixed(1)}
+                                    <div className="flex items-center gap-2 shrink-0">
+                                        <div className={cn(
+                                            "px-2.5 py-1 rounded-md text-xs font-bold font-mono shrink-0",
+                                            grade.grade >= 60 ? 'bg-green-500/10 text-green-700 dark:text-green-400' : 'bg-red-500/10 text-red-700 dark:text-red-400'
+                                        )}>
+                                            {grade.grade.toFixed(1)}
+                                        </div>
+                                        {canEditGrades && (
+                                            <div className="flex items-center gap-0.5">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-7 w-7 text-muted-foreground hover:text-accent hover:bg-accent/10"
+                                                    onClick={() => handleOpenEditGrade(index, grade)}
+                                                    title="Editar nota"
+                                                >
+                                                    <Edit className="h-3.5 w-3.5" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                    onClick={() => handleDeleteGrade(index)}
+                                                    title="Excluir nota"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
+                                        )}
                                     </div>
                                 </div>
                             ))
@@ -877,6 +1178,9 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
                                     <TableHead className="h-9 text-[10px] uppercase font-bold">Avaliação</TableHead>
                                     <TableHead className="h-9 text-[10px] uppercase font-bold">Período</TableHead>
                                     <TableHead className="h-9 text-[10px] uppercase font-bold text-right">Nota</TableHead>
+                                    {canEditGrades && (
+                                        <TableHead className="h-9 text-[10px] uppercase font-bold text-center w-20">Ações</TableHead>
+                                    )}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -885,14 +1189,38 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
                                         <TableCell className="py-2 text-xs font-medium">{grade.subject}</TableCell>
                                         <TableCell className="py-2 text-xs">{grade.periodNumber}º {grade.periodType}</TableCell>
                                         <TableCell className={cn(
-                                            "py-2 text-xs text-right font-bold",
+                                            "py-2 text-xs text-right font-bold font-mono",
                                             grade.grade >= 60 ? 'text-green-600' : 'text-red-600'
                                         )}>
                                             {grade.grade.toFixed(1)}
                                         </TableCell>
+                                        {canEditGrades && (
+                                            <TableCell className="py-2 text-center p-1">
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-7 w-7 text-muted-foreground hover:text-accent hover:bg-accent/10"
+                                                        onClick={() => handleOpenEditGrade(index, grade)}
+                                                        title="Editar nota"
+                                                    >
+                                                        <Edit className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                        onClick={() => handleDeleteGrade(index)}
+                                                        title="Excluir nota"
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        )}
                                     </TableRow>
                                 )) : (
-                                    <TableRow><TableCell colSpan={3} className="h-20 text-center text-xs text-muted-foreground italic">Nenhuma nota registrada.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={canEditGrades ? 4 : 3} className="h-20 text-center text-xs text-muted-foreground italic">Nenhuma nota registrada.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>
@@ -1172,7 +1500,7 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
                                         </p>
                                     </div>
 
-                                    <div className="flex items-center gap-2 shrink-0">
+                                    <div className="flex items-center gap-1.5 shrink-0">
                                         <span className="text-xs font-bold text-green-600 font-mono">
                                             {formatCurrency(payment.amount)}
                                         </span>
@@ -1180,17 +1508,37 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
                                             <Button 
                                                 variant="ghost" 
                                                 size="icon" 
-                                                className="h-8 w-8 text-accent hover:bg-accent/10" 
+                                                className="h-7 w-7 text-accent hover:bg-accent/10" 
                                                 onClick={() => {
                                                     setSelectedReceipt(payment.receiptUrl!);
                                                     setIsReceiptOpen(true);
                                                 }}
                                                 title="Ver Comprovante"
                                             >
-                                                <Eye className="h-4 w-4" />
+                                                <Eye className="h-3.5 w-3.5" />
                                             </Button>
-                                        ) : (
-                                            <div className="w-8" />
+                                        ) : null}
+                                        {canEditFinance && (
+                                            <div className="flex items-center gap-0.5">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-7 w-7 text-muted-foreground hover:text-accent hover:bg-accent/10"
+                                                    onClick={() => handleOpenEditPayment(payment)}
+                                                    title="Editar pagamento"
+                                                >
+                                                    <Edit className="h-3.5 w-3.5" />
+                                                </Button>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                    onClick={() => setPaymentToDelete(payment)}
+                                                    title="Estornar / Apagar pagamento (retorna para as pendências)"
+                                                >
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
@@ -1212,6 +1560,9 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
                                     <TableHead className="h-9 text-[10px] uppercase font-bold hidden sm:table-cell">Forma</TableHead>
                                     <TableHead className="h-9 text-[10px] uppercase font-bold text-right">Valor</TableHead>
                                     <TableHead className="h-9 text-[10px] uppercase font-bold text-center w-14">Comp.</TableHead>
+                                    {canEditFinance && (
+                                        <TableHead className="h-9 text-[10px] uppercase font-bold text-center w-20">Ações</TableHead>
+                                    )}
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -1245,9 +1596,33 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
                                                 <span className="text-muted-foreground/30 text-xs">-</span>
                                             )}
                                         </TableCell>
+                                        {canEditFinance && (
+                                            <TableCell className="py-2 text-center p-1">
+                                                <div className="flex items-center justify-center gap-1">
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-7 w-7 text-muted-foreground hover:text-accent hover:bg-accent/10"
+                                                        onClick={() => handleOpenEditPayment(payment)}
+                                                        title="Editar pagamento"
+                                                    >
+                                                        <Edit className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        className="h-7 w-7 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                                                        onClick={() => setPaymentToDelete(payment)}
+                                                        title="Estornar / Apagar pagamento (retorna para as pendências)"
+                                                    >
+                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        )}
                                     </TableRow>
                                 )) : (
-                                    <TableRow><TableCell colSpan={5} className="h-20 text-center text-xs text-muted-foreground italic">Nenhum pagamento registrado.</TableCell></TableRow>
+                                    <TableRow><TableCell colSpan={canEditFinance ? 6 : 5} className="h-20 text-center text-xs text-muted-foreground italic">Nenhum pagamento registrado.</TableCell></TableRow>
                                 )}
                             </TableBody>
                         </Table>
@@ -1531,6 +1906,409 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
                 </div>
             </DialogContent>
         </Dialog>
+
+      {/* Modal Lançar Nova Nota */}
+      <Dialog open={isNewGradeModalOpen} onOpenChange={setIsNewGradeModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <FileText className="h-4 w-4 text-accent" />
+              Lançar Avaliação / Nota
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Cadastre o resultado pedagógico do aluno nesta disciplina.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="new-grade-subject" className="text-xs font-semibold">
+                Disciplina / Avaliação <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="new-grade-subject"
+                placeholder="Ex: Robótica, Programação, Inglês..."
+                value={gradeSubject}
+                onChange={(e) => setGradeSubject(e.target.value)}
+                className="text-xs"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="new-grade-period" className="text-xs font-semibold">
+                  Semestre / Período
+                </Label>
+                <Select
+                  value={String(gradePeriodNumber)}
+                  onValueChange={(val) => setGradePeriodNumber(Number(val))}
+                >
+                  <SelectTrigger id="new-grade-period" className="text-xs h-9">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1º Semestre</SelectItem>
+                    <SelectItem value="2">2º Semestre</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="new-grade-value" className="text-xs font-semibold">
+                  Nota (0 a 100) <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="new-grade-value"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  placeholder="Ex: 85.0"
+                  value={gradeValue}
+                  onChange={(e) => setGradeValue(e.target.value)}
+                  className="text-xs h-9 font-mono font-bold"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="new-grade-date" className="text-xs font-semibold">
+                Data da Avaliação (Opcional)
+              </Label>
+              <Input
+                id="new-grade-date"
+                type="date"
+                value={gradeDate}
+                onChange={(e) => setGradeDate(e.target.value)}
+                className="text-xs h-9"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsNewGradeModalOpen(false)}
+              disabled={isSavingGrade}
+              className="text-xs"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="bg-accent hover:bg-accent/90 text-xs font-semibold"
+              onClick={handleCreateGrade}
+              disabled={isSavingGrade}
+            >
+              {isSavingGrade && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Salvar Nota
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Editar Nota */}
+      <Dialog open={isEditGradeModalOpen} onOpenChange={setIsEditGradeModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <Edit className="h-4 w-4 text-accent" />
+              Editar Avaliação / Nota
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Altere os dados da nota registrada para o aluno.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-grade-subject" className="text-xs font-semibold">
+                Disciplina / Avaliação <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="edit-grade-subject"
+                placeholder="Ex: Robótica, Programação..."
+                value={gradeSubject}
+                onChange={(e) => setGradeSubject(e.target.value)}
+                className="text-xs"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-grade-period" className="text-xs font-semibold">
+                  Semestre / Período
+                </Label>
+                <Select
+                  value={String(gradePeriodNumber)}
+                  onValueChange={(val) => setGradePeriodNumber(Number(val))}
+                >
+                  <SelectTrigger id="edit-grade-period" className="text-xs h-9">
+                    <SelectValue placeholder="Selecione" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="1">1º Semestre</SelectItem>
+                    <SelectItem value="2">2º Semestre</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-grade-value" className="text-xs font-semibold">
+                  Nota (0 a 100) <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="edit-grade-value"
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  placeholder="Ex: 85.0"
+                  value={gradeValue}
+                  onChange={(e) => setGradeValue(e.target.value)}
+                  className="text-xs h-9 font-mono font-bold"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-grade-date" className="text-xs font-semibold">
+                Data da Avaliação (Opcional)
+              </Label>
+              <Input
+                id="edit-grade-date"
+                type="date"
+                value={gradeDate}
+                onChange={(e) => setGradeDate(e.target.value)}
+                className="text-xs h-9"
+              />
+            </div>
+          </div>
+
+          <DialogFooter className="flex justify-between items-center pt-2">
+            {editingGradeIndex !== null && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="text-destructive hover:bg-destructive/10 text-xs"
+                onClick={() => {
+                  const idx = editingGradeIndex;
+                  setIsEditGradeModalOpen(false);
+                  handleDeleteGrade(idx);
+                }}
+                disabled={isSavingGrade}
+              >
+                <Trash2 className="h-3.5 w-3.5 mr-1" /> Excluir Nota
+              </Button>
+            )}
+            <div className="flex gap-2 ml-auto">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditGradeModalOpen(false)}
+                disabled={isSavingGrade}
+                className="text-xs"
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                className="bg-accent hover:bg-accent/90 text-xs font-semibold"
+                onClick={handleSaveEditGrade}
+                disabled={isSavingGrade}
+              >
+                {isSavingGrade && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Salvar Alterações
+              </Button>
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Editar Pagamento */}
+      <Dialog open={isEditPaymentModalOpen} onOpenChange={setIsEditPaymentModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2">
+              <Wallet className="h-4 w-4 text-accent" />
+              Editar Pagamento do Aluno
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Edite as informações financeiras deste lançamento.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-payment-desc" className="text-xs font-semibold">
+                Descrição <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="edit-payment-desc"
+                placeholder="Ex: Mensalidade Novembro/2026"
+                value={editPaymentDesc}
+                onChange={(e) => setEditPaymentDesc(e.target.value)}
+                className="text-xs"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-payment-date" className="text-xs font-semibold">
+                  Data do Pagamento <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="edit-payment-date"
+                  type="date"
+                  value={editPaymentDate}
+                  onChange={(e) => setEditPaymentDate(e.target.value)}
+                  className="text-xs h-9"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-payment-amount" className="text-xs font-semibold">
+                  Valor (R$) <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="edit-payment-amount"
+                  type="number"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="250.00"
+                  value={editPaymentAmount}
+                  onChange={(e) => setEditPaymentAmount(e.target.value)}
+                  className="text-xs h-9 font-mono font-bold text-green-600"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-payment-method" className="text-xs font-semibold">
+                Forma de Pagamento
+              </Label>
+              <Select
+                value={editPaymentMethod}
+                onValueChange={(val) => setEditPaymentMethod(val)}
+              >
+                <SelectTrigger id="edit-payment-method" className="text-xs h-9">
+                  <SelectValue placeholder="Selecione a forma" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Boleto Sicoob">Boleto Sicoob</SelectItem>
+                  <SelectItem value="PIX">PIX</SelectItem>
+                  <SelectItem value="Dinheiro">Dinheiro</SelectItem>
+                  <SelectItem value="Cartão de Crédito">Cartão de Crédito</SelectItem>
+                  <SelectItem value="Cartão de Débito">Cartão de Débito</SelectItem>
+                  <SelectItem value="Transferência Bancária">Transferência Bancária</SelectItem>
+                  <SelectItem value="Outro">Outro</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <DialogFooter className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsEditPaymentModalOpen(false)}
+              disabled={isSavingPaymentEdit}
+              className="text-xs"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              className="bg-accent hover:bg-accent/90 text-xs font-semibold"
+              onClick={handleSaveEditPayment}
+              disabled={isSavingPaymentEdit}
+            >
+              {isSavingPaymentEdit && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Salvar Pagamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal Estornar / Apagar Pagamento */}
+      <Dialog open={!!paymentToDelete} onOpenChange={(open) => !open && setPaymentToDelete(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-base font-bold flex items-center gap-2 text-destructive">
+              <Trash2 className="h-4 w-4" />
+              Estornar / Apagar Pagamento
+            </DialogTitle>
+            <DialogDescription className="text-xs text-muted-foreground">
+              Confirme a exclusão deste pagamento registrado.
+            </DialogDescription>
+          </DialogHeader>
+
+          {paymentToDelete && (
+            <div className="space-y-3 py-2 text-xs">
+              <div className="p-3 rounded-lg border bg-muted/40 space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Descrição:</span>
+                  <span className="font-semibold text-foreground">{paymentToDelete.description}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Data:</span>
+                  <span className="font-mono">{new Date(paymentToDelete.date).toLocaleDateString('pt-BR', { timeZone: 'UTC' })}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Valor:</span>
+                  <span className="font-mono font-bold text-destructive">{formatCurrency(paymentToDelete.amount)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Origem:</span>
+                  <span>{paymentToDelete.source === 'history' ? 'Boleto Sicoob (Perfil)' : 'Caixa / Transação'}</span>
+                </div>
+              </div>
+
+              <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-500/10 text-amber-800 dark:text-amber-300 space-y-1">
+                <p className="font-semibold flex items-center gap-1.5">
+                  <AlertCircle className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400" />
+                  Efeito do estorno:
+                </p>
+                <p className="text-[11px] leading-relaxed">
+                  Ao apagar este pagamento, o valor será cancelado e o aluno <strong>voltará a constar como pendente</strong> na lista de mensalidades do mês se não houver outra quitação suficiente.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setPaymentToDelete(null)}
+              disabled={isDeletingPayment}
+              className="text-xs"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              className="text-xs font-semibold"
+              onClick={handleDeletePayment}
+              disabled={isDeletingPayment}
+            >
+              {isDeletingPayment && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Estornar Pagamento
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Modelo Oficial Formatado para Impressão A4 (Renderizado via Portal diretamente no body) */}
       {mounted && typeof document !== "undefined" && ReactDOM.createPortal(

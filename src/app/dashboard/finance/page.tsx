@@ -1005,8 +1005,8 @@ export default function FinancePage() {
                             <ScrollArea className="h-[490px] pr-2.5">
                                 <ul className="space-y-2">
                                     {pendingStudents.map(student => (
-                                        <li key={student.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 border bg-card/60 transition-colors">
-                                            <div className="min-w-0 pr-2">
+                                        <li key={student.id} className="flex items-center justify-start gap-2.5 sm:gap-4 p-2 sm:p-2.5 rounded-xl hover:bg-muted/50 border bg-card/60 transition-colors">
+                                            <div className="min-w-0 flex-1 max-w-[220px] sm:max-w-[280px]">
                                                 <p className="font-bold text-[10px] sm:text-sm truncate" title={student.name}>{student.name}</p>
                                                 <p className="text-[8px] sm:text-xs text-muted-foreground truncate">
                                                     Vence dia {student.dueDate} {student.totalPaid > 0 ? `• Restante: ${formatCurrency(student.remaining)} (Pago: ${formatCurrency(student.totalPaid)})` : `• ${formatCurrency(student.monthlyFee)}`}
