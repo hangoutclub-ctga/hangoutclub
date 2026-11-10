@@ -335,9 +335,9 @@ export default function DashboardPage() {
                 )} onClick={() => handleEventClick(evt)}>
                   <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
                     {isBirthday ? (
-                      <Avatar className="h-9 w-9 sm:h-10 sm:w-10 border-2 border-amber-400 ring-2 ring-amber-400/20 shadow-xs">
+                      <Avatar className="h-9 w-9 sm:h-10 sm:w-10 border-2 border-amber-400 ring-2 ring-amber-400/20 shadow-xs shrink-0">
                         <AvatarImage 
-                          src={getDisplayAvatarUrl(evt.avatarUrl)} 
+                          src={evt.avatarUrl && !evt.avatarUrl.includes('placehold.co') ? getDisplayAvatarUrl(evt.avatarUrl) : undefined} 
                           alt={evt.personName || evt.task} 
                           className="object-cover" 
                         />

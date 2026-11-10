@@ -63,39 +63,73 @@ export const useAgenda = (date: Date | undefined, user: User | null, viewType: '
                     classId: c.id
                 }));
 
-            const studentBirthdays = students
-                .filter(s => s.status !== 'Apagado' && isBirthdayOnDay(s.dob, day))
-                .map(s => ({
-                    id: `BDAY-STUDENT-${s.id}-${dateKey}`,
-                    task: `Aniversário: ${s.name}`,
-                    time: "00:00",
-                    details: `Hoje é o aniversário de ${s.name}!`,
-                    type: 'birthday' as const,
-                    owners: ['Sistema'],
-                    recurrent: true,
-                    date: day,
-                    completed: false,
-                    avatarUrl: s.avatarUrl,
-                    personName: s.name,
-                    studentId: s.id
-                }));
+            // Helper de normalização para casar nomes entre alunos e colaboradores
+            const normalizeName = (str: string) => 
+                (str || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 
             const userBirthdays = users
-                .filter(u => isBirthdayOnDay(u.dob, day))
-                .map(u => ({
-                    id: `BDAY-USER-${u.id}-${dateKey}`,
-                    task: `Aniversário: ${u.nickname}`,
-                    time: "00:00",
-                    details: `Hoje é o aniversário de ${u.nickname} (${u.role})!`,
-                    type: 'birthday' as const,
-                    owners: ['Sistema'],
-                    recurrent: true,
-                    date: day,
-                    completed: false,
-                    avatarUrl: u.avatar,
-                    personName: u.nickname,
-                    userId: u.id
-                }));
+                .filter(u => u.role !== 'Apagado' && isBirthdayOnDay(u.dob, day))
+                .map(u => {
+                    const matchingStudent = students.find(s => {
+                        if (s.status === 'Apagado') return false;
+                        const sNorm = normalizeName(s.name);
+                        const uNorm = normalizeName(u.nickname);
+                        return sNorm === uNorm || sNorm.includes(uNorm) || uNorm.includes(sNorm);
+                    });
+                    const avatar = u.avatar || matchingStudent?.avatarUrl;
+
+                    return {
+                        id: `BDAY-USER-${u.id}-${dateKey}`,
+                        task: `Aniversário: ${u.nickname}`,
+                        time: "00:00",
+                        details: `Hoje é o aniversário de ${u.nickname} (${u.role})!`,
+                        type: 'birthday' as const,
+                        owners: ['Sistema'],
+                        recurrent: true,
+                        date: day,
+                        completed: false,
+                        avatarUrl: avatar,
+                        personName: u.nickname,
+                        userId: u.id
+                    };
+                });
+
+            const studentBirthdays = students
+                .filter(s => {
+                    if (s.status === 'Apagado' || !isBirthdayOnDay(s.dob, day)) return false;
+                    const sNorm = normalizeName(s.name);
+                    const alreadyInUsers = userBirthdays.some(ub => {
+                        const ubNorm = normalizeName(ub.personName);
+                        return sNorm === ubNorm || sNorm.includes(ubNorm) || ubNorm.includes(sNorm);
+                    });
+                    return !alreadyInUsers;
+                })
+                .map(s => {
+                    const matchingUser = users.find(u => {
+                        if (u.role === 'Apagado' || !u.avatar) return false;
+                        const sNorm = normalizeName(s.name);
+                        const uNorm = normalizeName(u.nickname);
+                        return sNorm === uNorm || sNorm.includes(uNorm) || uNorm.includes(sNorm);
+                    });
+                    const avatar = s.avatarUrl || matchingUser?.avatar;
+
+                    return {
+                        id: `BDAY-STUDENT-${s.id}-${dateKey}`,
+                        task: `Aniversário: ${s.name}`,
+                        time: "00:00",
+                        details: matchingUser 
+                            ? `Hoje é o aniversário de ${s.name} (${matchingUser.role})!` 
+                            : `Hoje é o aniversário de ${s.name}!`,
+                        type: 'birthday' as const,
+                        owners: ['Sistema'],
+                        recurrent: true,
+                        date: day,
+                        completed: false,
+                        avatarUrl: avatar,
+                        personName: s.name,
+                        studentId: s.id
+                    };
+                });
 
             allGeneratedEvents = [...allGeneratedEvents, ...manual, ...classEvents, ...studentBirthdays, ...userBirthdays];
         });
