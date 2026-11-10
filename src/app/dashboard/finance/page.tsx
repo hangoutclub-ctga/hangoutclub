@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -32,7 +33,7 @@ import { ptBR } from "date-fns/locale";
 import { TransactionForm } from "@/components/transaction-form";
 import { FixedExpenseForm } from "@/components/fixed-expense-form";
 import { PayFixedExpenseForm } from "@/components/pay-fixed-expense-form";
-import { ArrowDownCircle, ArrowUpCircle, MinusCircle, Printer, AlertCircle, CheckCircle, Trash2, FilterX, Calendar as CalendarIcon, DollarSign, PlusCircle, Eye, CreditCard, ChevronLeft, Home, ShieldAlert, FileSpreadsheet, Paperclip, Download, Pencil, Check, CheckCheck, Loader2, Users, Search, X, Wallet } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, MinusCircle, Printer, AlertCircle, CheckCircle, Trash2, FilterX, Calendar as CalendarIcon, DollarSign, PlusCircle, Eye, CreditCard, ChevronLeft, Home, ShieldAlert, FileSpreadsheet, Paperclip, Download, Pencil, Check, CheckCheck, Loader2, Users, Search, X, Wallet, PieChart } from 'lucide-react';
 import { Transaction, Student, FixedExpense, normalizeTransactionCategory, TransactionCategory } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
@@ -124,6 +125,7 @@ export default function FinancePage() {
     const [fixedExpenseToDelete, setFixedExpenseToDelete] = useState<FixedExpense | null>(null);
     const [isImporterOpen, setIsImporterOpen] = useState(false);
     const [isPendingModalOpen, setIsPendingModalOpen] = useState(false);
+    const [isInfographicModalOpen, setIsInfographicModalOpen] = useState(false);
     const [pendingSearchTerm, setPendingSearchTerm] = useState("");
 
     const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -722,6 +724,16 @@ export default function FinancePage() {
                 <Button 
                     size="icon" 
                     variant="outline" 
+                    className="h-10 w-10 border-accent/40 text-accent hover:bg-accent/10 shadow-sm"
+                    onClick={() => setIsInfographicModalOpen(true)}
+                    title="Infográfico Gerencial de Desempenho (Pizza & Telemetria)"
+                >
+                    <PieChart className="h-4 w-4 text-accent" />
+                </Button>
+
+                <Button 
+                    size="icon" 
+                    variant="outline" 
                     className="relative h-10 w-10 border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 shadow-sm"
                     onClick={() => setIsPendingModalOpen(true)}
                     title={`Pendências Alunos (${pendingStudents.length})`}
@@ -832,6 +844,28 @@ export default function FinancePage() {
                     isOpen={isImporterOpen} 
                     onClose={() => setIsImporterOpen(false)} 
                 />
+
+                <Dialog open={isInfographicModalOpen} onOpenChange={setIsInfographicModalOpen}>
+                    <DialogContent className="sm:max-w-[950px] w-[96vw] max-h-[92vh] overflow-y-auto p-3 sm:p-5 rounded-2xl">
+                        <DialogHeader className="pb-2 border-b">
+                            <DialogTitle className="flex items-center gap-2 text-sm sm:text-base font-bold font-headline">
+                                <PieChart className="h-4 w-4 text-accent" />
+                                Infográfico Gerencial de Desempenho
+                            </DialogTitle>
+                            <DialogDescription className="text-[11px] sm:text-xs text-muted-foreground">
+                                Período: <strong className="text-foreground capitalize">{periodLabel}</strong> • Análise orçamentária detalhada das 5 categorias
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="pt-2">
+                            <FinanceInfographic 
+                                categoryTotals={categoryTotals} 
+                                totals={totals} 
+                                periodLabel={periodLabel} 
+                                hideCollapseButton={true}
+                            />
+                        </div>
+                    </DialogContent>
+                </Dialog>
              </div>
         </div>
       
@@ -941,12 +975,14 @@ export default function FinancePage() {
                     </Card>
                 </div>
 
-                {/* Infográfico Gerencial com Distribuição das 5 Categorias e Indicadores */}
-                <FinanceInfographic 
-                    categoryTotals={categoryTotals} 
-                    totals={totals} 
-                    periodLabel={periodLabel} 
-                />
+                {/* Infográfico Gerencial com Distribuição das 5 Categorias e Indicadores (Apenas Impressão) */}
+                <div className="hidden print:block">
+                    <FinanceInfographic 
+                        categoryTotals={categoryTotals} 
+                        totals={totals} 
+                        periodLabel={periodLabel} 
+                    />
+                </div>
 
                 {/* Divisão Gerencial: Receitas, Custos, Despesas, Investimentos, Gastos */}
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none no-print">

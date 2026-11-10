@@ -43,9 +43,10 @@ interface FinanceInfographicProps {
     profit: number;
   };
   periodLabel: string;
+  hideCollapseButton?: boolean;
 }
 
-export function FinanceInfographic({ categoryTotals, totals, periodLabel }: FinanceInfographicProps) {
+export function FinanceInfographic({ categoryTotals, totals, periodLabel, hideCollapseButton = false }: FinanceInfographicProps) {
   const [isOpen, setIsOpen] = useState(true);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
@@ -205,24 +206,26 @@ export function FinanceInfographic({ categoryTotals, totals, periodLabel }: Fina
             </Button>
           )}
 
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-7 text-[10px] sm:text-xs gap-1 text-muted-foreground hover:text-foreground border border-border/50 rounded-lg px-2"
-            onClick={() => setIsOpen(!isOpen)}
-          >
-            {isOpen ? (
-              <>
-                <span>Recolher</span>
-                <ChevronUp className="h-3.5 w-3.5" />
-              </>
-            ) : (
-              <>
-                <span>Expandir</span>
-                <ChevronDown className="h-3.5 w-3.5" />
-              </>
-            )}
-          </Button>
+          {!hideCollapseButton && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-[10px] sm:text-xs gap-1 text-muted-foreground hover:text-foreground border border-border/50 rounded-lg px-2"
+              onClick={() => setIsOpen(!isOpen)}
+            >
+              {isOpen ? (
+                <>
+                  <span>Recolher</span>
+                  <ChevronUp className="h-3.5 w-3.5" />
+                </>
+              ) : (
+                <>
+                  <span>Expandir</span>
+                  <ChevronDown className="h-3.5 w-3.5" />
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </CardHeader>
 
