@@ -181,26 +181,41 @@ export function StudentProfile({ student: initialStudent }: { student: Student }
   }, [student.paymentHistory]);
 
   const displayPayments = React.useMemo(() => {
-    if (studentTransactions.length > 0) {
-      return studentTransactions.map(t => ({
-        id: t.id,
-        date: t.date,
-        description: t.description,
-        amount: t.value,
-        paymentMethod: t.paymentMethod,
-        receiptUrl: t.receiptUrl,
-        status: 'Pago' as const
-      }));
-    }
-    return legacyPayments.map((p, idx) => ({
-      id: `legacy-${idx}`,
+    const fromTx = studentTransactions.map(t => ({
+      id: t.id,
+      date: t.date,
+      description: t.description,
+      amount: t.value,
+      paymentMethod: t.paymentMethod || 'PIX/Outros',
+      receiptUrl: t.receiptUrl,
+      status: 'Pago' as const
+    }));
+
+    const fromHistory = legacyPayments.map((p, idx) => ({
+      id: `history-${idx}-${p.date}`,
       date: p.date,
       description: p.description,
       amount: p.amount,
-      paymentMethod: undefined,
-      receiptUrl: undefined,
+      paymentMethod: (p as any).method || 'Boleto Sicoob',
+      receiptUrl: (p as any).receiptUrl,
       status: p.status || ('Pago' as const)
     }));
+
+    // Se um item do histórico tiver mesma data e valor de uma transação existente, prioriza a transação
+    const uniqueHistory = fromHistory.filter(h => 
+      !fromTx.some(t => {
+        const sameDate = t.date.slice(0, 10) === h.date.slice(0, 10);
+        const sameAmount = Math.abs(t.amount - h.amount) < 0.01;
+        return sameDate && sameAmount;
+      })
+    );
+
+    // Combina e ordena por data decrescente
+    return [...fromTx, ...uniqueHistory].sort((a, b) => {
+      const da = new Date(a.date).getTime() || 0;
+      const db = new Date(b.date).getTime() || 0;
+      return db - da;
+    });
   }, [studentTransactions, legacyPayments]);
 
   if (!student) {

@@ -32,7 +32,7 @@ import { ptBR } from "date-fns/locale";
 import { TransactionForm } from "@/components/transaction-form";
 import { FixedExpenseForm } from "@/components/fixed-expense-form";
 import { PayFixedExpenseForm } from "@/components/pay-fixed-expense-form";
-import { ArrowDownCircle, ArrowUpCircle, MinusCircle, Printer, AlertCircle, CheckCircle, Trash2, FilterX, Calendar as CalendarIcon, DollarSign, PlusCircle, Eye, CreditCard, ChevronLeft, Home, ShieldAlert, FileSpreadsheet, Paperclip, Download, Pencil } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, MinusCircle, Printer, AlertCircle, CheckCircle, Trash2, FilterX, Calendar as CalendarIcon, DollarSign, PlusCircle, Eye, CreditCard, ChevronLeft, Home, ShieldAlert, FileSpreadsheet, Paperclip, Download, Pencil, Check, CheckCheck, Loader2, Users } from 'lucide-react';
 import { Transaction, Student, FixedExpense, normalizeTransactionCategory, TransactionCategory } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
@@ -54,6 +54,7 @@ export default function FinancePage() {
         transactions, 
         fixedExpenses, 
         students, 
+        updateStudent,
         addTransaction, 
         updateTransaction,
         deleteTransaction, 
@@ -61,6 +62,9 @@ export default function FinancePage() {
         updateFixedExpense,
         deleteFixedExpense
     } = useData();
+
+    const [isQuittingStudent, setIsQuittingStudent] = useState(false);
+    const [isBatchSettleOpen, setIsBatchSettleOpen] = useState(false);
 
     const [confirmedDate, setConfirmedDate] = useState<Date>(new Date());
     const [tempDate, setTempDate] = useState<Date>(new Date());
@@ -298,11 +302,14 @@ export default function FinancePage() {
     };
 
     const pendingStudents = useMemo(() => {
+        const monthLabel = months.find(m => m.value === currentMonth)?.label || '';
+
         return students
             .filter(s => s.status === 'Ativo' && s.studentCondition !== 'Bolsa' && (s.monthlyFee || 0) > 0)
             .map(student => {
                 const studentName = student.name.trim().toLowerCase();
                 
+                // 1. Pagamentos no Fluxo de Caixa (Transações como PIX, dinheiro, etc.)
                 const studentTransactions = filteredByDate.filter(t => {
                     if (t.type !== 'Entrada') return false;
                     const txName = (t.name || '').trim().toLowerCase();
@@ -310,8 +317,22 @@ export default function FinancePage() {
                            studentName.startsWith(txName) ||
                            txName.startsWith(studentName);
                 });
+                const txPaid = studentTransactions.reduce((acc, t) => acc + t.value, 0);
 
-                const totalPaid = studentTransactions.reduce((acc, t) => acc + t.value, 0);
+                // 2. Pagamentos no Histórico do Aluno (Quitados via Boleto Sicoob)
+                const historyPaid = (student.paymentHistory || [])
+                    .filter(p => {
+                        if (p.status && p.status !== 'Pago') return false;
+                        const matchDate = isTransactionInMonth(p.date, currentYear, currentMonth);
+                        const matchDesc = p.description && (
+                            p.description.toLowerCase().includes(monthLabel.toLowerCase()) &&
+                            p.description.includes(String(currentYear))
+                        );
+                        return matchDate || matchDesc;
+                    })
+                    .reduce((acc, p) => acc + (p.amount || 0), 0);
+
+                const totalPaid = txPaid + historyPaid;
                 const monthlyFee = student.monthlyFee || 0;
                 const remaining = Math.max(0, monthlyFee - totalPaid);
                 const isPaid = totalPaid >= monthlyFee;
@@ -320,11 +341,86 @@ export default function FinancePage() {
                     ...student,
                     totalPaid,
                     remaining,
-                    isPaid
+                    isPaid,
+                    paidViaBoleto: historyPaid > 0 && txPaid === 0
                 };
             })
             .filter(s => !s.isPaid);
-    }, [students, filteredByDate]);
+    }, [students, filteredByDate, currentMonth, currentYear, months]);
+
+    const handleSettleBoleto = async (student: any) => {
+        setIsQuittingStudent(true);
+        try {
+            const monthLabel = months.find(m => m.value === currentMonth)?.label || '';
+            const feeAmount = student.remaining > 0 ? student.remaining : (student.monthlyFee || 0);
+            const dueDay = String(student.dueDate || 10).padStart(2, '0');
+            const settleDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${dueDay}`;
+
+            const newPaymentEntry = {
+                date: settleDate,
+                description: `Mensalidade ${monthLabel}/${currentYear} (Boleto Sicoob)`,
+                amount: feeAmount,
+                status: 'Pago' as const,
+                method: 'Boleto Sicoob'
+            };
+
+            const updatedHistory = [...(student.paymentHistory || []), newPaymentEntry];
+            await updateStudent(student.id, { paymentHistory: updatedHistory });
+
+            toast({
+                title: "Mensalidade Quitada!",
+                description: `Baixa via Boleto registrada no perfil de ${student.name} sem duplicar no caixa.`
+            });
+        } catch (err: any) {
+            toast({
+                variant: 'destructive',
+                title: "Erro ao quitar mensalidade",
+                description: err.message
+            });
+        } finally {
+            setIsQuittingStudent(false);
+        }
+    };
+
+    const handleBatchSettleAll = async () => {
+        if (pendingStudents.length === 0) return;
+        setIsQuittingStudent(true);
+        const monthLabel = months.find(m => m.value === currentMonth)?.label || '';
+        try {
+            let count = 0;
+            for (const st of pendingStudents) {
+                const feeAmount = st.remaining > 0 ? st.remaining : (st.monthlyFee || 0);
+                const dueDay = String(st.dueDate || 10).padStart(2, '0');
+                const settleDate = `${currentYear}-${String(currentMonth).padStart(2, '0')}-${dueDay}`;
+
+                const newPaymentEntry = {
+                    date: settleDate,
+                    description: `Mensalidade ${monthLabel}/${currentYear} (Boleto Sicoob)`,
+                    amount: feeAmount,
+                    status: 'Pago' as const,
+                    method: 'Boleto Sicoob'
+                };
+
+                const updatedHistory = [...(st.paymentHistory || []), newPaymentEntry];
+                await updateStudent(st.id, { paymentHistory: updatedHistory });
+                count++;
+            }
+
+            toast({
+                title: "Baixa em Lote Concluída!",
+                description: `${count} mensalidades quitadas via Boleto para ${monthLabel}/${currentYear}.`
+            });
+            setIsBatchSettleOpen(false);
+        } catch (err: any) {
+            toast({
+                variant: 'destructive',
+                title: "Erro na baixa em lote",
+                description: err.message
+            });
+        } finally {
+            setIsQuittingStudent(false);
+        }
+    };
 
     const handleOpenEditTransaction = (t: Transaction) => {
         setEditingTransaction(t);
@@ -870,18 +966,38 @@ export default function FinancePage() {
                 </Card>
             </div>
             <div className="lg:col-span-1">
-                 <Card className="card-print">
+                 <Card className="card-print shadow-sm">
                     <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-3">
-                        <div className="flex items-center justify-between">
-                            <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
-                                <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-destructive" /> 
-                                Pendências Alunos
-                            </CardTitle>
-                            {pendingStudents.length > 0 && (
-                                <Badge variant="secondary" className="text-[10px] sm:text-xs font-semibold px-2">
-                                    {pendingStudents.length} pendente{pendingStudents.length > 1 ? 's' : ''}
-                                </Badge>
-                            )}
+                        <div className="flex items-center justify-between gap-1 flex-wrap">
+                            <div>
+                                <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-bold">
+                                    <AlertCircle className="h-4 w-4 text-destructive shrink-0" /> 
+                                    Pendências Alunos
+                                </CardTitle>
+                                <p className="text-[9px] sm:text-xs text-muted-foreground mt-0.5">
+                                    {months.find(m => m.value === currentMonth)?.label} de {currentYear}
+                                </p>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                {pendingStudents.length > 0 && (
+                                    <>
+                                        <Badge variant="secondary" className="text-[10px] font-semibold px-1.5 h-6">
+                                            {pendingStudents.length}
+                                        </Badge>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-7 text-[10px] px-2 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium gap-1"
+                                            disabled={!canEdit || isQuittingStudent}
+                                            onClick={() => setIsBatchSettleOpen(true)}
+                                            title="Dar baixa via Boleto em todos os alunos pendentes deste mês"
+                                        >
+                                            <CheckCheck className="h-3.5 w-3.5 text-emerald-600" />
+                                            <span className="hidden sm:inline">Quitar Todos</span>
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </CardHeader>
                     <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
@@ -896,9 +1012,28 @@ export default function FinancePage() {
                                                     Vence dia {student.dueDate} {student.totalPaid > 0 ? `• Restante: ${formatCurrency(student.remaining)} (Pago: ${formatCurrency(student.totalPaid)})` : `• ${formatCurrency(student.monthlyFee)}`}
                                                 </p>
                                             </div>
-                                            <Button variant="outline" size="sm" className="h-7 text-[10px] px-2.5 rounded-lg shrink-0 hover:bg-accent/10 hover:border-accent" onClick={() => handleOpenForm(student)} disabled={!canEdit}>
-                                                Pagar
-                                            </Button>
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <Button 
+                                                    size="sm" 
+                                                    className="h-7 text-[10px] px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium gap-1 shadow-sm rounded-lg" 
+                                                    onClick={() => handleSettleBoleto(student)} 
+                                                    disabled={!canEdit || isQuittingStudent}
+                                                    title="Quitar via Boleto Sicoob (Salva no perfil sem duplicar no fluxo de caixa)"
+                                                >
+                                                    <Check className="h-3 w-3" />
+                                                    Quitar
+                                                </Button>
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon" 
+                                                    className="h-7 w-7 text-muted-foreground hover:text-accent rounded-lg" 
+                                                    onClick={() => handleOpenForm(student)} 
+                                                    disabled={!canEdit}
+                                                    title="Lançar entrada manual no caixa (PIX / Dinheiro / Balcão)"
+                                                >
+                                                    <DollarSign className="h-3.5 w-3.5" />
+                                                </Button>
+                                            </div>
                                         </li>
                                     ))}
                                 </ul>
@@ -1207,6 +1342,39 @@ export default function FinancePage() {
                 }
             }}
         />
+
+        {/* Modal de Confirmação de Baixa em Lote via Boleto */}
+        <Dialog open={isBatchSettleOpen} onOpenChange={setIsBatchSettleOpen}>
+            <DialogContent className="sm:max-w-[420px] rounded-2xl">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-base">
+                        <CheckCheck className="h-5 w-5 text-emerald-600" />
+                        Quitar Mensalidades em Lote
+                    </DialogTitle>
+                </DialogHeader>
+                <div className="text-xs text-muted-foreground space-y-2 py-2">
+                    <p>
+                        Deseja marcar como <strong>PAGA (Boleto Sicoob)</strong> a mensalidade de todos os <strong>{pendingStudents.length} alunos</strong> pendentes referentes a <strong>{months.find(m => m.value === currentMonth)?.label} de {currentYear}</strong>?
+                    </p>
+                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-emerald-800 dark:text-emerald-300 text-[11px] space-y-1">
+                        <p className="font-semibold flex items-center gap-1.5">
+                            <ShieldAlert className="h-4 w-4 shrink-0 text-emerald-600" />
+                            Sem duplicidade de faturamento
+                        </p>
+                        <p>O histórico de cada aluno será atualizado com a mensalidade quitada, sem lançar novas entradas no fluxo de caixa (ideal para compensação em lote do extrato bancário).</p>
+                    </div>
+                </div>
+                <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="outline" size="sm" onClick={() => setIsBatchSettleOpen(false)} disabled={isQuittingStudent}>
+                        Cancelar
+                    </Button>
+                    <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold gap-1.5" onClick={handleBatchSettleAll} disabled={isQuittingStudent}>
+                        {isQuittingStudent ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCheck className="h-4 w-4" />}
+                        Confirmar Baixa em Lote
+                    </Button>
+                </div>
+            </DialogContent>
+        </Dialog>
     </div>
   )
 }
