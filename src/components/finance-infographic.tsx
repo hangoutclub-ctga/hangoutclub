@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { formatCurrency, cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { 
   PieChart as PieIcon, 
   TrendingUp, 
@@ -13,10 +14,16 @@ import {
   ShieldCheck, 
   AlertTriangle, 
   Sparkles,
+  Layers,
+  Cpu,
+  Activity,
+  Zap,
+  Target,
+  Crosshair,
   ArrowUpRight,
   ArrowDownRight,
-  Percent,
-  Layers
+  HelpCircle,
+  RotateCcw
 } from "lucide-react";
 
 interface FinanceInfographicProps {
@@ -40,6 +47,7 @@ interface FinanceInfographicProps {
 
 export function FinanceInfographic({ categoryTotals, totals, periodLabel }: FinanceInfographicProps) {
   const [isOpen, setIsOpen] = useState(true);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
 
   const { receitas, custos, despesas, investimentos, gastos } = categoryTotals;
   const totalSaidas = custos + despesas + investimentos + gastos;
@@ -50,238 +58,521 @@ export function FinanceInfographic({ categoryTotals, totals, periodLabel }: Fina
   const pctInvestimentos = totalSaidas > 0 ? (investimentos / totalSaidas) * 100 : 0;
   const pctGastos = totalSaidas > 0 ? (gastos / totalSaidas) * 100 : 0;
 
-  // Margem Líquida Operacional (Sobra sobre o faturamento)
+  // Margem Líquida Operacional (Receitas - Saídas) / Receitas
   const margemLiquida = receitas > 0 ? ((receitas - totalSaidas) / receitas) * 100 : 0;
 
-  // Índice de Cobertura (Receitas / Saídas)
+  // Índice de Cobertura de Saídas
   const indiceCobertura = totalSaidas > 0 ? receitas / totalSaidas : 0;
 
-  // Cálculo dos arcos para o gráfico Donut SVG
+  // Reinvestimento em relação ao faturamento
+  const taxaInvestimento = receitas > 0 ? (investimentos / receitas) * 100 : 0;
+
+  // Definição dos segmentos do Donut Holográfico
   const segments = [
-    { name: "Custos", value: custos, pct: pctCustos, color: "#f97316", textClass: "text-orange-500", bgClass: "bg-orange-500" },
-    { name: "Despesas", value: despesas, pct: pctDespesas, color: "#f59e0b", textClass: "text-amber-500", bgClass: "bg-amber-500" },
-    { name: "Investimentos", value: investimentos, pct: pctInvestimentos, color: "#3b82f6", textClass: "text-blue-500", bgClass: "bg-blue-500" },
-    { name: "Gastos", value: gastos, pct: pctGastos, color: "#a855f7", textClass: "text-purple-500", bgClass: "bg-purple-500" },
+    {
+      id: "custos",
+      name: "Custos",
+      subtitle: "Equipe & Pró-labore",
+      items: "Sidney, Patricia, Maisa, Gabriela, Celia",
+      value: custos,
+      pct: pctCustos,
+      color: "#f97316", // Electric Orange
+      glowColor: "rgba(249, 115, 22, 0.4)",
+      borderColor: "border-orange-500/30",
+      bgClass: "bg-orange-500/10",
+      textClass: "text-orange-500",
+      badgeClass: "bg-orange-500/20 text-orange-600 dark:text-orange-400 border-orange-500/30"
+    },
+    {
+      id: "despesas",
+      name: "Despesas",
+      subtitle: "Estruturais & ADM",
+      items: "Contador, Sistema, Aluguel, Luz, Internet, Marketing",
+      value: despesas,
+      pct: pctDespesas,
+      color: "#eab308", // Cyber Amber Gold
+      glowColor: "rgba(234, 179, 8, 0.4)",
+      borderColor: "border-amber-500/30",
+      bgClass: "bg-amber-500/10",
+      textClass: "text-amber-500",
+      badgeClass: "bg-amber-500/20 text-amber-600 dark:text-amber-400 border-amber-500/30"
+    },
+    {
+      id: "investimentos",
+      name: "Investimentos",
+      subtitle: "Patrimônio & Futuro",
+      items: "Aplicações financeiras, Reformas, Equipamentos",
+      value: investimentos,
+      pct: pctInvestimentos,
+      color: "#06b6d4", // Neon Cyan
+      glowColor: "rgba(6, 182, 212, 0.4)",
+      borderColor: "border-cyan-500/30",
+      bgClass: "bg-cyan-500/10",
+      textClass: "text-cyan-500",
+      badgeClass: "bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 border-cyan-500/30"
+    },
+    {
+      id: "gastos",
+      name: "Gastos",
+      subtitle: "Insumos & Rotina",
+      items: "Alimentação, Pão, Lanches, Embalagens, Papelaria, Limpeza",
+      value: gastos,
+      pct: pctGastos,
+      color: "#a855f7", // Cyber Purple
+      glowColor: "rgba(168, 85, 247, 0.4)",
+      borderColor: "border-purple-500/30",
+      bgClass: "bg-purple-500/10",
+      textClass: "text-purple-500",
+      badgeClass: "bg-purple-500/20 text-purple-600 dark:text-purple-400 border-purple-500/30"
+    }
   ];
 
-  // Coordenadas para Donut SVG (raio 40, centro 50, 50)
-  const radius = 38;
+  // Geometria do Donut SVG Futurista
+  const radius = 80;
+  const strokeWidth = 18;
+  const activeStrokeWidth = 24;
   const circumference = 2 * Math.PI * radius;
-  let strokeDashOffsetAccumulator = 0;
+
+  // Acumulador de offsets angulares
+  let offsetAccumulator = 0;
+  const arcSegments = segments.map((seg) => {
+    const fraction = totalSaidas > 0 ? seg.value / totalSaidas : 0;
+    const arcLength = fraction * circumference;
+    const offset = -offsetAccumulator;
+    offsetAccumulator += arcLength;
+
+    // Espaçamento visual fino de 2px entre arcos se houver mais de uma categoria
+    const gap = totalSaidas > 0 && fraction < 1 ? 2.5 : 0;
+    const dashLength = Math.max(0, arcLength - gap);
+    const spaceLength = circumference - dashLength;
+
+    return {
+      ...seg,
+      arcLength,
+      dasharray: `${dashLength} ${spaceLength}`,
+      dashoffset: offset
+    };
+  });
+
+  // Categoria ativa selecionada ou destacada
+  const currentInspect = segments.find(s => s.id === activeCategory);
 
   return (
-    <Card className="card-print border-accent/20 bg-card/60 backdrop-blur-sm overflow-hidden shadow-sm transition-all print:border-none print:shadow-none print:m-0">
-      <CardHeader className="p-3 sm:p-4 pb-2 border-b bg-muted/20 flex flex-row items-center justify-between no-print">
-        <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-accent/10 text-accent">
-            <PieIcon className="h-4 w-4" />
+    <Card className="card-print border border-accent/20 bg-card/60 backdrop-blur-md overflow-hidden shadow-lg transition-all print:border-none print:shadow-none print:m-0 relative">
+      {/* Detalhes de cantos cibernéticos (estilo viewfinder HUD) */}
+      <div className="absolute top-0 left-0 w-2.5 h-2.5 border-t-2 border-l-2 border-accent/60 pointer-events-none no-print" />
+      <div className="absolute top-0 right-0 w-2.5 h-2.5 border-t-2 border-r-2 border-accent/60 pointer-events-none no-print" />
+      <div className="absolute bottom-0 left-0 w-2.5 h-2.5 border-b-2 border-l-2 border-accent/60 pointer-events-none no-print" />
+      <div className="absolute bottom-0 right-0 w-2.5 h-2.5 border-b-2 border-r-2 border-accent/60 pointer-events-none no-print" />
+
+      {/* Header do HUD */}
+      <CardHeader className="p-3 sm:p-4 pb-2.5 border-b bg-muted/30 flex flex-row items-center justify-between no-print">
+        <div className="flex items-center gap-2.5">
+          <div className="relative p-2 rounded-xl bg-accent/10 text-accent border border-accent/20 shadow-xs">
+            <Cpu className="h-4 w-4 animate-pulse" />
+            <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-accent"></span>
+            </span>
           </div>
           <div>
-            <CardTitle className="text-xs sm:text-sm font-bold flex items-center gap-1.5">
-              Infográfico Gerencial de Desempenho
-              <span className="text-[10px] font-normal text-muted-foreground">({periodLabel})</span>
-            </CardTitle>
-            <CardDescription className="text-[10px] sm:text-xs text-muted-foreground">
-              Composição orçamentária das 5 categorias e indicadores de saúde financeira.
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-xs sm:text-sm font-black tracking-tight flex items-center gap-1.5 font-headline">
+                Infográfico Gerencial Futurista
+              </CardTitle>
+              <Badge variant="outline" className="text-[9px] h-4 px-1.5 font-mono uppercase bg-accent/5 border-accent/30 text-accent">
+                HUD v2.5
+              </Badge>
+              <span className="text-[10px] font-mono text-muted-foreground">({periodLabel})</span>
+            </div>
+            <CardDescription className="text-[10px] sm:text-xs text-muted-foreground flex items-center gap-1.5 mt-0.5">
+              <span>Radar holográfico das 5 categorias e telemetria de saúde de caixa</span>
             </CardDescription>
           </div>
         </div>
 
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-7 text-[10px] sm:text-xs gap-1 text-muted-foreground hover:text-foreground"
-          onClick={() => setIsOpen(!isOpen)}
-        >
-          {isOpen ? (
-            <>
-              <span>Recolher</span>
-              <ChevronUp className="h-3.5 w-3.5" />
-            </>
-          ) : (
-            <>
-              <span>Expandir</span>
-              <ChevronDown className="h-3.5 w-3.5" />
-            </>
+        <div className="flex items-center gap-1.5">
+          {activeCategory && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 text-[10px] px-2 gap-1 text-muted-foreground hover:text-foreground"
+              onClick={() => setActiveCategory(null)}
+              title="Voltar ao Resumo Geral"
+            >
+              <RotateCcw className="h-3 w-3" />
+              <span className="hidden sm:inline">Visão Geral</span>
+            </Button>
           )}
-        </Button>
-      </CardHeader>
 
-      {/* Conteúdo do Infográfico (sempre visível na impressão; toggleável na tela) */}
-      <div className={cn("p-3 sm:p-5 space-y-4 print:p-2 print:space-y-2", !isOpen && "hidden print:block")}>
-        {/* 1. RÉGUA DE DISTRIBUIÇÃO ORÇAMENTÁRIA VISUAL */}
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between text-[11px] sm:text-xs">
-            <span className="font-semibold text-muted-foreground flex items-center gap-1.5">
-              <Layers className="h-3.5 w-3.5 text-accent" /> Distribuição das Saídas
-            </span>
-            <span className="font-mono text-muted-foreground">
-              Total Saídas: <strong>{formatCurrency(totalSaidas)}</strong>
-            </span>
-          </div>
-
-          {/* Barra de Progresso Segmentada */}
-          <div className="h-3.5 sm:h-4 w-full rounded-full overflow-hidden flex bg-muted/40 p-0.5 border shadow-inner">
-            {totalSaidas > 0 ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 text-[10px] sm:text-xs gap-1 text-muted-foreground hover:text-foreground border border-border/50 rounded-lg px-2"
+            onClick={() => setIsOpen(!isOpen)}
+          >
+            {isOpen ? (
               <>
-                {pctCustos > 0 && (
-                  <div
-                    style={{ width: `${pctCustos}%` }}
-                    className="h-full bg-orange-500 rounded-l-full transition-all duration-500 relative group"
-                    title={`Custos: ${formatCurrency(custos)} (${pctCustos.toFixed(1)}%)`}
-                  />
-                )}
-                {pctDespesas > 0 && (
-                  <div
-                    style={{ width: `${pctDespesas}%` }}
-                    className="h-full bg-amber-500 transition-all duration-500 relative group"
-                    title={`Despesas: ${formatCurrency(despesas)} (${pctDespesas.toFixed(1)}%)`}
-                  />
-                )}
-                {pctInvestimentos > 0 && (
-                  <div
-                    style={{ width: `${pctInvestimentos}%` }}
-                    className="h-full bg-blue-500 transition-all duration-500 relative group"
-                    title={`Investimentos: ${formatCurrency(investimentos)} (${pctInvestimentos.toFixed(1)}%)`}
-                  />
-                )}
-                {pctGastos > 0 && (
-                  <div
-                    style={{ width: `${pctGastos}%` }}
-                    className="h-full bg-purple-500 rounded-r-full transition-all duration-500 relative group"
-                    title={`Gastos: ${formatCurrency(gastos)} (${pctGastos.toFixed(1)}%)`}
-                  />
-                )}
+                <span>Recolher</span>
+                <ChevronUp className="h-3.5 w-3.5" />
               </>
             ) : (
-              <div className="w-full h-full bg-muted/30 flex items-center justify-center text-[9px] text-muted-foreground">
-                Sem saídas registradas neste período
-              </div>
+              <>
+                <span>Expandir</span>
+                <ChevronDown className="h-3.5 w-3.5" />
+              </>
             )}
+          </Button>
+        </div>
+      </CardHeader>
+
+      {/* Corpo do Infográfico (Visível na tela com toggle; sempre impresso no papel) */}
+      <div className={cn("p-3 sm:p-5 space-y-4 print:p-2 print:space-y-3", !isOpen && "hidden print:block")}>
+        
+        {/* SEÇÃO PRINCIPAL: DONUT HOLOGRÁFICO + PAINEL DE TELEMETRIA DAS 5 CATEGORIAS */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+          
+          {/* COLUNA 1: O GRÁFICO DE PIZZA / ROSCA HOLOGRÁFICO (SVG INTERATIVO) */}
+          <div className="lg:col-span-5 flex flex-col items-center justify-center p-2 relative">
+            <div className="relative w-[240px] h-[240px] sm:w-[270px] sm:h-[270px] flex items-center justify-center">
+              
+              {/* Efeito radial de fundo */}
+              <div 
+                className="absolute inset-4 rounded-full blur-2xl opacity-20 pointer-events-none transition-all duration-700"
+                style={{
+                  background: currentInspect 
+                    ? currentInspect.glowColor 
+                    : margemLiquida >= 0 ? "rgba(16, 185, 129, 0.3)" : "rgba(239, 68, 68, 0.3)"
+                }}
+              />
+
+              {/* SVG Principal do Gráfico Donut Futurista */}
+              <svg 
+                viewBox="0 0 240 240" 
+                className="w-full h-full transform -rotate-90 filter drop-shadow-[0_4px_12px_rgba(0,0,0,0.15)]"
+              >
+                {/* Defs para filtros e gradientes */}
+                <defs>
+                  <filter id="cyber-glow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="3" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                  </filter>
+                </defs>
+
+                {/* Radar: Grade circular concêntrica de marcação cibernética */}
+                <circle cx="120" cy="120" r="108" fill="none" stroke="currentColor" strokeWidth="0.8" className="text-muted-foreground/15 stroke-dasharray-[2_6]" />
+                <circle cx="120" cy="120" r="62" fill="none" stroke="currentColor" strokeWidth="0.8" className="text-muted-foreground/15" />
+
+                {/* Linhas cruzadas cibernéticas (crosshairs em 0, 90, 180, 270 graus) */}
+                <line x1="120" y1="4" x2="120" y2="14" stroke="currentColor" strokeWidth="1" className="text-accent/40" />
+                <line x1="120" y1="226" x2="120" y2="236" stroke="currentColor" strokeWidth="1" className="text-accent/40" />
+                <line x1="4" y1="120" x2="14" y2="120" stroke="currentColor" strokeWidth="1" className="text-accent/40" />
+                <line x1="226" y1="120" x2="236" y2="120" stroke="currentColor" strokeWidth="1" className="text-accent/40" />
+
+                {/* Trilha base do Donut (caso sem saídas) */}
+                <circle
+                  cx="120"
+                  cy="120"
+                  r={radius}
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={strokeWidth}
+                  className="text-muted/30"
+                />
+
+                {/* Arcos Segmentados de Cada Categoria de Saída */}
+                {totalSaidas > 0 ? (
+                  arcSegments.map((seg) => {
+                    const isSelected = activeCategory === seg.id;
+                    const isOtherSelected = activeCategory && activeCategory !== seg.id;
+
+                    return (
+                      <circle
+                        key={seg.id}
+                        cx="120"
+                        cy="120"
+                        r={radius}
+                        fill="none"
+                        stroke={seg.color}
+                        strokeWidth={isSelected ? activeStrokeWidth : strokeWidth}
+                        strokeDasharray={seg.dasharray}
+                        strokeDashoffset={seg.dashoffset}
+                        strokeLinecap="round"
+                        className={cn(
+                          "cursor-pointer transition-all duration-300 hover:opacity-100",
+                          isOtherSelected ? "opacity-30" : "opacity-95"
+                        )}
+                        style={{
+                          filter: isSelected ? `drop-shadow(0 0 6px ${seg.color})` : undefined
+                        }}
+                        onMouseEnter={() => setActiveCategory(seg.id)}
+                        onMouseLeave={() => setActiveCategory(null)}
+                        onClick={() => setActiveCategory(prev => prev === seg.id ? null : seg.id)}
+                      />
+                    );
+                  })
+                ) : (
+                  <circle
+                    cx="120"
+                    cy="120"
+                    r={radius}
+                    fill="none"
+                    stroke="#10b981"
+                    strokeWidth={strokeWidth}
+                    strokeDasharray={`${circumference} 0`}
+                    opacity={0.3}
+                  />
+                )}
+              </svg>
+
+              {/* NÚCLEO CENTRAL DO HUD (Informações Dinâmicas de Alto Impacto) */}
+              <div 
+                className="absolute inset-0 flex flex-col items-center justify-center text-center p-4 pointer-events-auto cursor-pointer"
+                onClick={() => setActiveCategory(null)}
+                title="Clique para alternar visão geral"
+              >
+                {currentInspect ? (
+                  /* Exibição quando uma categoria está sob mira/hover */
+                  <div className="space-y-0.5 animate-in fade-in zoom-in-95 duration-200">
+                    <span 
+                      className="text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full font-mono inline-block mb-0.5"
+                      style={{ backgroundColor: currentInspect.color + '20', color: currentInspect.color }}
+                    >
+                      {currentInspect.name}
+                    </span>
+                    <div className="text-base sm:text-lg font-black font-mono tracking-tight text-foreground">
+                      {formatCurrency(currentInspect.value)}
+                    </div>
+                    <div className="text-[11px] font-black font-mono" style={{ color: currentInspect.color }}>
+                      {currentInspect.pct.toFixed(1)}% das saídas
+                    </div>
+                    <span className="text-[8.5px] text-muted-foreground block max-w-[120px] truncate mx-auto">
+                      {currentInspect.subtitle}
+                    </span>
+                  </div>
+                ) : (
+                  /* Exibição Geral Padrão (Saldo Líquido / Margem Operacional) */
+                  <div className="space-y-0.5 animate-in fade-in duration-200">
+                    <span className="text-[8.5px] font-mono uppercase tracking-wider text-muted-foreground flex items-center justify-center gap-1">
+                      <Crosshair className="h-2.5 w-2.5 text-accent" />
+                      Margem Líquida
+                    </span>
+                    <div className={cn(
+                      "text-lg sm:text-2xl font-black font-mono tracking-tight",
+                      margemLiquida >= 0 ? "text-emerald-500" : "text-red-500"
+                    )}>
+                      {margemLiquida >= 0 ? `+${margemLiquida.toFixed(1)}%` : `${margemLiquida.toFixed(1)}%`}
+                    </div>
+                    <div className="text-[9.5px] font-mono text-muted-foreground">
+                      Sobra: <strong className={margemLiquida >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500"}>
+                        {formatCurrency(receitas - totalSaidas)}
+                      </strong>
+                    </div>
+                    <div className="pt-0.5">
+                      <span className={cn(
+                        "inline-flex items-center gap-1 text-[8px] font-bold px-1.5 py-0.5 rounded-md",
+                        margemLiquida >= 20 ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20" :
+                        margemLiquida >= 0 ? "bg-sky-500/10 text-sky-600 border border-sky-500/20" :
+                        "bg-red-500/10 text-red-600 border border-red-500/20"
+                      )}>
+                        <span className={cn(
+                          "h-1.5 w-1.5 rounded-full shrink-0 animate-pulse",
+                          margemLiquida >= 0 ? "bg-emerald-500" : "bg-red-500"
+                        )} />
+                        {margemLiquida >= 20 ? "Caixa Blindado" : margemLiquida >= 0 ? "Operação Estável" : "Déficit Operacional"}
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Subtítulo auxiliar do Donut */}
+            <p className="text-[9.5px] font-mono text-muted-foreground mt-1 text-center no-print">
+              Passe o mouse ou toque nos arcos para inspecionar
+            </p>
           </div>
 
-          {/* Legenda com percentuais */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 text-[10px] sm:text-[11px]">
-            <div className="flex items-center justify-between p-1.5 px-2 rounded-lg bg-orange-500/10 border border-orange-500/20">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-orange-500 shrink-0" />
-                <span className="font-semibold text-orange-700 dark:text-orange-400">Custos</span>
+          {/* COLUNA 2: PAINEL HOLOGRÁFICO DETALHADO DAS 5 CATEGORIAS */}
+          <div className="lg:col-span-7 space-y-2">
+            
+            {/* Card Hero: RECEITAS (A fonte motriz) */}
+            <div 
+              className={cn(
+                "p-2.5 sm:p-3 rounded-xl border transition-all duration-200 relative overflow-hidden flex items-center justify-between gap-3",
+                "bg-emerald-500/[0.04] border-emerald-500/30 hover:border-emerald-500/60"
+              )}
+            >
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shrink-0 border border-emerald-500/20">
+                  <Zap className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs sm:text-sm font-black font-headline text-emerald-800 dark:text-emerald-300">
+                      Receitas
+                    </span>
+                    <Badge variant="outline" className="text-[8px] h-3.5 px-1 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 font-mono">
+                      Faturamento Total
+                    </Badge>
+                  </div>
+                  <p className="text-[9.5px] text-muted-foreground truncate max-w-[280px]">
+                    Mensalidades escolares, matrículas e entradas financeiras
+                  </p>
+                </div>
               </div>
-              <span className="font-mono font-bold text-orange-700 dark:text-orange-400">
-                {pctCustos.toFixed(1)}%
-              </span>
+
+              <div className="text-right shrink-0">
+                <div className="text-sm sm:text-base font-black font-mono text-emerald-600 dark:text-emerald-400">
+                  {formatCurrency(receitas)}
+                </div>
+                <span className="text-[9px] font-mono text-muted-foreground block">
+                  100% da arrecadação
+                </span>
+              </div>
             </div>
 
-            <div className="flex items-center justify-between p-1.5 px-2 rounded-lg bg-amber-500/10 border border-amber-500/20">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />
-                <span className="font-semibold text-amber-700 dark:text-amber-400">Despesas</span>
-              </div>
-              <span className="font-mono font-bold text-amber-700 dark:text-amber-400">
-                {pctDespesas.toFixed(1)}%
-              </span>
-            </div>
+            {/* Grid com os 4 Pilares de Saída (Custos, Despesas, Investimentos, Gastos) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              {segments.map((seg) => {
+                const isSelected = activeCategory === seg.id;
 
-            <div className="flex items-center justify-between p-1.5 px-2 rounded-lg bg-blue-500/10 border border-blue-500/20">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />
-                <span className="font-semibold text-blue-700 dark:text-blue-400">Investimentos</span>
-              </div>
-              <span className="font-mono font-bold text-blue-700 dark:text-blue-400">
-                {pctInvestimentos.toFixed(1)}%
-              </span>
-            </div>
+                return (
+                  <div
+                    key={seg.id}
+                    className={cn(
+                      "p-2.5 rounded-xl border transition-all duration-200 cursor-pointer relative group",
+                      seg.borderColor,
+                      isSelected ? `${seg.bgClass} ring-2 ring-accent scale-[1.01] shadow-md` : "bg-card/70 hover:bg-muted/30"
+                    )}
+                    onMouseEnter={() => setActiveCategory(seg.id)}
+                    onMouseLeave={() => setActiveCategory(null)}
+                    onClick={() => setActiveCategory(prev => prev === seg.id ? null : seg.id)}
+                  >
+                    <div className="flex items-start justify-between gap-1">
+                      <div className="flex items-center gap-1.5">
+                        <span 
+                          className="h-2.5 w-2.5 rounded-full shrink-0 shadow-xs"
+                          style={{ backgroundColor: seg.color }}
+                        />
+                        <span className="text-xs font-bold leading-tight">
+                          {seg.name}
+                        </span>
+                      </div>
+                      <span className="text-xs font-black font-mono" style={{ color: seg.color }}>
+                        {formatCurrency(seg.value)}
+                      </span>
+                    </div>
 
-            <div className="flex items-center justify-between p-1.5 px-2 rounded-lg bg-purple-500/10 border border-purple-500/20">
-              <div className="flex items-center gap-1.5">
-                <span className="h-2 w-2 rounded-full bg-purple-500 shrink-0" />
-                <span className="font-semibold text-purple-700 dark:text-purple-400">Gastos</span>
-              </div>
-              <span className="font-mono font-bold text-purple-700 dark:text-purple-400">
-                {pctGastos.toFixed(1)}%
-              </span>
+                    <div className="flex items-center justify-between text-[9px] text-muted-foreground mt-1">
+                      <span className="truncate max-w-[130px]">{seg.subtitle}</span>
+                      <strong className="font-mono">{seg.pct.toFixed(1)}% das saídas</strong>
+                    </div>
+
+                    {/* Mini barra de preenchimento cyber */}
+                    <div className="h-1.5 w-full rounded-full bg-muted/40 mt-1.5 overflow-hidden p-0.5 border border-border/30">
+                      <div
+                        style={{ width: `${Math.min(100, seg.pct)}%`, backgroundColor: seg.color }}
+                        className="h-full rounded-full transition-all duration-500"
+                      />
+                    </div>
+
+                    <p className="text-[8px] text-muted-foreground/80 line-clamp-1 mt-1 font-mono italic">
+                      {seg.items}
+                    </p>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
 
-        {/* 2. GRID DE DIAGNÓSTICO E SAÚDE OPERACIONAL */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-2.5 pt-1">
-          {/* Card A: Margem Líquida */}
-          <div className="p-3 rounded-xl border bg-card/80 flex items-center justify-between gap-3 shadow-xs">
-            <div>
-              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
-                Margem Líquida Operacional
+        {/* SEÇÃO 2: COCKPIT DE TELEMETRIA E DIAGNÓSTICO OPERACIONAL (4 MÓDULOS) */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-1 border-t border-border/50">
+          
+          {/* Módulo 1: Margem Líquida */}
+          <div className="p-2.5 rounded-xl border bg-card/60 relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                Margem Líquida
               </span>
-              <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className={cn(
-                  "text-lg sm:text-xl font-black font-mono",
-                  margemLiquida >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600"
-                )}>
-                  {margemLiquida >= 0 ? `+${margemLiquida.toFixed(1)}%` : `${margemLiquida.toFixed(1)}%`}
-                </span>
-                <span className="text-[10px] text-muted-foreground">do faturamento</span>
-              </div>
-              <p className="text-[9.5px] text-muted-foreground mt-0.5">
-                {margemLiquida >= 20 ? "Operação altamente sustentável" : margemLiquida >= 0 ? "Caixa positivo no período" : "Atenção: saídas superaram entradas"}
-              </p>
+              <Activity className="h-3.5 w-3.5 text-accent" />
             </div>
-            <div className={cn(
-              "p-2.5 rounded-xl shrink-0",
-              margemLiquida >= 0 ? "bg-emerald-500/10 text-emerald-600" : "bg-red-500/10 text-red-600"
-            )}>
-              {margemLiquida >= 0 ? <TrendingUp className="h-5 w-5" /> : <TrendingDown className="h-5 w-5" />}
+            <div className="flex items-baseline gap-1 mt-1">
+              <span className={cn(
+                "text-base sm:text-lg font-black font-mono",
+                margemLiquida >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600"
+              )}>
+                {margemLiquida >= 0 ? `+${margemLiquida.toFixed(1)}%` : `${margemLiquida.toFixed(1)}%`}
+              </span>
             </div>
+            <p className="text-[8.5px] text-muted-foreground mt-0.5 truncate">
+              {margemLiquida >= 20 ? "Alta rentabilidade" : margemLiquida >= 0 ? "Saldo positivo" : "Atenção: déficit"}
+            </p>
           </div>
 
-          {/* Card B: Índice de Cobertura */}
-          <div className="p-3 rounded-xl border bg-card/80 flex items-center justify-between gap-3 shadow-xs">
-            <div>
-              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
-                Cobertura de Saídas
+          {/* Módulo 2: Cobertura de Saídas */}
+          <div className="p-2.5 rounded-xl border bg-card/60 relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                Cobertura
               </span>
-              <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className={cn(
-                  "text-lg sm:text-xl font-black font-mono",
-                  indiceCobertura >= 1 ? "text-emerald-600 dark:text-emerald-400" : "text-amber-600"
-                )}>
-                  {indiceCobertura.toFixed(2)}x
-                </span>
-                <span className="text-[10px] text-muted-foreground">Receitas / Saídas</span>
-              </div>
-              <p className="text-[9.5px] text-muted-foreground mt-0.5">
-                {indiceCobertura >= 1.2 ? "Margem de segurança confortável" : indiceCobertura >= 1 ? "Cobriu integralmente as contas" : "Déficit operacional no período"}
-              </p>
+              <ShieldCheck className="h-3.5 w-3.5 text-sky-500" />
             </div>
-            <div className={cn(
-              "p-2.5 rounded-xl shrink-0",
-              indiceCobertura >= 1 ? "bg-emerald-500/10 text-emerald-600" : "bg-amber-500/10 text-amber-600"
-            )}>
-              <ShieldCheck className="h-5 w-5" />
+            <div className="flex items-baseline gap-1 mt-1">
+              <span className={cn(
+                "text-base sm:text-lg font-black font-mono",
+                indiceCobertura >= 1 ? "text-sky-600 dark:text-sky-400" : "text-amber-500"
+              )}>
+                {indiceCobertura.toFixed(2)}x
+              </span>
             </div>
+            <p className="text-[8.5px] text-muted-foreground mt-0.5 truncate">
+              {indiceCobertura >= 1.2 ? "Margem confortável" : indiceCobertura >= 1 ? "Contas em dia" : "Saídas > Receitas"}
+            </p>
           </div>
 
-          {/* Card C: Patrimônio em Investimentos */}
-          <div className="p-3 rounded-xl border bg-card/80 flex items-center justify-between gap-3 shadow-xs">
-            <div>
-              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider block">
-                Investimentos Patrimoniais
+          {/* Módulo 3: Taxa de Reinvestimento */}
+          <div className="p-2.5 rounded-xl border bg-card/60 relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                Reinvestimento
               </span>
-              <div className="flex items-baseline gap-1.5 mt-0.5">
-                <span className="text-lg sm:text-xl font-black font-mono text-blue-600 dark:text-blue-400">
-                  {formatCurrency(investimentos)}
-                </span>
-              </div>
-              <p className="text-[9.5px] text-muted-foreground mt-0.5">
-                Aplicações, reformas e bens duráveis
-              </p>
+              <Sparkles className="h-3.5 w-3.5 text-cyan-500" />
             </div>
-            <div className="p-2.5 rounded-xl bg-blue-500/10 text-blue-600 shrink-0">
-              <Sparkles className="h-5 w-5" />
+            <div className="flex items-baseline gap-1 mt-1">
+              <span className="text-base sm:text-lg font-black font-mono text-cyan-600 dark:text-cyan-400">
+                {taxaInvestimento.toFixed(1)}%
+              </span>
+              <span className="text-[8.5px] text-muted-foreground">da receita</span>
             </div>
+            <p className="text-[8.5px] text-muted-foreground mt-0.5 truncate">
+              {formatCurrency(investimentos)} em bens
+            </p>
           </div>
+
+          {/* Módulo 4: Peso de Custos Fixos (Custos + Despesas) */}
+          <div className="p-2.5 rounded-xl border bg-card/60 relative overflow-hidden">
+            <div className="flex items-center justify-between">
+              <span className="text-[9px] font-bold uppercase tracking-wider text-muted-foreground">
+                Comprometimento
+              </span>
+              <Target className="h-3.5 w-3.5 text-orange-500" />
+            </div>
+            <div className="flex items-baseline gap-1 mt-1">
+              <span className="text-base sm:text-lg font-black font-mono text-orange-600 dark:text-orange-400">
+                {receitas > 0 ? (((custos + despesas) / receitas) * 100).toFixed(1) : 0}%
+              </span>
+              <span className="text-[8.5px] text-muted-foreground">fixos/rec.</span>
+            </div>
+            <p className="text-[8.5px] text-muted-foreground mt-0.5 truncate">
+              Equipe + Estrutura
+            </p>
+          </div>
+
         </div>
+
       </div>
     </Card>
   );
 }
-
