@@ -36,6 +36,7 @@ type TransactionType = "Entrada (Aluno)" | "Entrada (Outros)" | "Saída";
 
 const formSchema = z.object({
   type: z.enum(["Entrada (Aluno)", "Entrada (Outros)", "Saída"]),
+  category: z.string().optional(),
   description: z.string().min(3, "Descrição muito curta."),
   name: z.string().min(1, "O nome é obrigatório."),
   value: z.coerce.number().positive("O valor deve ser positivo."),
@@ -64,6 +65,7 @@ export function TransactionForm({ defaultValues, allowedTypes = allTypes, onSave
     resolver: zodResolver(formSchema),
     defaultValues: defaultValues || {
       type: allowedTypes[0],
+      category: allowedTypes[0].includes('Entrada') ? 'Receita' : 'Despesa',
       description: "",
       name: "",
       value: 0,
@@ -82,6 +84,20 @@ export function TransactionForm({ defaultValues, allowedTypes = allTypes, onSave
       control: form.control,
       name: "name"
   })
+
+  // Sincroniza categoria quando o tipo mudar
+  React.useEffect(() => {
+    const currentCat = form.getValues('category');
+    if (transactionType?.includes('Entrada')) {
+      if (currentCat !== 'Receita') {
+        form.setValue('category', 'Receita');
+      }
+    } else if (transactionType === 'Saída') {
+      if (!currentCat || currentCat === 'Receita') {
+        form.setValue('category', 'Despesa');
+      }
+    }
+  }, [transactionType, form]);
 
   React.useEffect(() => {
     if (transactionType === 'Entrada (Aluno)' && selectedStudentName) {
@@ -217,6 +233,61 @@ export function TransactionForm({ defaultValues, allowedTypes = allTypes, onSave
                     {allowedTypes.map(type => (
                         <SelectItem key={type} value={type}>{type}</SelectItem>
                     ))}
+                    </SelectContent>
+                </Select>
+                <FormMessage />
+                </FormItem>
+            )}
+            />
+
+            <FormField
+            control={form.control}
+            name="category"
+            render={({ field }) => (
+                <FormItem>
+                <FormLabel className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Categoria Gerencial</FormLabel>
+                <Select onValueChange={field.onChange} value={field.value || (transactionType?.includes('Entrada') ? 'Receita' : 'Despesa')}>
+                    <FormControl>
+                    <SelectTrigger className="h-11">
+                        <SelectValue placeholder="Selecione a categoria" />
+                    </SelectTrigger>
+                    </FormControl>
+                    <SelectContent className="rounded-xl">
+                    {transactionType?.includes('Entrada') ? (
+                        <SelectItem value="Receita">
+                          <span className="flex items-center gap-2 font-medium text-emerald-600">
+                            <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 shrink-0" />
+                            Receita (Mensalidades, Matrículas, Vendas, Eventos)
+                          </span>
+                        </SelectItem>
+                    ) : (
+                        <>
+                          <SelectItem value="Custo">
+                            <span className="flex items-center gap-2 font-medium text-orange-600">
+                              <span className="h-2.5 w-2.5 rounded-full bg-orange-500 shrink-0" />
+                              Custo (Salários Aulas, Professores, Lanches, Material de Aula)
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="Despesa">
+                            <span className="flex items-center gap-2 font-medium text-amber-600">
+                              <span className="h-2.5 w-2.5 rounded-full bg-amber-500 shrink-0" />
+                              Despesa (Aluguel, Luz, Água, Internet, Secretária, Contabilidade)
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="Investimento">
+                            <span className="flex items-center gap-2 font-medium text-blue-600">
+                              <span className="h-2.5 w-2.5 rounded-full bg-blue-500 shrink-0" />
+                              Investimento (Reformas, Equipamentos, Tatames, Computadores)
+                            </span>
+                          </SelectItem>
+                          <SelectItem value="Gasto">
+                            <span className="flex items-center gap-2 font-medium text-purple-600">
+                              <span className="h-2.5 w-2.5 rounded-full bg-purple-500 shrink-0" />
+                              Gasto (Manutenção, Imprevistos, Saídas Avulsas)
+                            </span>
+                          </SelectItem>
+                        </>
+                    )}
                     </SelectContent>
                 </Select>
                 <FormMessage />

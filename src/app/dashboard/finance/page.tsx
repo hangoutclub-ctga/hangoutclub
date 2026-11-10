@@ -32,8 +32,8 @@ import { ptBR } from "date-fns/locale";
 import { TransactionForm } from "@/components/transaction-form";
 import { FixedExpenseForm } from "@/components/fixed-expense-form";
 import { PayFixedExpenseForm } from "@/components/pay-fixed-expense-form";
-import { ArrowDownCircle, ArrowUpCircle, MinusCircle, Printer, AlertCircle, CheckCircle, Trash2, FilterX, Calendar as CalendarIcon, DollarSign, PlusCircle, Eye, CreditCard, ChevronLeft, Home, ShieldAlert, FileSpreadsheet } from 'lucide-react';
-import { Transaction, Student, FixedExpense } from "@/types";
+import { ArrowDownCircle, ArrowUpCircle, MinusCircle, Printer, AlertCircle, CheckCircle, Trash2, FilterX, Calendar as CalendarIcon, DollarSign, PlusCircle, Eye, CreditCard, ChevronLeft, Home, ShieldAlert, FileSpreadsheet, Paperclip, Download, Pencil } from 'lucide-react';
+import { Transaction, Student, FixedExpense, normalizeTransactionCategory, TransactionCategory } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "@/hooks/use-toast";
@@ -44,6 +44,7 @@ import { useRouter } from "next/navigation";
 import { useLoading } from "@/hooks/use-loading";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import { BankStatementImporter } from "@/components/bank-statement-importer";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export default function FinancePage() {
     const { hasPermission } = useAuth();
@@ -54,6 +55,7 @@ export default function FinancePage() {
         fixedExpenses, 
         students, 
         addTransaction, 
+        updateTransaction,
         deleteTransaction, 
         addFixedExpense, 
         updateFixedExpense,
@@ -77,6 +79,11 @@ export default function FinancePage() {
     const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
     const [fixedExpenseToDelete, setFixedExpenseToDelete] = useState<FixedExpense | null>(null);
     const [isImporterOpen, setIsImporterOpen] = useState(false);
+
+    const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
+    const [viewingTransaction, setViewingTransaction] = useState<Transaction | null>(null);
+    const [editingFixedExpense, setEditingFixedExpense] = useState<FixedExpense | null>(null);
+    const [viewingFixedExpense, setViewingFixedExpense] = useState<FixedExpense | null>(null);
 
     const canEdit = hasPermission('finance:edit');
     const canView = hasPermission('nav:finance');
@@ -113,27 +120,122 @@ export default function FinancePage() {
         return { income, outcome, fixed: pendingFixed, profit: income - outcome };
     }, [filteredByDate, activeFixedExpenses]);
 
+    const categoryTotals = useMemo(() => {
+        let receitas = 0;
+        let custos = 0;
+        let despesas = 0;
+        let investimentos = 0;
+        let gastos = 0;
+
+        for (const t of filteredByDate) {
+            const cat = normalizeTransactionCategory(t.category, t.type);
+            if (cat === 'Receita') receitas += t.value;
+            else if (cat === 'Custo') custos += t.value;
+            else if (cat === 'Investimento') investimentos += t.value;
+            else if (cat === 'Gasto') gastos += t.value;
+            else despesas += t.value;
+        }
+
+        return { receitas, custos, despesas, investimentos, gastos };
+    }, [filteredByDate]);
+
     const filteredTransactions = useMemo(() => {
         if (filter === "Todos") return filteredByDate;
         if (filter === "Entradas") return filteredByDate.filter(t => t.type === "Entrada");
         if (filter === "Saídas") return filteredByDate.filter(t => t.type === "Saída");
+        if (filter === "Receitas") return filteredByDate.filter(t => normalizeTransactionCategory(t.category, t.type) === "Receita");
+        if (filter === "Custos") return filteredByDate.filter(t => normalizeTransactionCategory(t.category, t.type) === "Custo");
+        if (filter === "Despesas") return filteredByDate.filter(t => normalizeTransactionCategory(t.category, t.type) === "Despesa");
+        if (filter === "Investimentos") return filteredByDate.filter(t => normalizeTransactionCategory(t.category, t.type) === "Investimento");
+        if (filter === "Gastos") return filteredByDate.filter(t => normalizeTransactionCategory(t.category, t.type) === "Gasto");
         return filteredByDate;
     }, [filteredByDate, filter]);
 
+    const renderCategoryBadge = (category?: string, type?: 'Entrada' | 'Saída' | string) => {
+        const cat = normalizeTransactionCategory(category, type);
+        switch (cat) {
+            case 'Receita':
+                return (
+                    <Badge variant="outline" className="text-[8px] h-3.5 py-0 px-1.5 font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 shrink-0">
+                        Receita
+                    </Badge>
+                );
+            case 'Custo':
+                return (
+                    <Badge variant="outline" className="text-[8px] h-3.5 py-0 px-1.5 font-semibold bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30 shrink-0">
+                        Custo
+                    </Badge>
+                );
+            case 'Despesa':
+                return (
+                    <Badge variant="outline" className="text-[8px] h-3.5 py-0 px-1.5 font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 shrink-0">
+                        Despesa
+                    </Badge>
+                );
+            case 'Investimento':
+                return (
+                    <Badge variant="outline" className="text-[8px] h-3.5 py-0 px-1.5 font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30 shrink-0">
+                        Investimento
+                    </Badge>
+                );
+            case 'Gasto':
+                return (
+                    <Badge variant="outline" className="text-[8px] h-3.5 py-0 px-1.5 font-semibold bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30 shrink-0">
+                        Gasto
+                    </Badge>
+                );
+            default:
+                return <Badge variant="outline" className="text-[8px] h-3.5 py-0 px-1.5 font-semibold shrink-0">{cat}</Badge>;
+        }
+    };
+
+    // Localiza se há anexo de extrato bancário importado para este mês
+    const statementAttachmentUrl = useMemo(() => {
+        const tx = filteredByDate.find(t => 
+            t.receiptUrl && (
+                t.receiptUrl.toLowerCase().includes('.xlsx') || 
+                t.receiptUrl.toLowerCase().includes('.xls') || 
+                t.receiptUrl.toLowerCase().includes('.csv') || 
+                t.receiptUrl.toLowerCase().includes('.ofx') || 
+                t.receiptUrl.toLowerCase().includes('/extratos/')
+            )
+        );
+        return tx?.receiptUrl;
+    }, [filteredByDate]);
+
     const handleSaveTransaction = async (data: any) => {
         try {
-            await addTransaction({
-                type: data.type.includes('Entrada') ? 'Entrada' : 'Saída',
-                category: data.type === 'Entrada (Aluno)' ? 'Aluno' : 'Outros',
-                name: data.name,
-                description: data.description,
-                value: data.value,
-                date: data.date.toISOString(),
-                receiptUrl: data.receiptUrl,
-                paymentMethod: data.paymentMethod
-            });
-            toast({ title: "Transação Registrada!", description: "Salva com sucesso." });
+            const isIncome = data.type.includes('Entrada');
+            const chosenCategory = data.category || (isIncome ? 'Receita' : 'Despesa');
+            const normalizedCat = normalizeTransactionCategory(chosenCategory, isIncome ? 'Entrada' : 'Saída');
+
+            if (editingTransaction) {
+                await updateTransaction(editingTransaction.id, {
+                    type: isIncome ? 'Entrada' : 'Saída',
+                    category: normalizedCat,
+                    name: data.name,
+                    description: data.description,
+                    value: data.value,
+                    date: data.date.toISOString(),
+                    receiptUrl: data.receiptUrl,
+                    paymentMethod: data.paymentMethod
+                });
+                toast({ title: "Transação Atualizada!", description: "Alterações salvas com sucesso." });
+            } else {
+                await addTransaction({
+                    type: isIncome ? 'Entrada' : 'Saída',
+                    category: normalizedCat,
+                    name: data.name,
+                    description: data.description,
+                    value: data.value,
+                    date: data.date.toISOString(),
+                    receiptUrl: data.receiptUrl,
+                    paymentMethod: data.paymentMethod
+                });
+                toast({ title: "Transação Registrada!", description: "Salva com sucesso." });
+            }
             setIsFormOpen(false);
+            setEditingTransaction(null);
             setPrefilledData(undefined);
         } catch (err: any) {
             toast({ variant: 'destructive', title: "Erro ao salvar transação", description: err.message });
@@ -171,22 +273,30 @@ export default function FinancePage() {
 
     const handleSaveFixedExpense = async (data: any) => {
         try {
-            await addFixedExpense({
-                description: data.description,
-                value: data.value,
-                status: 'Pendente',
-                month: currentMonth,
-                year: currentYear,
-                dueDate: data.dueDate
-            });
-            toast({ title: "Despesa Fixa Adicionada!", description: "Salva com sucesso." });
+            if (editingFixedExpense) {
+                await updateFixedExpense(editingFixedExpense.id, {
+                    description: data.description,
+                    value: data.value,
+                    dueDate: data.dueDate
+                });
+                toast({ title: "Despesa Fixa Atualizada!", description: "Alterações salvas com sucesso." });
+            } else {
+                await addFixedExpense({
+                    description: data.description,
+                    value: data.value,
+                    status: 'Pendente',
+                    month: currentMonth,
+                    year: currentYear,
+                    dueDate: data.dueDate
+                });
+                toast({ title: "Despesa Fixa Adicionada!", description: "Salva com sucesso." });
+            }
             setIsFixedFormOpen(false);
+            setEditingFixedExpense(null);
         } catch (err: any) {
-            toast({ variant: 'destructive', title: "Erro ao criar despesa fixa", description: err.message });
+            toast({ variant: 'destructive', title: "Erro ao salvar despesa fixa", description: err.message });
         }
     };
-
-
 
     const pendingStudents = useMemo(() => {
         return students
@@ -217,13 +327,48 @@ export default function FinancePage() {
             .filter(s => !s.isPaid);
     }, [students, filteredByDate]);
 
+    const handleOpenEditTransaction = (t: Transaction) => {
+        setEditingTransaction(t);
+        const formType = t.type === 'Entrada' 
+            ? (t.category === 'Aluno' ? 'Entrada (Aluno)' : 'Entrada (Outros)')
+            : 'Saída';
+
+        let parsedDate = new Date();
+        try {
+            const d = new Date(t.date);
+            if (!isNaN(d.getTime())) parsedDate = d;
+        } catch {}
+
+        setPrefilledData({
+            type: formType,
+            category: normalizeTransactionCategory(t.category, t.type as any),
+            name: t.name || '',
+            description: t.description || '',
+            value: t.value || 0,
+            date: parsedDate,
+            paymentMethod: t.paymentMethod || 'Dinheiro',
+            receiptUrl: t.receiptUrl || ''
+        });
+        setIsFormOpen(true);
+    };
+
+    const handleOpenEditFixedExpense = (f: FixedExpense) => {
+        setEditingFixedExpense(f);
+        setIsFixedFormOpen(true);
+    };
+
     const handleOpenForm = (student?: any) => {
+        setEditingTransaction(null);
         if (student) {
             setPrefilledData({
                 type: 'Entrada (Aluno)',
+                category: 'Receita',
                 name: student.name,
                 value: student.remaining > 0 ? student.remaining : (student.monthlyFee || 0),
-                description: `Mensalidade ${months.find(m => m.value === currentMonth)?.label || ''}`
+                description: `Mensalidade ${months.find(m => m.value === currentMonth)?.label || ''}`,
+                date: new Date(),
+                paymentMethod: 'PIX',
+                receiptUrl: ''
             });
         } else {
             setPrefilledData(undefined);
@@ -286,17 +431,33 @@ export default function FinancePage() {
                     <FileSpreadsheet className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                 </Button>
 
+                {statementAttachmentUrl && (
+                    <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-10 border-emerald-600/40 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 gap-1.5 shadow-sm font-semibold"
+                        onClick={() => handleViewReceipt(statementAttachmentUrl)}
+                        title="Consultar anexo do extrato bancário importado para este mês"
+                    >
+                        <Paperclip className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                        <span className="hidden sm:inline">Anexo do Extrato</span>
+                    </Button>
+                )}
+
                 {filter === "Despesas Fixas" && (
-                    <Dialog open={isFixedFormOpen} onOpenChange={setIsFixedFormOpen}>
-                        <Button size="sm" variant="outline" className="h-10 border-accent text-accent hover:bg-accent/5 px-4 shadow-md" onClick={() => setIsFixedFormOpen(true)}>
-                            <PlusCircle className="h-4 w-4 mr-2" />
-                            <span className="hidden sm:inline">Nova Despesa Fixa</span>
-                        </Button>
-                        <DialogContent className="sm:max-w-[500px] rounded-2xl w-[94vw]">
-                            <DialogHeader><DialogTitle>Adicionar Despesa Fixa</DialogTitle></DialogHeader>
-                            <FixedExpenseForm onSave={handleSaveFixedExpense} onCancel={() => setIsFixedFormOpen(false)} />
-                        </DialogContent>
-                    </Dialog>
+                    <Button 
+                        size="sm" 
+                        variant="outline" 
+                        className="h-10 border-accent text-accent hover:bg-accent/5 px-4 shadow-md" 
+                        disabled={!canEdit}
+                        onClick={() => {
+                            setEditingFixedExpense(null);
+                            setIsFixedFormOpen(true);
+                        }}
+                    >
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        <span className="hidden sm:inline">Nova Despesa Fixa</span>
+                    </Button>
                 )}
                 <Button size="sm" className="bg-accent hover:bg-accent/90 h-10 w-9 sm:w-auto px-0 sm:px-4 shadow-md" disabled={!canEdit} onClick={() => handleOpenForm()}>
                     <DollarSign className="h-4 w-4 sm:mr-2" />
@@ -304,16 +465,51 @@ export default function FinancePage() {
                 </Button>
                 <Dialog open={isFormOpen} onOpenChange={(open) => {
                     setIsFormOpen(open);
-                    if (!open) setPrefilledData(undefined);
+                    if (!open) {
+                        setEditingTransaction(null);
+                        setPrefilledData(undefined);
+                    }
                 }}>
                     <DialogContent className="sm:max-w-[500px] rounded-2xl w-[94vw]">
-                        <DialogHeader><DialogTitle>Registrar Transação</DialogTitle></DialogHeader>
+                        <DialogHeader>
+                            <DialogTitle>{editingTransaction ? "Editar Transação" : "Registrar Transação"}</DialogTitle>
+                        </DialogHeader>
                         <TransactionForm 
-                            key={prefilledData ? JSON.stringify(prefilledData) : 'new'}
+                            key={editingTransaction ? `edit-${editingTransaction.id}` : (prefilledData ? JSON.stringify(prefilledData) : 'new')}
                             onSave={handleSaveTransaction} 
-                            onCancel={() => setIsFormOpen(false)} 
+                            onCancel={() => {
+                                setIsFormOpen(false);
+                                setEditingTransaction(null);
+                                setPrefilledData(undefined);
+                            }} 
                             students={students} 
                             defaultValues={prefilledData}
+                        />
+                    </DialogContent>
+                </Dialog>
+
+                <Dialog open={isFixedFormOpen} onOpenChange={(open) => {
+                    setIsFixedFormOpen(open);
+                    if (!open) setEditingFixedExpense(null);
+                }}>
+                    <DialogContent className="sm:max-w-[500px] rounded-2xl w-[94vw]">
+                        <DialogHeader>
+                            <DialogTitle>{editingFixedExpense ? "Editar Despesa Fixa" : "Adicionar Despesa Fixa"}</DialogTitle>
+                        </DialogHeader>
+                        <FixedExpenseForm 
+                            key={editingFixedExpense ? `edit-${editingFixedExpense.id}` : 'new'}
+                            defaultValues={editingFixedExpense ? {
+                                id: editingFixedExpense.id,
+                                description: editingFixedExpense.description,
+                                value: editingFixedExpense.value,
+                                dueDate: editingFixedExpense.dueDate,
+                                paymentMethod: editingFixedExpense.paymentMethod
+                            } : undefined}
+                            onSave={handleSaveFixedExpense} 
+                            onCancel={() => {
+                                setIsFixedFormOpen(false);
+                                setEditingFixedExpense(null);
+                            }} 
                         />
                     </DialogContent>
                 </Dialog>
@@ -389,6 +585,78 @@ export default function FinancePage() {
                     </Card>
                 </div>
 
+                {/* Divisão Gerencial: Receitas, Custos, Despesas, Investimentos, Gastos */}
+                <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none no-print">
+                    <Button 
+                        variant={filter === 'Todos' ? 'default' : 'outline'} 
+                        size="sm" 
+                        className={cn("h-7 text-[10px] sm:text-[11px] rounded-lg px-2.5", filter === 'Todos' ? "bg-primary text-primary-foreground font-bold" : "text-muted-foreground")}
+                        onClick={() => setFilter('Todos')}
+                    >
+                        Todos
+                    </Button>
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className={cn(
+                            "h-7 text-[10px] sm:text-[11px] rounded-lg px-2.5 border-emerald-500/40 text-emerald-700 dark:text-emerald-400 gap-1.5 font-medium transition-all shrink-0",
+                            filter === 'Receitas' ? "bg-emerald-500/20 ring-1 ring-emerald-500 font-bold" : "hover:bg-emerald-50 dark:hover:bg-emerald-950/30"
+                        )}
+                        onClick={() => setFilter(prev => prev === 'Receitas' ? 'Todos' : 'Receitas')}
+                    >
+                        <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                        Receitas: <strong className="font-mono">{formatCurrency(categoryTotals.receitas)}</strong>
+                    </Button>
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className={cn(
+                            "h-7 text-[10px] sm:text-[11px] rounded-lg px-2.5 border-orange-500/40 text-orange-700 dark:text-orange-400 gap-1.5 font-medium transition-all shrink-0",
+                            filter === 'Custos' ? "bg-orange-500/20 ring-1 ring-orange-500 font-bold" : "hover:bg-orange-50 dark:hover:bg-orange-950/30"
+                        )}
+                        onClick={() => setFilter(prev => prev === 'Custos' ? 'Todos' : 'Custos')}
+                    >
+                        <span className="h-2 w-2 rounded-full bg-orange-500 shrink-0" />
+                        Custos: <strong className="font-mono">{formatCurrency(categoryTotals.custos)}</strong>
+                    </Button>
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className={cn(
+                            "h-7 text-[10px] sm:text-[11px] rounded-lg px-2.5 border-amber-500/40 text-amber-700 dark:text-amber-400 gap-1.5 font-medium transition-all shrink-0",
+                            filter === 'Despesas' ? "bg-amber-500/20 ring-1 ring-amber-500 font-bold" : "hover:bg-amber-50 dark:hover:bg-amber-950/30"
+                        )}
+                        onClick={() => setFilter(prev => prev === 'Despesas' ? 'Todos' : 'Despesas')}
+                    >
+                        <span className="h-2 w-2 rounded-full bg-amber-500 shrink-0" />
+                        Despesas: <strong className="font-mono">{formatCurrency(categoryTotals.despesas)}</strong>
+                    </Button>
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className={cn(
+                            "h-7 text-[10px] sm:text-[11px] rounded-lg px-2.5 border-blue-500/40 text-blue-700 dark:text-blue-400 gap-1.5 font-medium transition-all shrink-0",
+                            filter === 'Investimentos' ? "bg-blue-500/20 ring-1 ring-blue-500 font-bold" : "hover:bg-blue-50 dark:hover:bg-blue-950/30"
+                        )}
+                        onClick={() => setFilter(prev => prev === 'Investimentos' ? 'Todos' : 'Investimentos')}
+                    >
+                        <span className="h-2 w-2 rounded-full bg-blue-500 shrink-0" />
+                        Investimentos: <strong className="font-mono">{formatCurrency(categoryTotals.investimentos)}</strong>
+                    </Button>
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className={cn(
+                            "h-7 text-[10px] sm:text-[11px] rounded-lg px-2.5 border-purple-500/40 text-purple-700 dark:text-purple-400 gap-1.5 font-medium transition-all shrink-0",
+                            filter === 'Gastos' ? "bg-purple-500/20 ring-1 ring-purple-500 font-bold" : "hover:bg-purple-50 dark:hover:bg-purple-950/30"
+                        )}
+                        onClick={() => setFilter(prev => prev === 'Gastos' ? 'Todos' : 'Gastos')}
+                    >
+                        <span className="h-2 w-2 rounded-full bg-purple-500 shrink-0" />
+                        Gastos: <strong className="font-mono">{formatCurrency(categoryTotals.gastos)}</strong>
+                    </Button>
+                </div>
+
                 <Card className="card-print">
                     <CardHeader className="p-3 sm:p-6">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -447,36 +715,30 @@ export default function FinancePage() {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead className="text-[10px] sm:text-xs">Despesa</TableHead>
-                                        <TableHead className="text-[10px] sm:text-xs">Vencimento</TableHead>
-                                        <TableHead className="text-right text-[10px] sm:text-xs">Valor</TableHead>
-                                        <TableHead className="text-center no-print text-[10px] sm:text-xs">Status</TableHead>
+                                        <TableHead className="text-[10px] sm:text-xs whitespace-nowrap w-[90px]">Vencimento</TableHead>
+                                        <TableHead className="text-right text-[10px] sm:text-xs whitespace-nowrap w-[100px]">Valor</TableHead>
+                                        <TableHead className="text-center no-print text-[10px] sm:text-xs whitespace-nowrap w-[110px]">Ações</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {activeFixedExpenses.length > 0 ? activeFixedExpenses.map((f) => (
                                         <TableRow key={f.id}>
-                                            <TableCell>
-                                                <div className="font-bold text-[10px] sm:text-sm">{f.description}</div>
-                                                {f.paymentMethod && <div className="text-[9px] text-muted-foreground flex items-center gap-1"><CreditCard className="h-2.5 w-2.5" /> {f.paymentMethod}</div>}
+                                            <TableCell className="max-w-[180px] sm:max-w-[260px] p-2 sm:p-4">
+                                                <div className="font-bold text-[10px] sm:text-sm line-clamp-2 break-words" title={f.description}>{f.description}</div>
+                                                {f.paymentMethod && <div className="text-[9px] text-muted-foreground flex items-center gap-1 mt-0.5"><CreditCard className="h-2.5 w-2.5 shrink-0" /> {f.paymentMethod}</div>}
                                             </TableCell>
-                                            <TableCell className="text-[10px] sm:text-xs">Dia {f.dueDate}</TableCell>
-                                            <TableCell className="text-right font-mono font-bold text-[10px] sm:text-sm">{formatCurrency(f.value)}</TableCell>
-                                            <TableCell className="no-print p-1 sm:p-4 text-center">
+                                            <TableCell className="text-[10px] sm:text-xs whitespace-nowrap w-[90px]">Dia {f.dueDate}</TableCell>
+                                            <TableCell className="text-right font-mono font-bold text-[10px] sm:text-sm whitespace-nowrap w-[100px] p-2 sm:p-4">{formatCurrency(f.value)}</TableCell>
+                                            <TableCell className="no-print p-1 sm:p-4 text-center whitespace-nowrap w-[110px]">
                                                 <div className="flex items-center justify-center gap-1">
                                                     {f.status === 'Pago' ? (
-                                                        <>
-                                                            <Badge className="bg-green-500 text-white text-[9px] h-5">Pago</Badge>
-                                                            {f.receiptUrl && (
-                                                                <Button variant="ghost" size="icon" className="h-7 w-7 text-accent" onClick={() => handleViewReceipt(f.receiptUrl!)}>
-                                                                    <Eye className="h-3.5 w-3.5" />
-                                                                </Button>
-                                                            )}
-                                                        </>
+                                                        <Badge className="bg-green-500 text-white text-[9px] h-5">Pago</Badge>
                                                     ) : (
                                                         <Button 
                                                             size="sm" 
                                                             variant="outline" 
-                                                            className="h-7 text-[10px] px-2 border-red-500 text-red-600 hover:bg-red-50 rounded-lg"
+                                                            className="h-7 text-[10px] px-2 border-red-500 text-red-600 hover:bg-red-50 rounded-lg font-medium"
+                                                            disabled={!canEdit}
                                                             onClick={() => { setPayingExpense(f); setIsPayFormOpen(true); }}
                                                         >
                                                             Pagar
@@ -485,11 +747,34 @@ export default function FinancePage() {
                                                     <Button 
                                                         variant="ghost" 
                                                         size="icon" 
-                                                        className="h-7 w-7 text-destructive hover:bg-destructive/10" 
-                                                        onClick={() => setFixedExpenseToDelete(f)}
+                                                        className="h-7 w-7 text-muted-foreground hover:text-accent" 
+                                                        title="Visualizar despesa fixa"
+                                                        onClick={() => setViewingFixedExpense(f)}
                                                     >
-                                                        <Trash2 className="h-3.5 w-3.5" />
+                                                        <Eye className="h-3.5 w-3.5" />
                                                     </Button>
+                                                    {canEdit && (
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            className="h-7 w-7 text-muted-foreground hover:text-primary" 
+                                                            title="Editar despesa fixa"
+                                                            onClick={() => handleOpenEditFixedExpense(f)}
+                                                        >
+                                                            <Pencil className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    )}
+                                                    {canEdit && (
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            className="h-7 w-7 text-destructive hover:bg-destructive/10" 
+                                                            title="Excluir despesa fixa"
+                                                            onClick={() => setFixedExpenseToDelete(f)}
+                                                        >
+                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    )}
                                                 </div>
                                             </TableCell>
                                         </TableRow>
@@ -503,38 +788,76 @@ export default function FinancePage() {
                                 <TableHeader>
                                     <TableRow>
                                         <TableHead className="text-[10px] sm:text-xs">Descrição</TableHead>
-                                        <TableHead className="hidden sm:table-cell text-[10px] sm:text-xs">Tipo</TableHead>
-                                        <TableHead className="text-right text-[10px] sm:text-xs">Valor</TableHead>
-                                        <TableHead className="text-center no-print text-[10px] sm:text-xs">Ações</TableHead>
+                                        <TableHead className="hidden sm:table-cell text-[10px] sm:text-xs w-[80px]">Tipo</TableHead>
+                                        <TableHead className="text-right text-[10px] sm:text-xs whitespace-nowrap w-[100px]">Valor</TableHead>
+                                        <TableHead className="text-center no-print text-[10px] sm:text-xs whitespace-nowrap w-[90px]">Ações</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {filteredTransactions.length > 0 ? filteredTransactions.map((t) => (
                                         <TableRow key={t.id}>
-                                            <TableCell>
-                                                <div className="flex items-center gap-1.5">
-                                                    {t.type === 'Entrada' ? <ArrowUpCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" /> : <ArrowDownCircle className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />}
-                                                    <div className="min-w-0">
-                                                        <div className="font-bold text-[10px] sm:text-sm flex items-center gap-1 truncate">
-                                                            {t.description}
-                                                            {t.category === 'Despesa Fixa' && <Badge variant="outline" className="text-[8px] h-3.5 py-0 px-1 font-normal">Fixa</Badge>}
+                                            <TableCell className="max-w-[160px] sm:max-w-[240px] md:max-w-[320px] p-2 sm:p-4">
+                                                <div className="flex items-start gap-1.5 min-w-0">
+                                                    {t.type === 'Entrada' ? (
+                                                        <ArrowUpCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-500 shrink-0 mt-0.5" />
+                                                    ) : (
+                                                        <ArrowDownCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-500 shrink-0 mt-0.5" />
+                                                    )}
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="font-bold text-[10px] sm:text-sm flex items-center gap-1.5 flex-wrap">
+                                                            <span className="truncate">{t.description}</span>
+                                                            {renderCategoryBadge(t.category, t.type)}
                                                         </div>
-                                                        <div className="text-[9px] sm:text-xs text-muted-foreground truncate">{t.name}</div>
+                                                        {t.name && (
+                                                            <div 
+                                                                className="text-[9px] sm:text-xs text-muted-foreground line-clamp-2 break-words leading-tight mt-0.5" 
+                                                                title={t.name}
+                                                            >
+                                                                {t.name}
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="hidden sm:table-cell">
+                                            <TableCell className="hidden sm:table-cell whitespace-nowrap w-[80px]">
                                                 <Badge className={cn('text-[9px] h-5', t.type === 'Entrada' ? 'bg-green-500 text-white' : 'bg-red-500 text-white')}>{t.type}</Badge>
                                             </TableCell>
-                                            <TableCell className="text-right font-mono font-bold text-[10px] sm:text-sm">{formatCurrency(t.value)}</TableCell>
-                                            <TableCell className="no-print p-1 sm:p-4">
+                                            <TableCell className="text-right font-mono font-bold text-[10px] sm:text-sm whitespace-nowrap w-[100px] p-2 sm:p-4">
+                                                {formatCurrency(t.value)}
+                                            </TableCell>
+                                            <TableCell className="no-print p-1 sm:p-4 whitespace-nowrap w-[90px]">
                                                 <div className="flex items-center justify-end gap-1">
-                                                    {t.receiptUrl && (
-                                                        <Button variant="ghost" size="icon" className="text-accent h-7 w-7" onClick={() => handleViewReceipt(t.receiptUrl!)}>
-                                                            <Eye className="h-3.5 w-3.5" />
+                                                    <Button 
+                                                        variant="ghost" 
+                                                        size="icon" 
+                                                        className="text-muted-foreground hover:text-accent h-7 w-7" 
+                                                        title="Visualizar detalhes"
+                                                        onClick={() => setViewingTransaction(t)}
+                                                    >
+                                                        <Eye className="h-3.5 w-3.5" />
+                                                    </Button>
+                                                    {canEdit && (
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            className="text-muted-foreground hover:text-primary h-7 w-7" 
+                                                            title="Editar transação"
+                                                            onClick={() => handleOpenEditTransaction(t)}
+                                                        >
+                                                            <Pencil className="h-3.5 w-3.5" />
                                                         </Button>
                                                     )}
-                                                    <Button variant="ghost" size="icon" className="text-destructive h-7 w-7" onClick={() => setTransactionToDelete(t)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                                                    {canEdit && (
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            className="text-destructive hover:bg-destructive/10 h-7 w-7" 
+                                                            title="Excluir transação"
+                                                            onClick={() => setTransactionToDelete(t)}
+                                                        >
+                                                            <Trash2 className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    )}
                                                 </div>
                                             </TableCell>
                                         </TableRow>
@@ -549,24 +872,38 @@ export default function FinancePage() {
             </div>
             <div className="lg:col-span-1">
                  <Card className="card-print">
-                    <CardHeader className="p-3 sm:p-6">
-                        <CardTitle className="flex items-center gap-2 text-sm sm:text-lg"><AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-destructive" /> Pendências Alunos</CardTitle>
+                    <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-3">
+                        <div className="flex items-center justify-between">
+                            <CardTitle className="flex items-center gap-2 text-sm sm:text-lg">
+                                <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-destructive" /> 
+                                Pendências Alunos
+                            </CardTitle>
+                            {pendingStudents.length > 0 && (
+                                <Badge variant="secondary" className="text-[10px] sm:text-xs font-semibold px-2">
+                                    {pendingStudents.length} pendente{pendingStudents.length > 1 ? 's' : ''}
+                                </Badge>
+                            )}
+                        </div>
                     </CardHeader>
                     <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
                         {pendingStudents.length > 0 ? (
-                             <ul className="space-y-2 sm:space-y-4">
-                                {pendingStudents.map(student => (
-                                    <li key={student.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 border">
-                                        <div className="min-w-0">
-                                            <p className="font-bold text-[10px] sm:text-sm truncate">{student.name}</p>
-                                            <p className="text-[8px] sm:text-xs text-muted-foreground">
-                                                Vence dia {student.dueDate} {student.totalPaid > 0 ? `• Restante: ${formatCurrency(student.remaining)} (Pago: ${formatCurrency(student.totalPaid)})` : `• ${formatCurrency(student.monthlyFee)}`}
-                                            </p>
-                                        </div>
-                                        <Button variant="outline" size="sm" className="h-7 text-[10px] px-2 rounded-lg" onClick={() => handleOpenForm(student)} disabled={!canEdit}>Pagar</Button>
-                                    </li>
-                                ))}
-                             </ul>
+                            <ScrollArea className="h-[490px] pr-2.5">
+                                <ul className="space-y-2">
+                                    {pendingStudents.map(student => (
+                                        <li key={student.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-muted/50 border bg-card/60 transition-colors">
+                                            <div className="min-w-0 pr-2">
+                                                <p className="font-bold text-[10px] sm:text-sm truncate" title={student.name}>{student.name}</p>
+                                                <p className="text-[8px] sm:text-xs text-muted-foreground truncate">
+                                                    Vence dia {student.dueDate} {student.totalPaid > 0 ? `• Restante: ${formatCurrency(student.remaining)} (Pago: ${formatCurrency(student.totalPaid)})` : `• ${formatCurrency(student.monthlyFee)}`}
+                                                </p>
+                                            </div>
+                                            <Button variant="outline" size="sm" className="h-7 text-[10px] px-2.5 rounded-lg shrink-0 hover:bg-accent/10 hover:border-accent" onClick={() => handleOpenForm(student)} disabled={!canEdit}>
+                                                Pagar
+                                            </Button>
+                                        </li>
+                                    ))}
+                                </ul>
+                            </ScrollArea>
                         ) : (
                              <div className="text-center text-[10px] sm:text-sm text-muted-foreground py-6 sm:py-8">
                                 <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 mx-auto text-green-500 mb-2" /><p>Tudo em dia!</p>
@@ -577,19 +914,242 @@ export default function FinancePage() {
             </div>
         </div>
 
+        <Dialog open={!!viewingTransaction} onOpenChange={(open) => !open && setViewingTransaction(null)}>
+            <DialogContent className="sm:max-w-[480px] rounded-2xl w-[94vw]">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+                        <Eye className="h-5 w-5 text-accent" />
+                        Detalhes da Transação
+                    </DialogTitle>
+                </DialogHeader>
+                {viewingTransaction && (
+                    <div className="space-y-4 pt-2">
+                        <div className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border">
+                            <div>
+                                <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Valor</span>
+                                <div className={cn("text-xl sm:text-2xl font-black font-mono", viewingTransaction.type === 'Entrada' ? 'text-green-600' : 'text-red-600')}>
+                                    {viewingTransaction.type === 'Entrada' ? '+' : '-'} {formatCurrency(viewingTransaction.value)}
+                                </div>
+                            </div>
+                            <Badge className={cn("text-xs px-2.5 py-1", viewingTransaction.type === 'Entrada' ? 'bg-green-500 text-white' : 'bg-red-500 text-white')}>
+                                {viewingTransaction.type}
+                            </Badge>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div className="p-2.5 rounded-lg border bg-card">
+                                <span className="text-[10px] text-muted-foreground font-semibold uppercase block">Descrição</span>
+                                <span className="font-bold text-foreground text-xs sm:text-sm">{viewingTransaction.description}</span>
+                            </div>
+                            <div className="p-2.5 rounded-lg border bg-card">
+                                <span className="text-[10px] text-muted-foreground font-semibold uppercase block">Favorecido / Nome</span>
+                                <span className="font-bold text-foreground text-xs sm:text-sm">{viewingTransaction.name || "—"}</span>
+                            </div>
+                            <div className="p-2.5 rounded-lg border bg-card">
+                                <span className="text-[10px] text-muted-foreground font-semibold uppercase block">Data</span>
+                                <span className="font-medium text-foreground text-xs sm:text-sm">
+                                    {(() => {
+                                        try {
+                                            const d = new Date(viewingTransaction.date);
+                                            return isNaN(d.getTime()) ? viewingTransaction.date : format(d, "dd/MM/yyyy", { locale: ptBR });
+                                        } catch {
+                                            return viewingTransaction.date || "—";
+                                        }
+                                    })()}
+                                </span>
+                            </div>
+                            <div className="p-2.5 rounded-lg border bg-card">
+                                <span className="text-[10px] text-muted-foreground font-semibold uppercase block">Categoria Gerencial</span>
+                                <div className="mt-1">
+                                    {renderCategoryBadge(viewingTransaction.category, viewingTransaction.type as any)}
+                                </div>
+                            </div>
+                            <div className="p-2.5 rounded-lg border bg-card col-span-2">
+                                <span className="text-[10px] text-muted-foreground font-semibold uppercase block">Forma de Pagamento</span>
+                                <span className="font-medium text-foreground text-xs sm:text-sm">{viewingTransaction.paymentMethod || "Não informado"}</span>
+                            </div>
+                        </div>
+
+                        {viewingTransaction.receiptUrl && (
+                            <div className="pt-2">
+                                <Button 
+                                    variant="outline" 
+                                    className="w-full gap-2 border-accent text-accent hover:bg-accent/10 rounded-xl"
+                                    onClick={() => {
+                                        const url = viewingTransaction.receiptUrl!;
+                                        setViewingTransaction(null);
+                                        handleViewReceipt(url);
+                                    }}
+                                >
+                                    <Paperclip className="h-4 w-4" />
+                                    Visualizar Comprovante / Anexo
+                                </Button>
+                            </div>
+                        )}
+
+                        <div className="flex justify-end gap-2 pt-2 border-t">
+                            {canEdit && (
+                                <Button 
+                                    variant="outline" 
+                                    className="gap-1.5 rounded-xl text-xs" 
+                                    onClick={() => {
+                                        const tx = viewingTransaction;
+                                        setViewingTransaction(null);
+                                        handleOpenEditTransaction(tx);
+                                    }}
+                                >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                    Editar
+                                </Button>
+                            )}
+                            <Button variant="default" className="rounded-xl text-xs px-5" onClick={() => setViewingTransaction(null)}>
+                                Fechar
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </DialogContent>
+        </Dialog>
+
+        <Dialog open={!!viewingFixedExpense} onOpenChange={(open) => !open && setViewingFixedExpense(null)}>
+            <DialogContent className="sm:max-w-[460px] rounded-2xl w-[94vw]">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2 text-base sm:text-lg">
+                        <Eye className="h-5 w-5 text-accent" />
+                        Detalhes da Despesa Fixa
+                    </DialogTitle>
+                </DialogHeader>
+                {viewingFixedExpense && (
+                    <div className="space-y-4 pt-2">
+                        <div className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border">
+                            <div>
+                                <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">Valor</span>
+                                <div className="text-xl sm:text-2xl font-black font-mono text-red-600">
+                                    {formatCurrency(viewingFixedExpense.value)}
+                                </div>
+                            </div>
+                            <Badge className={cn("text-xs px-2.5 py-1", viewingFixedExpense.status === 'Pago' ? 'bg-green-500 text-white' : 'bg-yellow-500 text-white')}>
+                                {viewingFixedExpense.status}
+                            </Badge>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div className="p-2.5 rounded-lg border bg-card col-span-2">
+                                <span className="text-[10px] text-muted-foreground font-semibold uppercase block">Descrição</span>
+                                <span className="font-bold text-foreground text-xs sm:text-sm">{viewingFixedExpense.description}</span>
+                            </div>
+                            <div className="p-2.5 rounded-lg border bg-card">
+                                <span className="text-[10px] text-muted-foreground font-semibold uppercase block">Vencimento</span>
+                                <span className="font-medium text-foreground text-xs sm:text-sm">Dia {viewingFixedExpense.dueDate} de cada mês</span>
+                            </div>
+                            <div className="p-2.5 rounded-lg border bg-card">
+                                <span className="text-[10px] text-muted-foreground font-semibold uppercase block">Competência</span>
+                                <span className="font-medium text-foreground text-xs sm:text-sm">{months.find(m => m.value === viewingFixedExpense.month)?.label || viewingFixedExpense.month} / {viewingFixedExpense.year}</span>
+                            </div>
+                            {viewingFixedExpense.paymentMethod && (
+                                <div className="p-2.5 rounded-lg border bg-card col-span-2">
+                                    <span className="text-[10px] text-muted-foreground font-semibold uppercase block">Forma de Pagamento</span>
+                                    <span className="font-medium text-foreground text-xs sm:text-sm">{viewingFixedExpense.paymentMethod}</span>
+                                </div>
+                            )}
+                        </div>
+
+                        {viewingFixedExpense.receiptUrl && (
+                            <div className="pt-2">
+                                <Button 
+                                    variant="outline" 
+                                    className="w-full gap-2 border-accent text-accent hover:bg-accent/10 rounded-xl"
+                                    onClick={() => {
+                                        const url = viewingFixedExpense.receiptUrl!;
+                                        setViewingFixedExpense(null);
+                                        handleViewReceipt(url);
+                                    }}
+                                >
+                                    <Paperclip className="h-4 w-4" />
+                                    Visualizar Comprovante / Anexo
+                                </Button>
+                            </div>
+                        )}
+
+                        <div className="flex justify-end gap-2 pt-2 border-t">
+                            {canEdit && (
+                                <Button 
+                                    variant="outline" 
+                                    className="gap-1.5 rounded-xl text-xs" 
+                                    onClick={() => {
+                                        const fx = viewingFixedExpense;
+                                        setViewingFixedExpense(null);
+                                        handleOpenEditFixedExpense(fx);
+                                    }}
+                                >
+                                    <Pencil className="h-3.5 w-3.5" />
+                                    Editar
+                                </Button>
+                            )}
+                            <Button variant="default" className="rounded-xl text-xs px-5" onClick={() => setViewingFixedExpense(null)}>
+                                Fechar
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </DialogContent>
+        </Dialog>
+
         <Dialog open={isReceiptOpen} onOpenChange={setIsReceiptOpen}>
             <DialogContent className="sm:max-w-[500px] rounded-2xl w-[94vw]">
-                <DialogHeader><DialogTitle>Comprovante de Pagamento</DialogTitle></DialogHeader>
+                <DialogHeader><DialogTitle>Comprovante / Anexo</DialogTitle></DialogHeader>
                 <div className="flex justify-center p-4 bg-muted/20 rounded-lg border">
                     {selectedReceipt ? (
-                        <Image 
-                            src={getDisplayAvatarUrl(selectedReceipt)} 
-                            alt="Comprovante" 
-                            width={400} 
-                            height={600} 
-                            className="max-h-[70vh] object-contain rounded-md"
-                            data-ai-hint="payment receipt"
-                        />
+                        (() => {
+                            const lower = selectedReceipt.toLowerCase();
+                            const isDoc = lower.includes('.xlsx') || lower.includes('.xls') || lower.includes('.csv') || lower.includes('.ofx') || lower.includes('.xml') || lower.includes('/extratos/');
+                            const isPdf = lower.includes('.pdf');
+
+                            if (isDoc) {
+                                const rawName = selectedReceipt.split('/').pop()?.split('?')[0] || "extrato-bancario";
+                                const cleanName = decodeURIComponent(rawName);
+                                return (
+                                    <div className="flex flex-col items-center justify-center p-6 text-center gap-4">
+                                        <div className="p-4 rounded-2xl bg-emerald-600/10 text-emerald-600">
+                                            <FileSpreadsheet className="h-16 w-16" />
+                                        </div>
+                                        <div>
+                                            <p className="font-bold text-sm text-foreground truncate max-w-[320px]">{cleanName}</p>
+                                            <p className="text-xs text-muted-foreground mt-1">Extrato / Planilha bancária original anexada.</p>
+                                        </div>
+                                        <Button asChild className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-2 rounded-xl shadow-md">
+                                            <a href={selectedReceipt} target="_blank" rel="noopener noreferrer" download>
+                                                <Download className="h-4 w-4" /> Baixar Planilha / Extrato
+                                            </a>
+                                        </Button>
+                                    </div>
+                                );
+                            }
+
+                            if (isPdf) {
+                                return (
+                                    <div className="flex flex-col items-center gap-3 w-full">
+                                        <iframe src={selectedReceipt} className="w-full h-[60vh] rounded-md border" />
+                                        <Button asChild variant="outline" size="sm" className="rounded-xl">
+                                            <a href={selectedReceipt} target="_blank" rel="noopener noreferrer" download>
+                                                <Download className="h-4 w-4 mr-1.5" /> Baixar PDF
+                                            </a>
+                                        </Button>
+                                    </div>
+                                );
+                            }
+
+                            return (
+                                <Image 
+                                    src={getDisplayAvatarUrl(selectedReceipt)} 
+                                    alt="Comprovante" 
+                                    width={400} 
+                                    height={600} 
+                                    className="max-h-[70vh] object-contain rounded-md"
+                                    data-ai-hint="payment receipt"
+                                />
+                            );
+                        })()
                     ) : (
                         <div className="py-20 text-muted-foreground italic">Comprovante não disponível.</div>
                     )}

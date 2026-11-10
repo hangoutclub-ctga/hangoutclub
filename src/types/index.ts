@@ -79,11 +79,39 @@ export type Class = {
   status: 'Ativa' | 'Inativa' | 'Apagado';
 };
 
+export type TransactionCategory = 
+  | 'Receita' 
+  | 'Custo' 
+  | 'Despesa' 
+  | 'Investimento' 
+  | 'Gasto'
+  // Compatibilidade com dados anteriores
+  | 'Despesa Fixa' 
+  | 'Aluno' 
+  | 'Fornecedor' 
+  | 'Outros'
+  | 'Entrada'
+  | 'Saída';
+
+export function normalizeTransactionCategory(
+  rawCategory?: string, 
+  type?: 'Entrada' | 'Saída' | string
+): 'Receita' | 'Custo' | 'Despesa' | 'Investimento' | 'Gasto' {
+  if (!rawCategory) return type === 'Entrada' ? 'Receita' : 'Despesa';
+  const upper = rawCategory.toUpperCase().trim();
+  if (upper === 'RECEITA' || upper === 'ALUNO' || upper === 'ENTRADA') return 'Receita';
+  if (upper === 'CUSTO') return 'Custo';
+  if (upper === 'INVESTIMENTO') return 'Investimento';
+  if (upper === 'GASTO') return 'Gasto';
+  if (upper === 'DESPESA' || upper === 'DESPESA FIXA' || upper === 'FORNECEDOR' || upper === 'SAÍDA' || upper === 'SAIDA') return 'Despesa';
+  return type === 'Entrada' ? 'Receita' : 'Despesa';
+}
+
 export type Transaction = {
     id: string;
     type: 'Entrada' | 'Saída' | 'Apagado';
     description: string;
-    category: 'Fornecedor' | 'Aluno' | 'Despesa Fixa' | 'Outros';
+    category: TransactionCategory;
     name: string; // 'Fornecedor' or 'Cliente' name
     date: string;
     value: number;

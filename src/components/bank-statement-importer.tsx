@@ -28,18 +28,24 @@ import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { cn, formatCurrency } from "@/lib/utils";
 import { useData } from "@/hooks/use-data";
-import { Transaction } from "@/types";
+import { Transaction, FixedExpense } from "@/types";
+import { uploadFileToStorage } from "@/lib/supabase/storage";
 
 export interface ImportedCandidate {
   id: string;
   selected: boolean;
   date: string; // YYYY-MM-DD
   description: string;
+  complementaryInfo?: string; // Informações complementares da planilha/extrato
+  documentNumber?: string;
   value: number;
   type: 'Entrada' | 'Saída';
-  category: 'Aluno' | 'Fornecedor' | 'Despesa Fixa' | 'Outros';
+  category: 'Receita' | 'Custo' | 'Despesa' | 'Investimento' | 'Gasto';
   name: string;
   isDuplicate?: boolean;
+  duplicateReason?: string;
+  matchedFixedExpenseId?: string; // ID da despesa fixa vinculada para dar baixa
+  originalFixedExpenseValue?: number; // Valor previsto cadastrado antes do extrato
 }
 
 interface BankStatementImporterProps {
@@ -49,18 +55,25 @@ interface BankStatementImporterProps {
 }
 
 export function BankStatementImporter({ isOpen, onClose, onImportComplete }: BankStatementImporterProps) {
-  const { transactions, addTransaction, students } = useData();
+  const { transactions, addTransaction, students, fixedExpenses, updateFixedExpense } = useData();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isLoading, setIsLoading] = useState(false);
   const [fileName, setFileName] = useState<string>("");
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [parsedItems, setParsedItems] = useState<ImportedCandidate[]>([]);
   const [filterType, setFilterType] = useState<string>("todos");
   const [searchTerm, setSearchTerm] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
+  // Lista de despesas fixas pendentes no sistema para facilitar seleção de vínculo
+  const pendingFixedExpenses = useMemo(() => {
+    return (fixedExpenses || []).filter(f => f.status === 'Pendente');
+  }, [fixedExpenses]);
+
   const resetState = () => {
     setFileName("");
+    setSelectedFile(null);
     setParsedItems([]);
     setFilterType("todos");
     setSearchTerm("");
@@ -74,44 +87,160 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
     onClose();
   };
 
-  // Sugere categoria baseando-se no texto do lançamento
-  const autoDetectCategory = (desc: string, isIncome: boolean): 'Aluno' | 'Fornecedor' | 'Despesa Fixa' | 'Outros' => {
-    const text = desc.toUpperCase();
+  // Localiza automaticamente se um débito corresponde a uma despesa fixa cadastrada
+  const findMatchingFixedExpense = (
+    desc: string,
+    complement: string = "",
+    dateStr: string,
+    excludedIds?: Set<string>
+  ): FixedExpense | undefined => {
+    if (!fixedExpenses || fixedExpenses.length === 0) return undefined;
+
+    const [yStr, mStr] = dateStr.split('-');
+    const itemYear = parseInt(yStr, 10);
+    const itemMonth = parseInt(mStr, 10);
+
+    const fullText = `${desc} ${complement}`.toUpperCase();
+
+    // 1. Prioriza despesas fixas cadastradas para o mês correspondente
+    const monthExpenses = fixedExpenses.filter(f => 
+      f.status !== 'Apagado' && f.month === itemMonth && f.year === itemYear
+    );
+
+    const pool = monthExpenses.length > 0 
+      ? monthExpenses 
+      : fixedExpenses.filter(f => f.status !== 'Apagado');
+
+    for (const fe of pool) {
+      // Pula despesas fixas que já foram vinculadas a outro item nesta importação
+      if (excludedIds?.has(fe.id)) continue;
+
+      const feUpper = fe.description.toUpperCase().trim();
+      // Remove termos genéricos para encontrar a palavra-chave (ex: "Salário Maria" -> "MARIA")
+      const keyword = feUpper
+        .replace(/\b(SALÁRIO|SALARIO|PGTO|PAGAMENTO|DESPESA|FIXA|DE|DA|DO|CONTA|TAXA|MENSAL)\b/gi, '')
+        .trim();
+
+      if (keyword.length >= 3 && fullText.includes(keyword)) {
+        return fe;
+      }
+
+      if (feUpper.length >= 3 && fullText.includes(feUpper)) {
+        return fe;
+      }
+
+      // Concessionárias e contas comuns
+      if (
+        (fullText.includes("CEMIG") && feUpper.includes("CEMIG")) ||
+        (fullText.includes("COPASA") && feUpper.includes("COPASA")) ||
+        (fullText.includes("ALUGUEL") && feUpper.includes("ALUGUEL")) ||
+        (fullText.includes("INTERNET") && feUpper.includes("INTERNET")) ||
+        (fullText.includes("ENERGIA") && (feUpper.includes("ENERGIA") || feUpper.includes("LUZ"))) ||
+        (fullText.includes("TELEFONE") && feUpper.includes("TELEFONE"))
+      ) {
+        return fe;
+      }
+    }
+
+    return undefined;
+  };
+
+  // Sugere categoria gerencial inteligente: Receita, Custo, Despesa, Investimento, Gasto
+  const autoDetectCategory = (
+    desc: string, 
+    complement: string, 
+    isIncome: boolean,
+    hasMatchedFixed: boolean = false
+  ): 'Receita' | 'Custo' | 'Despesa' | 'Investimento' | 'Gasto' => {
+    if (isIncome) {
+      return 'Receita';
+    }
+
+    if (hasMatchedFixed) {
+      return 'Despesa';
+    }
+
+    const text = `${desc} ${complement}`.toUpperCase();
+
+    // Custos diretos das aulas e atividades
+    if (
+      text.includes("PROFESSOR") ||
+      text.includes("INSTRUTOR") ||
+      text.includes("LANCHE") ||
+      text.includes("PADARIA") ||
+      text.includes("PAO") ||
+      text.includes("PÃO") ||
+      text.includes("BISCOITO") ||
+      text.includes("BOLO") ||
+      text.includes("PACOCA") ||
+      text.includes("PAÇOCA") ||
+      text.includes("AULA") ||
+      text.includes("APOSTILA") ||
+      text.includes("DIDATICO") ||
+      text.includes("DIDÁTICO") ||
+      text.includes("UNIFORME") ||
+      text.includes("SALARIO PROF") ||
+      text.includes("SALÁRIO PROF")
+    ) {
+      return 'Custo';
+    }
+
+    // Investimentos (reformas, equipamentos, novos bens, tatames, eletrônicos)
+    if (
+      text.includes("REFORMA") ||
+      text.includes("EQUIPAMENTO") ||
+      text.includes("TATAME") ||
+      text.includes("COMPUTADOR") ||
+      text.includes("NOTEBOOK") ||
+      text.includes("AR CONDICIONADO") ||
+      text.includes("AR-CONDICIONADO") ||
+      text.includes("MOBILIA") ||
+      text.includes("MOVEIS") ||
+      text.includes("MÓVEIS") ||
+      text.includes("OBRA") ||
+      text.includes("CONSTRUCAO") ||
+      text.includes("CONSTRUÇÃO") ||
+      text.includes("PATRIMONIO") ||
+      text.includes("PATRIMÔNIO")
+    ) {
+      return 'Investimento';
+    }
     
-    // Despesas fixas típicas de empresas
+    // Despesas operacionais e fixas da estrutura
     if (
       text.includes("ENERGIA") || 
       text.includes("LUZ") || 
       text.includes("CEMIG") || 
       text.includes("COPASA") || 
       text.includes("AGUA") || 
+      text.includes("ÁGUA") || 
       text.includes("TELEFONE") || 
       text.includes("INTERNET") || 
       text.includes("ALUGUEL") || 
       text.includes("TARIFA") || 
       text.includes("TAXA MANUT") || 
-      text.includes("CONDOM") ||
-      text.includes("SEGURO")
+      text.includes("CONDOM") || 
+      text.includes("SEGURO") ||
+      text.includes("SALARIO") ||
+      text.includes("SALÁRIO") ||
+      text.includes("CONTABIL") ||
+      text.includes("HONORARIO") ||
+      text.includes("SECRETARIA") ||
+      text.includes("LIMPEZA") ||
+      text.includes("SISTEMA") ||
+      text.includes("SOFTWARE")
     ) {
-      return 'Despesa Fixa';
+      return 'Despesa';
     }
 
-    if (isIncome) {
-      return 'Aluno';
-    }
-
-    if (text.includes("FORNEC") || text.includes("PAPELARIA") || text.includes("MATERIAIS") || text.includes("MERCADO")) {
-      return 'Fornecedor';
-    }
-
-    return 'Outros';
+    return 'Gasto';
   };
 
-  // Tenta associar o nome do aluno se encontrar o nome no histórico
-  const autoDetectName = (desc: string, isIncome: boolean): string => {
-    const text = desc.toUpperCase();
+  // Tenta associar o nome do aluno se encontrar o nome no histórico ou nas informações complementares
+  const autoDetectName = (desc: string, complement: string, isIncome: boolean): string => {
+    const text = `${desc} ${complement}`.toUpperCase();
     if (isIncome) {
-      // Procura nomes de alunos cadastrados no texto
+      // Procura nomes de alunos ou responsáveis cadastrados no texto
       for (const st of students) {
         const parts = st.name.trim().toUpperCase().split(" ");
         const firstName = parts[0];
@@ -119,15 +248,31 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
         if (firstName.length >= 3 && text.includes(firstName) && (lastName.length < 3 || text.includes(lastName))) {
           return st.name;
         }
+
+        if (st.guardianName) {
+          const gParts = st.guardianName.trim().toUpperCase().split(" ");
+          const gFirst = gParts[0];
+          const gLast = gParts.length > 1 ? gParts[gParts.length - 1] : "";
+          if (gFirst.length >= 3 && text.includes(gFirst) && (gLast.length < 3 || text.includes(gLast))) {
+            return st.name;
+          }
+        }
       }
-      return "Mensalidade / Aluno";
+      return complement || "Mensalidade / Aluno";
     }
+
+    // Para saídas: se tiver informações complementares (ex: CENTER PAO LTDA CARATINGA BRA), usa como favorecido/fornecedor
+    if (complement) {
+      return complement;
+    }
+
     return "Fornecedor / Despesa";
   };
 
   // Parser para OFX
   const parseOFXContent = (content: string): ImportedCandidate[] => {
     const results: ImportedCandidate[] = [];
+    const matchedFixedIds = new Set<string>();
     const regex = /<STMTTRN>([\s\S]*?)<\/STMTTRN>/gi;
     let match;
 
@@ -135,7 +280,9 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
       const block = match[1];
       const dateMatch = block.match(/<DTPOSTED>(\d{8})/i);
       const amountMatch = block.match(/<TRNAMT>([^<\r\n]+)/i);
-      const memoMatch = block.match(/<MEMO>([^<\r\n]+)/i) || block.match(/<NAME>([^<\r\n]+)/i);
+      const memoMatch = block.match(/<MEMO>([^<\r\n]+)/i);
+      const nameMatch = block.match(/<NAME>([^<\r\n]+)/i);
+      const checkNumMatch = block.match(/<CHECKNUM>([^<\r\n]+)/i);
 
       if (dateMatch && amountMatch) {
         const rawAmt = parseFloat(amountMatch[1].trim());
@@ -144,19 +291,39 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
         const m = dateStr.substring(4, 6);
         const d = dateStr.substring(6, 8);
         const isoDate = `${y}-${m}-${d}`;
-        const desc = memoMatch ? memoMatch[1].trim() : "Transação Bancária";
+
+        const memoStr = memoMatch ? memoMatch[1].trim() : "";
+        const nameStr = nameMatch ? nameMatch[1].trim() : "";
+        let desc = nameStr || memoStr || "Transação Bancária";
+        let comp = "";
+
+        if (nameStr && memoStr && nameStr !== memoStr) {
+          desc = nameStr;
+          comp = memoStr;
+        }
+
         const isIncome = rawAmt > 0;
         const absVal = Math.abs(rawAmt);
+        const docNum = checkNumMatch ? checkNumMatch[1].trim() : undefined;
+        const matchedFixed = !isIncome ? findMatchingFixedExpense(desc, comp, isoDate, matchedFixedIds) : undefined;
+        if (matchedFixed) {
+          matchedFixedIds.add(matchedFixed.id);
+        }
+        const detectedCat = autoDetectCategory(desc, comp, isIncome, !!matchedFixed);
 
         results.push({
           id: `ofx-${Date.now()}-${results.length}-${Math.random().toString(36).substr(2, 4)}`,
           selected: true,
           date: isoDate,
           description: desc,
+          complementaryInfo: comp || undefined,
+          documentNumber: docNum,
           value: absVal,
           type: isIncome ? 'Entrada' : 'Saída',
-          category: autoDetectCategory(desc, isIncome),
-          name: autoDetectName(desc, isIncome),
+          category: detectedCat,
+          name: autoDetectName(desc, comp, isIncome),
+          matchedFixedExpenseId: matchedFixed?.id,
+          originalFixedExpenseValue: matchedFixed?.value
         });
       }
     }
@@ -177,6 +344,8 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
     let headerIdx = -1;
     let colDate = -1;
     let colDesc = -1;
+    let colComplement = -1;
+    let colDoc = -1;
     let colValue = -1;
     let colType = -1; // Opcional (D/C)
     let colCredit = -1; // Opcional (coluna separada de crédito)
@@ -185,7 +354,26 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
     for (let i = 0; i < Math.min(rawRows.length, 25); i++) {
       const row = rawRows[i].map(c => String(c).trim().toLowerCase());
       const dIdx = row.findIndex(c => c.includes("data") || c === "dt" || c.includes("dia"));
-      const descIdx = row.findIndex(c => c.includes("hist") || c.includes("descri") || c.includes("lançam") || c.includes("lancam") || c.includes("detalhe"));
+      
+      const descIdx = row.findIndex(c => 
+        (c.includes("histórico") || c.includes("historico") || c.includes("descri") || c.includes("lançam") || c.includes("lancam") || c === "hist") &&
+        !c.includes("complem")
+      );
+
+      const compIdx = row.findIndex(c => 
+        c.includes("complem") || 
+        c.includes("informações") || 
+        c.includes("informacoes") || 
+        c.includes("info.") || 
+        c.includes("info ") || 
+        c === "info" ||
+        c.includes("observa")
+      );
+
+      const docIdx = row.findIndex(c => 
+        c.includes("doc") || c.includes("documento") || c.includes("número") || c.includes("numero")
+      );
+
       const valIdx = row.findIndex(c => c.includes("valor") || c === "vl" || c.includes("montante"));
       const credIdx = row.findIndex(c => c.includes("crédito") || c.includes("credito") || c === "entradas");
       const debIdx = row.findIndex(c => c.includes("débito") || c.includes("debito") || c === "saídas" || c === "saidas");
@@ -195,6 +383,8 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
         headerIdx = i;
         colDate = dIdx;
         colDesc = descIdx !== -1 ? descIdx : 1;
+        colComplement = compIdx;
+        colDoc = docIdx;
         colValue = valIdx;
         colType = typeIdx;
         colCredit = credIdx;
@@ -212,6 +402,7 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
     }
 
     const results: ImportedCandidate[] = [];
+    const matchedFixedIds = new Set<string>();
 
     for (let r = headerIdx + 1; r < rawRows.length; r++) {
       const row = rawRows[r];
@@ -242,6 +433,10 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
       if (!parsedDate) continue;
 
       const desc = colDesc !== -1 && row[colDesc] ? String(row[colDesc]).trim() : "Lançamento Bancário";
+      const rawComplement = colComplement !== -1 && row[colComplement] ? String(row[colComplement]).trim() : "";
+      const cleanComplement = rawComplement && rawComplement !== "-" ? rawComplement : "";
+      const rawDoc = colDoc !== -1 && row[colDoc] ? String(row[colDoc]).trim() : "";
+      const cleanDoc = rawDoc && rawDoc !== "-" ? rawDoc : "";
       
       // Ignorar linhas de saldo ou totalizador
       const upperDesc = desc.toUpperCase();
@@ -304,15 +499,25 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
 
       if (value <= 0) continue;
 
+      const matchedFixed = !isIncome ? findMatchingFixedExpense(desc, cleanComplement, parsedDate, matchedFixedIds) : undefined;
+      if (matchedFixed) {
+        matchedFixedIds.add(matchedFixed.id);
+      }
+      const detectedCat = autoDetectCategory(desc, cleanComplement, isIncome, !!matchedFixed);
+
       results.push({
         id: `row-${r}-${Date.now()}-${Math.random().toString(36).substr(2, 4)}`,
         selected: true,
         date: parsedDate,
         description: desc,
+        complementaryInfo: cleanComplement || undefined,
+        documentNumber: cleanDoc || undefined,
         value: Number(value.toFixed(2)),
         type: isIncome ? 'Entrada' : 'Saída',
-        category: autoDetectCategory(desc, isIncome),
-        name: autoDetectName(desc, isIncome),
+        category: detectedCat,
+        name: autoDetectName(desc, cleanComplement, isIncome),
+        matchedFixedExpenseId: matchedFixed?.id,
+        originalFixedExpenseValue: matchedFixed?.value
       });
     }
 
@@ -323,6 +528,7 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
     const file = e.target.files?.[0];
     if (!file) return;
 
+    setSelectedFile(file);
     setIsLoading(true);
     setFileName(file.name);
 
@@ -348,7 +554,7 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
         return;
       }
 
-      // Cruzar com transações existentes no Supabase para alertar duplicatas
+      // Cruzar com transações existentes no Supabase e Despesas Fixas para alertar duplicatas
       const existingKeySet = new Set(
         transactions
           .filter(t => t.type !== 'Apagado')
@@ -357,11 +563,27 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
 
       const flagged = candidates.map(c => {
         const key = `${c.date}_${c.value.toFixed(2)}_${c.type}`;
-        const isDup = existingKeySet.has(key);
+        const isTxDup = existingKeySet.has(key);
+
+        // Se tem despesa fixa vinculada
+        if (c.matchedFixedExpenseId) {
+          const fe = (fixedExpenses || []).find(f => f.id === c.matchedFixedExpenseId);
+          if (fe && fe.status === 'Pago') {
+            return {
+              ...c,
+              category: 'Despesa' as const,
+              isDuplicate: true,
+              duplicateReason: `Despesa Fixa "${fe.description}" já foi quitada neste mês.`,
+              selected: false // Previne duplicação de despesa fixa já paga
+            };
+          }
+        }
+
         return {
           ...c,
-          isDuplicate: isDup,
-          selected: !isDup // Por padrão desmarca possíveis duplicatas
+          isDuplicate: isTxDup,
+          duplicateReason: isTxDup ? "Já existe transação idêntica no sistema." : undefined,
+          selected: !isTxDup
         };
       });
 
@@ -390,6 +612,31 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
     setParsedItems(prev => prev.map(item => item.id === id ? { ...item, selected: !item.selected } : item));
   };
 
+  const updateItemCategory = (id: string, category: 'Receita' | 'Custo' | 'Despesa' | 'Investimento' | 'Gasto') => {
+    setParsedItems(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      const newType: 'Entrada' | 'Saída' = category === 'Receita' ? 'Entrada' : 'Saída';
+      return {
+        ...item,
+        category,
+        type: newType,
+        matchedFixedExpenseId: (category === 'Despesa' || category === 'Custo') ? item.matchedFixedExpenseId : undefined
+      };
+    }));
+  };
+
+  const updateItemFixedMatch = (id: string, fixedId?: string) => {
+    const fe = (fixedExpenses || []).find(f => f.id === fixedId);
+    setParsedItems(prev => prev.map(item => {
+      if (item.id !== id) return item;
+      return {
+        ...item,
+        matchedFixedExpenseId: fixedId,
+        originalFixedExpenseValue: fe?.value
+      };
+    }));
+  };
+
   const updateItemField = (id: string, field: keyof ImportedCandidate, value: any) => {
     setParsedItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item));
   };
@@ -397,13 +644,23 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
   // Filtragem dos itens exibidos na tabela de prévia
   const displayedItems = useMemo(() => {
     return parsedItems.filter(item => {
+      if (filterType === 'receitas' && item.category !== 'Receita') return false;
+      if (filterType === 'custos' && item.category !== 'Custo') return false;
+      if (filterType === 'despesas' && item.category !== 'Despesa') return false;
+      if (filterType === 'investimentos' && item.category !== 'Investimento') return false;
+      if (filterType === 'gastos' && item.category !== 'Gasto') return false;
       if (filterType === 'entradas' && item.type !== 'Entrada') return false;
       if (filterType === 'saidas' && item.type !== 'Saída') return false;
+      if (filterType === 'fixas' && !item.matchedFixedExpenseId) return false;
       if (filterType === 'duplicadas' && !item.isDuplicate) return false;
       if (filterType === 'selecionadas' && !item.selected) return false;
       if (searchTerm) {
         const q = searchTerm.toLowerCase();
-        return item.description.toLowerCase().includes(q) || item.name.toLowerCase().includes(q);
+        return (
+          item.description.toLowerCase().includes(q) || 
+          item.name.toLowerCase().includes(q) ||
+          (item.complementaryInfo ? item.complementaryInfo.toLowerCase().includes(q) : false)
+        );
       }
       return true;
     });
@@ -414,12 +671,14 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
     const incomeTotal = selected.filter(i => i.type === 'Entrada').reduce((a, b) => a + b.value, 0);
     const outcomeTotal = selected.filter(i => i.type === 'Saída').reduce((a, b) => a + b.value, 0);
     const duplicateCount = parsedItems.filter(i => i.isDuplicate).length;
+    const fixedMatchCount = selected.filter(i => !!i.matchedFixedExpenseId).length;
 
     return {
       totalSelected: selected.length,
       incomeTotal,
       outcomeTotal,
       duplicateCount,
+      fixedMatchCount,
       net: incomeTotal - outcomeTotal,
     };
   }, [parsedItems]);
@@ -437,16 +696,54 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
 
     setIsSaving(true);
     let successCount = 0;
+    let fixedUpdatedCount = 0;
+    let statementFileUrl: string | undefined = undefined;
 
     try {
+      // 1. Faz upload do arquivo do extrato para o Supabase Storage para ficar disponível como anexo
+      if (selectedFile) {
+        try {
+          const uploadRes = await uploadFileToStorage(
+            selectedFile,
+            'extratos',
+            selectedFile.name
+          );
+          if (uploadRes?.url) {
+            statementFileUrl = uploadRes.url;
+          }
+        } catch (uploadErr) {
+          console.error("Erro ao subir arquivo do extrato para o storage:", uploadErr);
+        }
+      }
+
       for (const item of toImport) {
+        // Se o nome for o padrão genérico e tivermos a informação complementar da empresa/fornecedor, registra ela!
+        const finalName = (item.name === "Fornecedor / Despesa" && item.complementaryInfo)
+          ? item.complementaryInfo
+          : item.name;
+
+        // Se estiver vinculada a uma despesa fixa, dá baixa e ajusta o valor real pago pelo extrato!
+        if (item.matchedFixedExpenseId) {
+          try {
+            await updateFixedExpense(item.matchedFixedExpenseId, {
+              status: 'Pago',
+              value: item.value, // Atualiza para o valor real que saiu no extrato!
+              receiptUrl: statementFileUrl || undefined // Anexa o arquivo à despesa fixa quitada
+            });
+            fixedUpdatedCount++;
+          } catch (e) {
+            console.error("Erro ao atualizar despesa fixa:", e);
+          }
+        }
+
         await addTransaction({
           date: item.date,
           description: item.description,
           type: item.type,
           value: item.value,
           category: item.category,
-          name: item.name,
+          name: finalName,
+          receiptUrl: statementFileUrl || undefined, // Anexa o arquivo à transação
           paymentMethod: 'Pix / Banco',
         });
         successCount++;
@@ -454,7 +751,7 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
 
       toast({
         title: "Importação concluída!",
-        description: `${successCount} transações foram adicionadas ao financeiro do Hangout Club com sucesso.`
+        description: `${successCount} transações adicionadas (${fixedUpdatedCount} despesas fixas baixadas/atualizadas).`
       });
 
       onImportComplete?.();
@@ -592,15 +889,19 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-1">
                 <div className="flex items-center gap-2">
                   <Select value={filterType} onValueChange={setFilterType}>
-                    <SelectTrigger className="h-8 text-xs w-[140px] sm:w-[160px]">
+                    <SelectTrigger className="h-8 text-xs w-[150px] sm:w-[170px]">
                       <SelectValue placeholder="Filtro" />
                     </SelectTrigger>
                     <SelectContent className="text-xs">
                       <SelectItem value="todos">Todos ({parsedItems.length})</SelectItem>
                       <SelectItem value="selecionadas">Selecionadas ({summary.totalSelected})</SelectItem>
-                      <SelectItem value="entradas">Entradas</SelectItem>
-                      <SelectItem value="saidas">Saídas</SelectItem>
-                      <SelectItem value="duplicadas">Duplicadas ({summary.duplicateCount})</SelectItem>
+                      <SelectItem value="receitas">Receitas</SelectItem>
+                      <SelectItem value="custos">Custos</SelectItem>
+                      <SelectItem value="despesas">Despesas</SelectItem>
+                      <SelectItem value="investimentos">Investimentos</SelectItem>
+                      <SelectItem value="gastos">Gastos</SelectItem>
+                      <SelectItem value="fixas">Vinculadas a Fixas ({summary.fixedMatchCount})</SelectItem>
+                      <SelectItem value="duplicadas">Duplicadas / Quitadas ({summary.duplicateCount})</SelectItem>
                     </SelectContent>
                   </Select>
 
@@ -647,8 +948,7 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
                       </TableHead>
                       <TableHead className="w-24">Data</TableHead>
                       <TableHead>Histórico / Lançamento</TableHead>
-                      <TableHead className="w-28">Tipo</TableHead>
-                      <TableHead className="w-32">Categoria</TableHead>
+                      <TableHead className="w-48">Categoria / Vínculo</TableHead>
                       <TableHead className="w-28 text-right">Valor</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -672,48 +972,125 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
                           <TableCell className="font-mono text-[11px] p-2 whitespace-nowrap">
                             {format(parseISO(item.date), "dd/MM/yyyy")}
                           </TableCell>
-                          <TableCell className="p-2">
-                            <div className="flex flex-col">
-                              <span className="font-bold text-primary truncate max-w-xs sm:max-w-md">{item.description}</span>
-                              <div className="flex items-center gap-1.5 mt-0.5">
-                                {item.isDuplicate && (
-                                  <Badge variant="outline" className="text-[9px] h-4 border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400">
-                                    Já existe no sistema
+                          <TableCell className="p-2 min-w-0 max-w-[200px] sm:max-w-xs">
+                            <div className="flex flex-col gap-0.5">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-bold text-primary text-xs sm:text-sm line-clamp-2 break-words" title={item.description}>
+                                  {item.description}
+                                </span>
+                                {item.documentNumber && (
+                                  <Badge variant="outline" className="text-[9px] h-4 py-0 px-1 font-mono text-muted-foreground shrink-0">
+                                    Doc: {item.documentNumber}
                                   </Badge>
                                 )}
-                                <span className="text-[10px] text-muted-foreground">{item.name}</span>
+                                {item.isDuplicate && (
+                                  <Badge 
+                                    variant="outline" 
+                                    className="text-[9px] h-4 border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400 font-normal shrink-0"
+                                    title={item.duplicateReason}
+                                  >
+                                    {item.duplicateReason || "Já existe no sistema"}
+                                  </Badge>
+                                )}
                               </div>
+
+                              {item.complementaryInfo && (
+                                <div className="flex items-start gap-1 text-[11px] text-slate-700 dark:text-slate-200 bg-muted/60 px-1.5 py-0.5 rounded border border-border/40 font-medium max-w-full" title={item.complementaryInfo}>
+                                  <span className="text-[9px] uppercase font-bold text-muted-foreground shrink-0 mt-0.5">Info:</span>
+                                  <span className="line-clamp-2 break-words leading-tight">
+                                    {item.complementaryInfo}
+                                  </span>
+                                </div>
+                              )}
+
+                              {item.name && item.name !== item.complementaryInfo && (
+                                <span className="text-[10px] text-muted-foreground line-clamp-2 break-words max-w-full leading-tight" title={item.name}>
+                                  {item.name}
+                                </span>
+                              )}
                             </div>
                           </TableCell>
                           <TableCell className="p-2">
-                            <Select 
-                              value={item.type} 
-                              onValueChange={(val: 'Entrada' | 'Saída') => updateItemField(item.id, 'type', val)}
-                            >
-                              <SelectTrigger className="h-7 text-[11px] w-24">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent className="text-xs">
-                                <SelectItem value="Entrada">Entrada</SelectItem>
-                                <SelectItem value="Saída">Saída</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell className="p-2">
-                            <Select 
-                              value={item.category} 
-                              onValueChange={(val) => updateItemField(item.id, 'category', val)}
-                            >
-                              <SelectTrigger className="h-7 text-[11px] w-28">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent className="text-xs">
-                                <SelectItem value="Aluno">Aluno</SelectItem>
-                                <SelectItem value="Fornecedor">Fornecedor</SelectItem>
-                                <SelectItem value="Despesa Fixa">Despesa Fixa</SelectItem>
-                                <SelectItem value="Outros">Outros</SelectItem>
-                              </SelectContent>
-                            </Select>
+                            <div className="flex flex-col gap-1.5">
+                              <Select 
+                                value={item.category} 
+                                onValueChange={(val: 'Receita' | 'Custo' | 'Despesa' | 'Investimento' | 'Gasto') => updateItemCategory(item.id, val)}
+                              >
+                                <SelectTrigger className={cn(
+                                  "h-7 text-[11px] font-bold w-36 shadow-sm",
+                                  item.category === 'Receita' && "text-emerald-700 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300",
+                                  item.category === 'Custo' && "text-orange-700 bg-orange-50 dark:bg-orange-950/40 border-orange-300",
+                                  item.category === 'Despesa' && "text-amber-700 bg-amber-50 dark:bg-amber-950/40 border-amber-300",
+                                  item.category === 'Investimento' && "text-blue-700 bg-blue-50 dark:bg-blue-950/40 border-blue-300",
+                                  item.category === 'Gasto' && "text-purple-700 bg-purple-50 dark:bg-purple-950/40 border-purple-300"
+                                )}>
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="text-xs">
+                                  <SelectItem value="Receita">
+                                    <span className="flex items-center gap-1.5 font-semibold text-emerald-600">
+                                      <span className="h-2 w-2 rounded-full bg-emerald-500" /> Receita
+                                    </span>
+                                  </SelectItem>
+                                  <SelectItem value="Custo">
+                                    <span className="flex items-center gap-1.5 font-semibold text-orange-600">
+                                      <span className="h-2 w-2 rounded-full bg-orange-500" /> Custo
+                                    </span>
+                                  </SelectItem>
+                                  <SelectItem value="Despesa">
+                                    <span className="flex items-center gap-1.5 font-semibold text-amber-600">
+                                      <span className="h-2 w-2 rounded-full bg-amber-500" /> Despesa
+                                    </span>
+                                  </SelectItem>
+                                  <SelectItem value="Investimento">
+                                    <span className="flex items-center gap-1.5 font-semibold text-blue-600">
+                                      <span className="h-2 w-2 rounded-full bg-blue-500" /> Investimento
+                                    </span>
+                                  </SelectItem>
+                                  <SelectItem value="Gasto">
+                                    <span className="flex items-center gap-1.5 font-semibold text-purple-600">
+                                      <span className="h-2 w-2 rounded-full bg-purple-500" /> Gasto
+                                    </span>
+                                  </SelectItem>
+                                </SelectContent>
+                              </Select>
+
+                              {item.type === 'Saída' && (
+                                <div className="flex flex-col gap-0.5">
+                                  <select
+                                    value={item.matchedFixedExpenseId || ""}
+                                    onChange={(e) => updateItemFixedMatch(item.id, e.target.value || undefined)}
+                                    className="text-[10px] h-6 px-1.5 rounded-lg border border-amber-300/80 bg-background text-foreground max-w-[160px] truncate shadow-sm font-medium"
+                                    title="Vincular a uma despesa fixa para dar baixa automática"
+                                  >
+                                    <option value="">Sem vínculo com fixa</option>
+                                    {pendingFixedExpenses.map(fe => {
+                                      const isClaimedByAnother = parsedItems.some(
+                                        p => p.id !== item.id && p.matchedFixedExpenseId === fe.id
+                                      );
+                                      return (
+                                        <option 
+                                          key={fe.id} 
+                                          value={fe.id}
+                                          disabled={isClaimedByAnother}
+                                          className={isClaimedByAnother ? "text-muted-foreground opacity-40 bg-muted/40 font-normal" : "font-medium"}
+                                        >
+                                          {fe.description} ({formatCurrency(fe.value)}){isClaimedByAnother ? " [Já vinculado]" : ""}
+                                        </option>
+                                      );
+                                    })}
+                                  </select>
+                                  {item.matchedFixedExpenseId && item.originalFixedExpenseValue !== undefined && item.originalFixedExpenseValue !== item.value && (
+                                    <span 
+                                      className="text-[9px] text-amber-600 dark:text-amber-400 font-semibold truncate max-w-[160px]"
+                                      title={`Ajustará a despesa fixa de ${formatCurrency(item.originalFixedExpenseValue)} para ${formatCurrency(item.value)}`}
+                                    >
+                                      Ajusta: {formatCurrency(item.originalFixedExpenseValue)} → {formatCurrency(item.value)}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
                           </TableCell>
                           <TableCell className="text-right font-black p-2 whitespace-nowrap">
                             <span className={item.type === 'Entrada' ? "text-green-600" : "text-red-500"}>
@@ -724,7 +1101,7 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
                       ))
                     ) : (
                       <TableRow>
-                        <TableCell colSpan={6} className="text-center py-8 text-xs text-muted-foreground">
+                        <TableCell colSpan={5} className="text-center py-8 text-xs text-muted-foreground">
                           Nenhum lançamento corresponde ao filtro.
                         </TableCell>
                       </TableRow>

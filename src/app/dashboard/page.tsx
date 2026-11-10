@@ -208,7 +208,7 @@ export default function DashboardPage() {
                     try {
                       await addTransaction({
                         type: data.type.includes('Entrada') ? 'Entrada' : 'Saída',
-                        category: data.type === 'Entrada (Aluno)' ? 'Aluno' : 'Outros',
+                        category: (data.category as any) || (data.type.includes('Entrada') ? 'Receita' : 'Despesa'),
                         name: data.name,
                         description: data.description,
                         value: data.value,
