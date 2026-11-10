@@ -21,7 +21,7 @@ import { cn, getDisplayAvatarUrl } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from "@/components/ui/dialog"
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription, DialogTrigger } from "@/components/ui/dialog"
 import { EmployeeForm } from "./employee-form";
 import { CategoryManager } from "./category-manager";
 import { ALL_PERMISSIONS, PERMISSION_CATEGORIES, DEFAULT_ROLE_PERMISSIONS, getDefaultPermissionsForRole } from "@/lib/permissions";
@@ -563,9 +563,26 @@ const SystemManagementPanel = () => {
                         <TableRow key={user.id} className="hover:bg-muted/5">
                             <TableCell className="p-2 sm:p-4">
                                 <div className="flex items-center gap-2 sm:gap-3">
-                                    <div className="h-7 w-7 sm:h-9 sm:w-9 rounded-full border bg-muted flex items-center justify-center overflow-hidden">
-                                        <img src={getDisplayAvatarUrl(user.avatar)} alt={user.nickname} className="h-full w-full object-cover" />
-                                    </div>
+                                    <Dialog>
+                                        <DialogTrigger asChild>
+                                            <div 
+                                                className="h-7 w-7 sm:h-9 sm:w-9 rounded-full border bg-muted flex items-center justify-center overflow-hidden cursor-pointer hover:opacity-80 transition-opacity shrink-0"
+                                                title="Clique para ver a foto"
+                                            >
+                                                <img src={getDisplayAvatarUrl(user.avatar)} alt={user.nickname} className="h-full w-full object-cover" />
+                                            </div>
+                                        </DialogTrigger>
+                                        <DialogContent className="sm:max-w-xs">
+                                            <DialogHeader>
+                                                <DialogTitle className="truncate">Foto de {user.nickname || user.email}</DialogTitle>
+                                            </DialogHeader>
+                                            <div className="flex justify-center items-center p-4">
+                                                <div className="h-64 w-64 rounded-xl border bg-muted overflow-hidden flex items-center justify-center">
+                                                    <img src={getDisplayAvatarUrl(user.avatar)} alt={user.nickname} className="h-full w-full object-cover" />
+                                                </div>
+                                            </div>
+                                        </DialogContent>
+                                    </Dialog>
                                     <div className="flex flex-col min-w-0">
                                         <span className="font-bold text-[10px] sm:text-sm truncate">{user.nickname}</span>
                                         <span className="text-[8px] sm:text-[10px] text-muted-foreground truncate">{user.email}</span>

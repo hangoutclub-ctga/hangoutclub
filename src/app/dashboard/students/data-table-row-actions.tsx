@@ -22,11 +22,19 @@ export function DataTableRowActions<TData>({
   const canEdit = isAdmin || hasPermission('students:edit');
 
   return (
-    <div className="flex items-center justify-end gap-1">
+    <div 
+      data-no-row-click="true"
+      onClick={(e) => e.stopPropagation()}
+      onPointerDown={(e) => e.stopPropagation()}
+      onPointerUp={(e) => e.stopPropagation()}
+      className="flex items-center justify-end gap-1"
+    >
         <Button 
             variant="ghost" 
             size="icon" 
             className="h-8 w-8 text-accent hover:text-accent hover:bg-accent/10"
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
             onClick={(e) => {
                 e.stopPropagation();
                 (table.options.meta as any)?.viewStudent?.(student);
@@ -41,6 +49,8 @@ export function DataTableRowActions<TData>({
               variant="ghost" 
               size="icon" 
               className="h-8 w-8 text-muted-foreground hover:text-primary"
+              onPointerDown={(e) => e.stopPropagation()}
+              onPointerUp={(e) => e.stopPropagation()}
               onClick={(e) => {
                   e.stopPropagation();
                   (table.options.meta as any)?.editStudent?.(student);
@@ -56,6 +66,8 @@ export function DataTableRowActions<TData>({
               variant="ghost"
               size="icon"
               className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+              onPointerDown={(e) => e.stopPropagation()}
+              onPointerUp={(e) => e.stopPropagation()}
               onClick={(e) => {
                   e.stopPropagation();
                   (table.options.meta as any)?.requestDeleteStudent?.(student);

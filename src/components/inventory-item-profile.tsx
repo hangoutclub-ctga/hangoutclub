@@ -25,15 +25,34 @@ export function InventoryItemProfile({ item }: InventoryItemProfileProps) {
     return (
         <div className="flex flex-col gap-6 p-6 pt-0 max-h-[80vh] overflow-y-auto">
              <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
-                <div className="relative w-32 h-32 rounded-lg overflow-hidden border-4 border-card flex-shrink-0 bg-muted flex items-center justify-center">
-                     <Image 
-                        src={getDisplayAvatarUrl(item.imageUrl)} 
-                        alt={item.name} 
-                        fill
-                        className="object-cover" 
-                        data-ai-hint="inventory item"
-                    />
-                </div>
+                <Dialog>
+                    <DialogTrigger asChild>
+                        <div className="relative w-32 h-32 rounded-lg overflow-hidden border-4 border-card flex-shrink-0 bg-muted flex items-center justify-center cursor-pointer hover:opacity-85 transition-opacity" title="Clique para ampliar a foto">
+                            <Image 
+                                src={getDisplayAvatarUrl(item.imageUrl)} 
+                                alt={item.name} 
+                                fill
+                                className="object-cover" 
+                                data-ai-hint="inventory item"
+                            />
+                        </div>
+                    </DialogTrigger>
+                    <DialogContent className="sm:max-w-xs">
+                        <DialogHeader>
+                            <DialogTitle className="truncate">Foto de {item.name}</DialogTitle>
+                        </DialogHeader>
+                        <div className="flex justify-center items-center p-4">
+                            <div className="relative h-64 w-64 rounded-xl border overflow-hidden">
+                                <Image
+                                    src={getDisplayAvatarUrl(item.imageUrl)}
+                                    alt={item.name}
+                                    fill
+                                    className="object-cover"
+                                />
+                            </div>
+                        </div>
+                    </DialogContent>
+                </Dialog>
                 <div className="flex-1 space-y-2 text-center sm:text-left">
                     <h2 className="text-2xl font-black text-primary">{item.name}</h2>
                     <Badge variant="outline" className="text-sm">{item.category}</Badge>

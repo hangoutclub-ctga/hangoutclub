@@ -246,7 +246,25 @@ export default function InventoryPage() {
                                 return (
                                     <TableRow key={item.id} className={isLow ? 'bg-red-500/5' : ''}>
                                         <TableCell className="p-2">
-                                            <Avatar className="h-8 w-8 sm:h-9 sm:w-9 border"><AvatarImage src={getDisplayAvatarUrl(item.imageUrl)} /><AvatarFallback>IT</AvatarFallback></Avatar>
+                                            <Dialog>
+                                                <DialogTrigger asChild>
+                                                    <Avatar className="h-8 w-8 sm:h-9 sm:w-9 border cursor-pointer hover:opacity-80 transition-opacity">
+                                                        <AvatarImage src={getDisplayAvatarUrl(item.imageUrl)} alt={item.name} />
+                                                        <AvatarFallback>{item.name ? item.name.substring(0, 2).toUpperCase() : 'IT'}</AvatarFallback>
+                                                    </Avatar>
+                                                </DialogTrigger>
+                                                <DialogContent className="sm:max-w-xs">
+                                                    <DialogHeader>
+                                                        <DialogTitle className="truncate">Foto de {item.name}</DialogTitle>
+                                                    </DialogHeader>
+                                                    <div className="flex justify-center items-center p-4">
+                                                        <Avatar className="h-64 w-64 rounded-xl border">
+                                                            <AvatarImage src={getDisplayAvatarUrl(item.imageUrl)} alt={item.name} className="object-cover" />
+                                                            <AvatarFallback className="text-4xl">{item.name ? item.name.substring(0, 2).toUpperCase() : 'IT'}</AvatarFallback>
+                                                        </Avatar>
+                                                    </div>
+                                                </DialogContent>
+                                            </Dialog>
                                         </TableCell>
                                         <TableCell className="p-2">
                                             <div className="font-bold text-[10px] sm:text-sm truncate max-w-[80px] sm:max-w-none">{item.name}</div>

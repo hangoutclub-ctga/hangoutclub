@@ -147,7 +147,8 @@ export function DataTable<TData, TValue>({
       target.closest('[role="checkbox"]') || 
       target.closest('[role="dialog"]') ||
       target.closest('[data-radix-portal]') ||
-      target.closest('[data-no-row-click]')
+      target.closest('[data-no-row-click]') ||
+      target.closest('[data-slot="avatar"]')
     ) {
       return;
     }
@@ -173,7 +174,8 @@ export function DataTable<TData, TValue>({
           target.closest('[role="checkbox"]') || 
           target.closest('[role="dialog"]') ||
           target.closest('[data-radix-portal]') ||
-          target.closest('[data-no-row-click]')
+          target.closest('[data-no-row-click]') ||
+          target.closest('[data-slot="avatar"]')
         ) {
             return;
         }
@@ -236,14 +238,28 @@ export function DataTable<TData, TValue>({
                   onPointerLeave={() => handlePointerLeave(row)}
                   className="cursor-pointer hover:bg-muted/50 transition-colors select-none"
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="py-2 px-2 sm:px-4 text-[10px] sm:text-xs">
-                      {flexRender(
-                        cell.column.columnDef.cell,
-                        cell.getContext()
-                      )}
-                    </TableCell>
-                  ))}
+                  {row.getVisibleCells().map((cell) => {
+                    const isNonRowClickCell = 
+                      cell.column.id === 'select' || 
+                      cell.column.id === 'avatarUrl' || 
+                      cell.column.id === 'actions';
+
+                    return (
+                      <TableCell 
+                        key={cell.id} 
+                        className="py-2 px-2 sm:px-4 text-[10px] sm:text-xs"
+                        data-no-row-click={isNonRowClickCell ? "true" : undefined}
+                        onClick={isNonRowClickCell ? (e) => e.stopPropagation() : undefined}
+                        onPointerDown={isNonRowClickCell ? (e) => e.stopPropagation() : undefined}
+                        onPointerUp={isNonRowClickCell ? (e) => e.stopPropagation() : undefined}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext()
+                        )}
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
               ))
             ) : (

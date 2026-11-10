@@ -46,22 +46,27 @@ export const columns: ColumnDef<Student>[] = [
       const student = row.original;
       const displayUrl = getDisplayAvatarUrl(student.avatarUrl);
       return (
-        <div onClick={(e) => e.stopPropagation()}>
+        <div 
+          data-no-row-click="true"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+          onPointerUp={(e) => e.stopPropagation()}
+        >
           <Dialog>
               <DialogTrigger asChild>
-                  <Avatar className="h-9 w-9 cursor-pointer">
+                  <Avatar className="h-9 w-9 cursor-pointer hover:opacity-80 transition-opacity">
                       <AvatarImage src={displayUrl} alt={student.name} data-ai-hint="student avatar" />
                       <AvatarFallback>{student.name.charAt(0)}</AvatarFallback>
                   </Avatar>
               </DialogTrigger>
               <DialogContent className="sm:max-w-xs">
                   <DialogHeader>
-                      <DialogTitle>Foto de {student.name}</DialogTitle>
+                      <DialogTitle className="truncate">Foto de {student.name}</DialogTitle>
                   </DialogHeader>
                   <div className="flex justify-center items-center p-4">
-                       <Avatar className="h-64 w-64">
-                          <AvatarImage src={displayUrl} alt={student.name} data-ai-hint="student avatar" />
-                          <AvatarFallback>{student.name.substring(0, 2)}</AvatarFallback>
+                       <Avatar className="h-64 w-64 rounded-xl border">
+                          <AvatarImage src={displayUrl} alt={student.name} data-ai-hint="student avatar" className="object-cover" />
+                          <AvatarFallback className="text-4xl">{student.name.substring(0, 2)}</AvatarFallback>
                       </Avatar>
                   </div>
               </DialogContent>
@@ -124,6 +129,7 @@ export const columns: ColumnDef<Student>[] = [
     id: "actions",
     cell: ({ row, table }) => (
       <div 
+        data-no-row-click="true"
         onClick={(e) => e.stopPropagation()}
         onPointerDown={(e) => e.stopPropagation()}
         onPointerUp={(e) => e.stopPropagation()}
