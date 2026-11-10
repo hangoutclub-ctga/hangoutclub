@@ -129,12 +129,13 @@
   }
 
   /* When printing, isolate the printable content tree and hide everything else.
-     The shopping-print-sheet and student-print-sheet are rendered via createPortal as direct body children,
+     The shopping-print-sheet, student-print-sheet, and infographic-print-sheet are rendered via createPortal as direct body children,
      so they need to survive ALL isolation rules. */
-  body:has([role="dialog"]) > *:not(:has([role="dialog"])):not([data-radix-portal]):not(:has([data-radix-portal])):not(.shopping-print-sheet):not(.student-print-sheet),
+  body:has([role="dialog"]):not(:has(.infographic-print-sheet)) > *:not(:has([role="dialog"])):not([data-radix-portal]):not(:has([data-radix-portal])):not(.shopping-print-sheet):not(.student-print-sheet):not(.infographic-print-sheet),
   body:has(.student-print-sheet) > *:not(.student-print-sheet):not(:has(.student-print-sheet)),
   body:has(.shopping-print-sheet) > *:not(.shopping-print-sheet):not(:has(.shopping-print-sheet)),
-  body:not(:has([role="dialog"])):not(:has(.student-print-sheet)):not(:has(.shopping-print-sheet)):has(.printable-area) > *:not(:has(.printable-area)) {
+  body:has(.infographic-print-sheet) > *:not(.infographic-print-sheet):not(:has(.infographic-print-sheet)),
+  body:not(:has([role="dialog"])):not(:has(.student-print-sheet)):not(:has(.shopping-print-sheet)):not(:has(.infographic-print-sheet)):has(.printable-area) > *:not(:has(.printable-area)) {
     display: none !important;
     height: 0 !important;
     max-height: 0 !important;
@@ -148,7 +149,9 @@
   div:has(> .student-print-sheet),
   .student-print-sheet,
   div:has(> .shopping-print-sheet),
-  .shopping-print-sheet {
+  .shopping-print-sheet,
+  div:has(> .infographic-print-sheet),
+  .infographic-print-sheet {
     display: block !important;
     width: 100% !important;
     background: #ffffff !important;
@@ -161,8 +164,22 @@
   body:has(.student-print-sheet) [data-radix-portal],
   body:has(.student-print-sheet) div[role="dialog"],
   body:has(.shopping-print-sheet) [data-radix-portal],
-  body:has(.shopping-print-sheet) div[role="dialog"] {
+  body:has(.shopping-print-sheet) div[role="dialog"],
+  body:has(.infographic-print-sheet) [data-radix-portal],
+  body:has(.infographic-print-sheet) div[role="dialog"] {
     display: none !important;
+  }
+
+  /* Infographic print sheet sizing and layout */
+  .infographic-print-sheet {
+    display: block !important;
+    width: 100% !important;
+    max-width: 277mm !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    page: landscape-infographic;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
   }
 
   /* Ensure body with Radix scroll lock expands naturally for print */

@@ -1,7 +1,8 @@
 
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import ReactDOM from "react-dom";
 import {
   Card,
   CardContent,
@@ -126,6 +127,13 @@ export default function FinancePage() {
     const [isImporterOpen, setIsImporterOpen] = useState(false);
     const [isPendingModalOpen, setIsPendingModalOpen] = useState(false);
     const [isInfographicModalOpen, setIsInfographicModalOpen] = useState(false);
+    const [isPrintingInfographic, setIsPrintingInfographic] = useState(false);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     const [pendingSearchTerm, setPendingSearchTerm] = useState("");
 
     const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
@@ -692,17 +700,20 @@ export default function FinancePage() {
         }
         styleEl.innerHTML = `@page { size: A4 landscape !important; margin: 8mm 10mm !important; }`;
 
+        setIsPrintingInfographic(true);
+
         const cleanup = () => {
             const el = document.getElementById(styleId);
             if (el) el.remove();
+            setIsPrintingInfographic(false);
             window.removeEventListener("afterprint", cleanup);
         };
         window.addEventListener("afterprint", cleanup);
-        setTimeout(cleanup, 5000);
+        setTimeout(cleanup, 10000);
 
         setTimeout(() => {
             window.print();
-        }, 50);
+        }, 150);
     };
 
     const handleBack = () => {
@@ -869,22 +880,33 @@ export default function FinancePage() {
                 />
 
                 <Dialog open={isInfographicModalOpen} onOpenChange={setIsInfographicModalOpen}>
-                    <DialogContent className="sm:max-w-[950px] w-[96vw] max-h-[92vh] overflow-y-auto p-3 sm:p-5 rounded-2xl print:max-h-none print:overflow-visible print:w-full print:p-0 print:border-none print:shadow-none print:bg-white print:static print:transform-none printable-area">
+                    <DialogContent 
+                        className="sm:max-w-[950px] w-[96vw] max-h-[92vh] overflow-y-auto p-3 sm:p-5 rounded-2xl"
+                        onInteractOutside={(e) => {
+                            if (isPrintingInfographic) {
+                                e.preventDefault();
+                            }
+                        }}
+                        onFocusOutside={(e) => {
+                            // Impede que a perda de foco ao abrir a tela de impressão do navegador feche o modal
+                            e.preventDefault();
+                        }}
+                    >
                         <DialogHeader className="pb-3 border-b">
                             <div className="flex items-center justify-between pr-8">
                                 <div>
-                                    <DialogTitle className="flex items-center gap-2 text-sm sm:text-base font-bold font-headline print:text-lg">
-                                        <PieChart className="h-4 w-4 text-accent print:hidden" />
+                                    <DialogTitle className="flex items-center gap-2 text-sm sm:text-base font-bold font-headline">
+                                        <PieChart className="h-4 w-4 text-accent" />
                                         Infográfico Gerencial de Desempenho
                                     </DialogTitle>
-                                    <DialogDescription className="text-[11px] sm:text-xs text-muted-foreground mt-0.5 print:text-[10px] print:text-slate-600">
+                                    <DialogDescription className="text-[11px] sm:text-xs text-muted-foreground mt-0.5">
                                         Período: <strong className="text-foreground capitalize">{periodLabel}</strong> • Análise orçamentária detalhada das 5 categorias
                                     </DialogDescription>
                                 </div>
                                 <Button 
                                     variant="outline" 
                                     size="sm" 
-                                    className="h-8 px-2.5 rounded-xl border-accent/30 text-accent hover:bg-accent/10 gap-1.5 text-xs font-semibold no-print shadow-xs"
+                                    className="h-8 px-2.5 rounded-xl border-accent/30 text-accent hover:bg-accent/10 gap-1.5 text-xs font-semibold no-print shadow-xs cursor-pointer"
                                     onClick={handlePrintInfographic}
                                     title="Imprimir Infográfico em Modo Paisagem"
                                 >
@@ -1875,6 +1897,37 @@ export default function FinancePage() {
                 </div>
             </DialogContent>
         </Dialog>
+
+        {/* Folha Oficial de Impressão do Infográfico Gerencial (Renderizada via Portal no body para isolamento perfeito em Modo Paisagem) */}
+        {mounted && isPrintingInfographic && typeof document !== "undefined" && ReactDOM.createPortal(
+            <div className="infographic-print-sheet print-only">
+                <div className="border-b-2 border-slate-900 pb-2 mb-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2.5">
+                        <div className="h-7 w-7 rounded-lg bg-slate-900 text-white flex items-center justify-center font-black text-sm">
+                            H
+                        </div>
+                        <div>
+                            <h1 className="text-base font-black tracking-tight text-slate-900 font-headline uppercase leading-none">
+                                Hangout Club • Infográfico Gerencial de Desempenho
+                            </h1>
+                            <p className="text-[10px] text-slate-600 font-medium mt-0.5">
+                                Período: <strong className="text-slate-900 capitalize">{periodLabel}</strong> • Análise orçamentária detalhada das 5 categorias e telemetria financeira
+                            </p>
+                        </div>
+                    </div>
+                    <div className="text-right text-[10px] text-slate-500 font-mono">
+                        Emitido em: {new Date().toLocaleDateString('pt-BR')} às {new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                </div>
+                <FinanceInfographic 
+                    categoryTotals={categoryTotals} 
+                    totals={totals} 
+                    periodLabel={periodLabel} 
+                    hideCollapseButton={true}
+                />
+            </div>,
+            document.body
+        )}
     </div>
   )
 }
