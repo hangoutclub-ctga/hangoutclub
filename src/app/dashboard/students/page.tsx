@@ -153,7 +153,7 @@ export default function StudentsPage() {
                           student={editingStudent} 
                           onSave={handleSaveStudent} 
                           onCancel={() => setIsFormOpen(false)}
-                          availableClasses={classes}
+                          availableClasses={classes.filter(c => (c.status || '').trim().toLowerCase() === 'ativa')}
                           studentConditions={categories.studentConditions}
                       />
                     </DialogContent>

@@ -125,6 +125,17 @@ export function StudentForm({ student, onSave, onCancel, availableClasses, stude
   const [newDocUrl, setNewDocUrl] = React.useState("");
   const [newDocType, setNewDocType] = React.useState<'image' | 'pdf' | 'link'>('image');
   
+  // Apenas turmas ativas/disponíveis (ignora turmas apagadas ou inativas/inaptas)
+  const activeAvailableClasses = React.useMemo(() => {
+    return (availableClasses || [])
+      .filter(c => {
+        if (!c) return false;
+        const status = (c.status || '').trim().toLowerCase();
+        return status === 'ativa';
+      })
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' }));
+  }, [availableClasses]);
+
   const numberInputRef = React.useRef<HTMLInputElement>(null);
   
   const form = useForm<StudentFormValues>({
@@ -547,7 +558,7 @@ export function StudentForm({ student, onSave, onCancel, availableClasses, stude
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="__NONE__">Não vincular a nenhuma turma</SelectItem>
-                      {availableClasses.map(c => (
+                      {activeAvailableClasses.map(c => (
                         <SelectItem key={c.id} value={c.name}>{c.name}</SelectItem>
                       ))}
                     </SelectContent>
