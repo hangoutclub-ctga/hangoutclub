@@ -151,11 +151,11 @@ export function FinanceInfographic({ categoryTotals, totals, periodLabel, hideCo
       <div className="space-y-4 print:p-2 print:space-y-3">
         
         {/* SEÇÃO PRINCIPAL: DONUT HOLOGRÁFICO + PAINEL DE TELEMETRIA DAS 5 CATEGORIAS */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 items-center">
+        <div className="grid grid-cols-1 lg:grid-cols-12 print:grid-cols-12 gap-4 print:gap-3 items-center">
           
           {/* COLUNA 1: O GRÁFICO DE PIZZA / ROSCA HOLOGRÁFICO (SVG INTERATIVO) */}
-          <div className="lg:col-span-5 flex flex-col items-center justify-center p-2 relative">
-            <div className="relative w-[240px] h-[240px] sm:w-[270px] sm:h-[270px] flex items-center justify-center">
+          <div className="lg:col-span-5 print:col-span-5 flex flex-col items-center justify-center p-2 print:p-0 relative">
+            <div className="relative w-[240px] h-[240px] sm:w-[270px] sm:h-[270px] print:w-[200px] print:h-[200px] flex items-center justify-center">
               
               {/* Efeito radial de fundo */}
               <div 
@@ -327,7 +327,7 @@ export function FinanceInfographic({ categoryTotals, totals, periodLabel, hideCo
           </div>
 
           {/* COLUNA 2: PAINEL HOLOGRÁFICO DETALHADO DAS 5 CATEGORIAS */}
-          <div className="lg:col-span-7 space-y-2">
+          <div className="lg:col-span-7 print:col-span-7 space-y-2 print:space-y-1.5">
             
             {/* Card Hero: RECEITAS (A fonte motriz) */}
             <div 
@@ -366,7 +366,7 @@ export function FinanceInfographic({ categoryTotals, totals, periodLabel, hideCo
             </div>
 
             {/* Grid com os 4 Pilares de Saída (Custos, Despesas, Investimentos, Gastos) */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 print:grid-cols-2 gap-2 print:gap-1.5">
               {segments.map((seg) => {
                 const isSelected = activeCategory === seg.id;
 
@@ -421,7 +421,7 @@ export function FinanceInfographic({ categoryTotals, totals, periodLabel, hideCo
         </div>
 
         {/* SEÇÃO 2: COCKPIT DE TELEMETRIA E DIAGNÓSTICO OPERACIONAL (4 MÓDULOS) */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-2 pt-1 border-t border-border/50">
+        <div className="grid grid-cols-2 md:grid-cols-4 print:grid-cols-4 gap-2 pt-1 border-t border-border/50 print:gap-1.5 print:pt-1.5">
           
           {/* Módulo 1: Margem Líquida */}
           <div className="p-2.5 rounded-xl border bg-card/60 relative overflow-hidden">

@@ -682,6 +682,29 @@ export default function FinancePage() {
         }
     };
 
+    const handlePrintInfographic = () => {
+        const styleId = "infographic-print-orientation";
+        let styleEl = document.getElementById(styleId) as HTMLStyleElement | null;
+        if (!styleEl) {
+            styleEl = document.createElement("style");
+            styleEl.id = styleId;
+            document.head.appendChild(styleEl);
+        }
+        styleEl.innerHTML = `@page { size: A4 landscape !important; margin: 8mm 10mm !important; }`;
+
+        const cleanup = () => {
+            const el = document.getElementById(styleId);
+            if (el) el.remove();
+            window.removeEventListener("afterprint", cleanup);
+        };
+        window.addEventListener("afterprint", cleanup);
+        setTimeout(cleanup, 5000);
+
+        setTimeout(() => {
+            window.print();
+        }, 50);
+    };
+
     const handleBack = () => {
         handleLinkClick();
         router.back();
@@ -862,15 +885,11 @@ export default function FinancePage() {
                                     variant="outline" 
                                     size="sm" 
                                     className="h-8 px-2.5 rounded-xl border-accent/30 text-accent hover:bg-accent/10 gap-1.5 text-xs font-semibold no-print shadow-xs"
-                                    onClick={() => {
-                                        setTimeout(() => {
-                                            window.print();
-                                        }, 50);
-                                    }}
-                                    title="Imprimir este Infográfico"
+                                    onClick={handlePrintInfographic}
+                                    title="Imprimir Infográfico em Modo Paisagem"
                                 >
                                     <Printer className="h-3.5 w-3.5" />
-                                    <span className="hidden sm:inline">Imprimir</span>
+                                    <span className="hidden sm:inline">Imprimir (Paisagem)</span>
                                 </Button>
                             </div>
                         </DialogHeader>
@@ -991,15 +1010,6 @@ export default function FinancePage() {
                             </p>
                         </CardContent>
                     </Card>
-                </div>
-
-                {/* Infográfico Gerencial com Distribuição das 5 Categorias e Indicadores (Apenas Impressão) */}
-                <div className="hidden print:block">
-                    <FinanceInfographic 
-                        categoryTotals={categoryTotals} 
-                        totals={totals} 
-                        periodLabel={periodLabel} 
-                    />
                 </div>
 
                 {/* Divisão Gerencial: Receitas, Custos, Despesas, Investimentos, Gastos */}

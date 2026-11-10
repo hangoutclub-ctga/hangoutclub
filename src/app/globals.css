@@ -211,6 +211,11 @@
     display: none !important;
   }
 
+  @page landscape-infographic {
+    size: A4 landscape;
+    margin: 8mm 10mm;
+  }
+
   /* Reset dialog container so it paginates naturally across pages without gaps */
   [role="dialog"] {
     position: static !important;
@@ -233,6 +238,7 @@
     color: #0f172a !important;
     opacity: 1 !important;
     visibility: visible !important;
+    page: landscape-infographic;
   }
 
   /* Hide close button and action buttons inside dialogs during print */
