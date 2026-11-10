@@ -32,13 +32,13 @@ import { ptBR } from "date-fns/locale";
 import { TransactionForm } from "@/components/transaction-form";
 import { FixedExpenseForm } from "@/components/fixed-expense-form";
 import { PayFixedExpenseForm } from "@/components/pay-fixed-expense-form";
-import { ArrowDownCircle, ArrowUpCircle, MinusCircle, Printer, AlertCircle, CheckCircle, Trash2, FilterX, Calendar as CalendarIcon, DollarSign, PlusCircle, Eye, CreditCard, ChevronLeft, Home, ShieldAlert, FileSpreadsheet, Paperclip, Download, Pencil, Check, CheckCheck, Loader2, Users, Search, X } from 'lucide-react';
+import { ArrowDownCircle, ArrowUpCircle, MinusCircle, Printer, AlertCircle, CheckCircle, Trash2, FilterX, Calendar as CalendarIcon, DollarSign, PlusCircle, Eye, CreditCard, ChevronLeft, Home, ShieldAlert, FileSpreadsheet, Paperclip, Download, Pencil, Check, CheckCheck, Loader2, Users, Search, X, Wallet } from 'lucide-react';
 import { Transaction, Student, FixedExpense, normalizeTransactionCategory, TransactionCategory } from "@/types";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "@/hooks/use-toast";
-import { cn, formatCurrency, getDisplayAvatarUrl, isTransactionInMonth } from "@/lib/utils";
+import { cn, formatCurrency, getDisplayAvatarUrl, isTransactionInMonth, getTransactionYearMonth } from "@/lib/utils";
 import { useData } from "@/hooks/use-data";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -120,11 +120,73 @@ export default function FinancePage() {
     }, [transactions, currentMonth, currentYear]);
 
     const totals = useMemo(() => {
+        // Encontra o menor ano e mês com registros na base
+        let minYear = currentYear;
+        let minMonth = currentMonth;
+
+        for (const t of transactions) {
+            if (t.type === 'Apagado' || !t.date) continue;
+            const ym = getTransactionYearMonth(t.date);
+            if (ym) {
+                if (ym.year < minYear || (ym.year === minYear && ym.month < minMonth)) {
+                    minYear = ym.year;
+                    minMonth = ym.month;
+                }
+            }
+        }
+
+        for (const fe of activeFixedExpenses) {
+            if (fe.year < minYear || (fe.year === minYear && fe.month < minMonth)) {
+                minYear = fe.year;
+                minMonth = fe.month;
+            }
+        }
+
+        // Itera mês a mês desde o primeiro registro até o mês imediatamente anterior
+        let runningBalance = 0;
+        let iterYear = minYear;
+        let iterMonth = minMonth;
+
+        while (iterYear < currentYear || (iterYear === currentYear && iterMonth < currentMonth)) {
+            const mIncome = transactions
+                .filter(t => t.type === 'Entrada' && isTransactionInMonth(t.date, iterYear, iterMonth))
+                .reduce((acc, t) => acc + (t.value || 0), 0);
+
+            const mOutcome = transactions
+                .filter(t => t.type === 'Saída' && isTransactionInMonth(t.date, iterYear, iterMonth))
+                .reduce((acc, t) => acc + (t.value || 0), 0);
+
+            const mPendingFixed = activeFixedExpenses
+                .filter(f => f.status === 'Pendente' && f.year === iterYear && f.month === iterMonth)
+                .reduce((acc, f) => acc + (f.value || 0), 0);
+
+            // Fórmula cumulativa: Saldo final do mês = Saldo anterior + Entradas - Saídas - Despesas Fixas
+            runningBalance += (mIncome - mOutcome - mPendingFixed);
+
+            iterMonth++;
+            if (iterMonth > 12) {
+                iterMonth = 1;
+                iterYear++;
+            }
+        }
+
         const income = filteredByDate.filter(t => t.type === 'Entrada').reduce((acc, t) => acc + t.value, 0);
         const outcome = filteredByDate.filter(t => t.type === 'Saída').reduce((acc, t) => acc + t.value, 0);
-        const pendingFixed = activeFixedExpenses.filter(f => f.status === 'Pendente').reduce((acc, f) => acc + f.value, 0);
-        return { income, outcome, fixed: pendingFixed, profit: income - outcome };
-    }, [filteredByDate, activeFixedExpenses]);
+        const pendingFixed = activeFixedExpenses.filter(f => f.status === 'Pendente' && f.year === currentYear && f.month === currentMonth).reduce((acc, f) => acc + f.value, 0);
+
+        const initialBalance = runningBalance;
+        const finalBalance = initialBalance + income - outcome - pendingFixed;
+        const profit = income - outcome - pendingFixed;
+
+        return { 
+            income, 
+            outcome, 
+            fixed: pendingFixed, 
+            initialBalance,
+            finalBalance,
+            profit 
+        };
+    }, [transactions, activeFixedExpenses, filteredByDate, currentYear, currentMonth]);
 
     const categoryTotals = useMemo(() => {
         let receitas = 0;
@@ -645,7 +707,27 @@ export default function FinancePage() {
         </div>
       
         <div className="space-y-4 sm:space-y-8">
-                <div className="grid gap-2 sm:gap-4 grid-cols-2 lg:grid-cols-4">
+                <div className="grid gap-2 sm:gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+                    {/* Card 1: Saldo Inicial */}
+                    <Card className="card-print relative overflow-hidden bg-sky-500/[0.03] border-sky-500/20">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 p-2 sm:p-3 sm:pb-2">
+                            <CardTitle className="text-[10px] sm:text-sm font-bold">Saldo Inicial</CardTitle>
+                            <Wallet className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-sky-500" />
+                        </CardHeader>
+                        <CardContent className="p-2 sm:p-3 pt-0">
+                            <div className={cn(
+                                "text-sm sm:text-2xl font-black truncate",
+                                totals.initialBalance >= 0 ? "text-sky-600 dark:text-sky-400" : "text-red-500"
+                            )}>
+                                {formatCurrency(totals.initialBalance)}
+                            </div>
+                            <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5 truncate">
+                                Do mês anterior
+                            </p>
+                        </CardContent>
+                    </Card>
+
+                    {/* Card 2: Entradas */}
                     <Card 
                         className={cn(
                             "cursor-pointer hover:bg-muted/50 transition-all card-print relative overflow-hidden",
@@ -659,8 +741,13 @@ export default function FinancePage() {
                         </CardHeader>
                         <CardContent className="p-2 sm:p-3 pt-0">
                             <div className="text-sm sm:text-2xl font-black text-green-600 truncate">{formatCurrency(totals.income)}</div>
+                            <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5 truncate">
+                                Recebimentos
+                            </p>
                         </CardContent>
                     </Card>
+
+                    {/* Card 3: Saídas */}
                     <Card 
                         className={cn(
                             "cursor-pointer hover:bg-muted/50 transition-all card-print relative overflow-hidden",
@@ -674,8 +761,13 @@ export default function FinancePage() {
                         </CardHeader>
                         <CardContent className="p-2 sm:p-3 pt-0">
                             <div className="text-sm sm:text-2xl font-black text-red-600 truncate">{formatCurrency(totals.outcome)}</div>
+                            <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5 truncate">
+                                Pagamentos feitos
+                            </p>
                         </CardContent>
                     </Card>
+
+                    {/* Card 4: Despesas Fixas */}
                     <Card 
                         className={cn(
                             "cursor-pointer hover:bg-muted/50 transition-all card-print relative overflow-hidden",
@@ -689,20 +781,33 @@ export default function FinancePage() {
                         </CardHeader>
                         <CardContent className="p-2 sm:p-3 pt-0">
                             <div className="text-sm sm:text-2xl font-black truncate">{formatCurrency(totals.fixed)}</div>
+                            <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5 truncate">
+                                Pendentes do mês
+                            </p>
                         </CardContent>
                     </Card>
+
+                    {/* Card 5: Saldo Final */}
                     <Card 
                         className={cn(
-                            "card-print relative overflow-hidden", 
-                            totals.profit > 0 ? "border-green-500" : "border-red-500"
+                            "card-print relative overflow-hidden col-span-2 md:col-span-1", 
+                            totals.finalBalance >= 0 ? "border-green-500 bg-green-500/[0.02]" : "border-red-500 bg-red-500/[0.02]"
                         )}
                     >
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 p-2 sm:p-3 sm:pb-2">
-                            <CardTitle className="text-[10px] sm:text-sm font-bold">Líquido</CardTitle>
-                            <div className={cn("text-[10px] font-bold", totals.profit > 0 ? "text-green-500" : "text-red-500")}>$</div>
+                            <CardTitle className="text-[10px] sm:text-sm font-bold">Saldo Final</CardTitle>
+                            <div className={cn("text-[10px] font-bold", totals.finalBalance >= 0 ? "text-green-500" : "text-red-500")}>$</div>
                         </CardHeader>
                         <CardContent className="p-2 sm:p-3 pt-0">
-                            <div className={`text-sm sm:text-2xl font-black truncate ${totals.profit > 0 ? "text-green-500" : "text-red-500"}`}>{formatCurrency(totals.profit)}</div>
+                            <div className={cn(
+                                "text-sm sm:text-2xl font-black truncate",
+                                totals.finalBalance >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
+                            )}>
+                                {formatCurrency(totals.finalBalance)}
+                            </div>
+                            <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5 truncate" title="Fórmula: Saldo Inicial + Entradas - Saídas - Despesas Fixas">
+                                Líquido: {formatCurrency(totals.profit)}
+                            </p>
                         </CardContent>
                     </Card>
                 </div>

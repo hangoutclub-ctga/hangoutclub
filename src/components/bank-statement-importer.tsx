@@ -162,9 +162,9 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
 
     const text = `${desc} ${complement}`.toUpperCase();
 
-    // 1. Aplicações Financeiras e Investimentos Patrimoniais -> Sempre INVESTIMENTO
-    // Ex: "Aplicação RDC", "RDC", "CDB", "LCI", "Fundo", reformas, móveis, tatames
-    if (
+    // 1. Aplicações Financeiras, Reformas e Equipamentos/Móveis -> Sempre INVESTIMENTO
+    // Ex: "Aplicação RDC", "RDC", "CDB", "LCI", "Fundo", reformas, obras, móveis, tatames, computadores
+    const isInvestment = (
       text.includes("APLICACAO") ||
       text.includes("APLICAÇÃO") ||
       text.includes("RDC") ||
@@ -174,6 +174,7 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
       text.includes("INVESTIMENTO") ||
       text.includes("REFORMA") ||
       text.includes("EQUIPAMENTO") ||
+      text.includes("QUADRO") ||
       text.includes("TATAME") ||
       text.includes("COMPUTADOR") ||
       text.includes("NOTEBOOK") ||
@@ -181,18 +182,32 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
       text.includes("AR-CONDICIONADO") ||
       text.includes("MOBILIA") ||
       /\bM[OÓ]VEIS\b/.test(text) ||
-      /\bOBRAS?\b/.test(text) ||
+      /\bM[OÓ]VEL\b/.test(text) ||
+      (/\bOBRAS?\b/.test(text) && !text.includes("COBRANCA") && !text.includes("COBRANÇA")) ||
       text.includes("CONSTRUCAO") ||
       text.includes("CONSTRUÇÃO") ||
       text.includes("PATRIMONIO") ||
       text.includes("PATRIMÔNIO")
-    ) {
+    );
+
+    if (isInvestment) {
       return 'Investimento';
     }
 
-    // 2. Pró-labore dos Sócios (Sidney Xisto / Patrícia Lara / Intercredis) -> Sempre DESPESA
-    // (Não entra como Custo de aula, mas sim como Despesa operacional de Pró-labore)
-    if (
+    // 2. Custos Operacionais / Pessoal Direto -> CUSTO
+    // - Marketing (Pagamentos Marketing, Meta, Instagram, Google Ads, Nina Turbinar)
+    // - Pró-labore dos sócios (Transferência Intercredis, Sidney Xisto, Patrícia Lara)
+    // - Professores (Maisa, Gabriela, etc.)
+    // - Secretaria (Célia)
+    const isCusto = (
+      text.includes("MARKETING") ||
+      text.includes("META PLATFORMS") ||
+      text.includes("FACEBOOK") ||
+      text.includes("INSTAGRAM") ||
+      text.includes("GOOGLE ADS") ||
+      text.includes("TURBINAR REDE") ||
+      text.includes("ANA CAROLINA") ||
+      text.includes("NINA") ||
       text.includes("INTERCREDIS") ||
       text.includes("SIDNEY") ||
       text.includes("PATRICIA") ||
@@ -200,27 +215,18 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
       text.includes("PROLABORE") ||
       text.includes("PRO-LABORE") ||
       text.includes("PRÓ-LABORE") ||
-      text.includes("PRO LABORE")
-    ) {
-      return 'Despesa';
-    }
-
-    // 3. Custos diretos das aulas e atividades (Professores e Lanches) -> CUSTO
-    if (
+      text.includes("PRO LABORE") ||
       text.includes("MAISA") ||
       text.includes("MAÍSA") ||
       text.includes("GABRIEL") ||
       text.includes("GABI") ||
+      text.includes("GABRILA") ||
+      text.includes("CELIA") ||
+      text.includes("CÉLIA") ||
+      text.includes("SECRETARIA") ||
+      text.includes("SECRETÁRIA") ||
       text.includes("PROFESSOR") ||
       text.includes("INSTRUTOR") ||
-      text.includes("LANCHE") ||
-      text.includes("PADARIA") ||
-      text.includes("PAO") ||
-      text.includes("PÃO") ||
-      text.includes("BISCOITO") ||
-      text.includes("BOLO") ||
-      text.includes("PACOCA") ||
-      text.includes("PAÇOCA") ||
       text.includes("AULA") ||
       text.includes("APOSTILA") ||
       text.includes("DIDATICO") ||
@@ -228,11 +234,100 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
       text.includes("UNIFORME") ||
       text.includes("SALARIO PROF") ||
       text.includes("SALÁRIO PROF")
-    ) {
+    ) && !text.includes("BOLO P/MAISA");
+
+    if (isCusto) {
       return 'Custo';
     }
 
-    // 4. Outros colaboradores cadastrados (Professores restantes -> Custo; Secretaria/Admin -> Despesa)
+    // 3. Gastos de Consumo, Lanches e Materiais -> GASTO
+    // Pão, bala, bolo e paçocas, Copos, Guardanapo, Suco, milho, Sabão, Açúcar, Resma, Papelaria, Detergente, produtos de limpeza e Comidas
+    const isGasto = (
+      text.includes("PAO") ||
+      text.includes("PÃO") ||
+      text.includes("PADARIA") ||
+      text.includes("CENTER PAO") ||
+      text.includes("ALESSANDRA FERREIRA") ||
+      text.includes("BALA") ||
+      text.includes("BALAS") ||
+      text.includes("BOLO") ||
+      text.includes("BOLOS") ||
+      text.includes("PACOCA") ||
+      text.includes("PAÇOCA") ||
+      text.includes("BISCOITO") ||
+      text.includes("PIPOCA") ||
+      text.includes("BOMBOM") ||
+      text.includes("DOCE") ||
+      text.includes("DOCES") ||
+      text.includes("PIRULITO") ||
+      text.includes("COPO") ||
+      text.includes("COPOS") ||
+      text.includes("GUARDANAPO") ||
+      text.includes("GUARD.") ||
+      text.includes("SUCO") ||
+      text.includes("SUCOS") ||
+      text.includes("REFRI") ||
+      text.includes("REFRIGERANTE") ||
+      text.includes("MILHO") ||
+      text.includes("SABAO") ||
+      text.includes("SABÃO") ||
+      text.includes("ACUCAR") ||
+      text.includes("AÇUCAR") ||
+      text.includes("AÇÚCAR") ||
+      text.includes("RESMA") ||
+      text.includes("PAPELARIA") ||
+      text.includes("SÃO PAULO") ||
+      text.includes("SAO PAULO") ||
+      text.includes("INFOBOX") ||
+      text.includes("SULFITE") ||
+      text.includes("CARTOLINA") ||
+      text.includes("EVA") ||
+      text.includes("PINCEL") ||
+      text.includes("TINTA") ||
+      text.includes("CANETA") ||
+      text.includes("ADESIVO") ||
+      text.includes("FITA") ||
+      text.includes("DETERGENTE") ||
+      text.includes("LIMPEZA") ||
+      text.includes("LIMPESA") ||
+      text.includes("DESINFETANTE") ||
+      text.includes("HIGIENICO") ||
+      text.includes("HIGIÊNICO") ||
+      text.includes("PAPEL TOALHA") ||
+      text.includes("PAPELTOALHA") ||
+      text.includes("SACO DE LIXO") ||
+      text.includes("RODO") ||
+      text.includes("COMIDA") ||
+      text.includes("COMIDAS") ||
+      text.includes("LANCHE") ||
+      text.includes("ALIMENTACAO") ||
+      text.includes("ALIMENTAÇÃO") ||
+      text.includes("SUPERMERCADO") ||
+      text.includes("SUPERM DO IRMAO") ||
+      text.includes("FRUTAS") ||
+      text.includes("SACOLAO") ||
+      text.includes("SACOLÃO") ||
+      text.includes("EMBALAGEM") ||
+      text.includes("EMBALAGENS") ||
+      text.includes("SALGADINHO") ||
+      text.includes("MARGARINA") ||
+      text.includes("LEITE") ||
+      text.includes("ACHOCOL") ||
+      text.includes("BISNAGA") ||
+      text.includes("ROSQUINHA") ||
+      text.includes("OVOS") ||
+      text.includes("L.COND") ||
+      text.includes("FARMACIA") ||
+      text.includes("PRESENTE") ||
+      text.includes("AVATIM") ||
+      text.includes("EXTENSÃO")
+    );
+
+    if (isGasto) {
+      return 'Gasto';
+    }
+
+    // 4. Outros colaboradores cadastrados (Professores -> Custo; Outros -> Custo/Despesa)
     for (const u of (users || [])) {
       const uName = (u.nickname || '').trim().toUpperCase();
       if (!uName) continue;
@@ -242,57 +337,9 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
       }
     }
 
-    // 5. Pagamentos gerais, tarifas, impostos, contas e despesas operacionais -> DESPESA
-    // "tudo que tiver descrição de pagamento, e despesa Como pagamento do Contador"
-    if (
-      text.includes("PAGAMENTO") ||
-      text.includes("PGTO") ||
-      text.includes("PAGTO") ||
-      text.includes("CONTADOR") ||
-      text.includes("CONTABIL") ||
-      text.includes("HONORARIO") ||
-      text.includes("TARIFA") || 
-      text.includes("TAXA") || 
-      text.includes("COBRANCA") || 
-      text.includes("COBRANÇA") || 
-      text.includes("IOF") || 
-      text.includes("JUROS") || 
-      text.includes("ENERGIA") || 
-      text.includes("LUZ") || 
-      text.includes("CEMIG") || 
-      text.includes("COPASA") || 
-      text.includes("AGUA") || 
-      text.includes("ÁGUA") || 
-      text.includes("TELEFONE") || 
-      text.includes("INTERNET") || 
-      text.includes("ALUGUEL") || 
-      text.includes("CONDOM") || 
-      text.includes("SEGURO") ||
-      text.includes("SECRETARIA") ||
-      text.includes("CELIA") ||
-      text.includes("CÉLIA") ||
-      text.includes("LIMPEZA") ||
-      text.includes("SISTEMA") ||
-      text.includes("SOFTWARE") ||
-      text.includes("SALARIO") ||
-      text.includes("SALÁRIO") ||
-      text.includes("FGTS") ||
-      text.includes("SIMPLES") ||
-      text.includes("RECEITA") ||
-      text.includes("DARF") ||
-      text.includes("DAS ") ||
-      text.includes("INSS") ||
-      text.includes("IMPOSTO") ||
-      text.includes("TRIBUT") ||
-      text.includes("BOLETO") ||
-      text.includes("FATURA") ||
-      text.includes("TITULO") ||
-      text.includes("TÍTULO")
-    ) {
-      return 'Despesa';
-    }
-
-    return 'Gasto';
+    // 5. Despesas Operacionais, Contas, Sistema, Tarifas, Impostos -> DESPESA
+    // Contador, Sistema, Aluguel, energia, internet, agua, condominio, Tarifas, FGTS
+    return 'Despesa';
   };
 
   // Tenta associar o nome do aluno se encontrar o nome no histórico ou nas informações complementares
