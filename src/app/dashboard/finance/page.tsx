@@ -46,6 +46,8 @@ import { useLoading } from "@/hooks/use-loading";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
 import { BankStatementImporter } from "@/components/bank-statement-importer";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import * as XLSX from "xlsx";
+import { FinanceInfographic } from "@/components/finance-infographic";
 
 export default function FinancePage() {
     const { hasPermission } = useAuth();
@@ -71,8 +73,45 @@ export default function FinancePage() {
     const [tempDate, setTempDate] = useState<Date>(new Date());
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
+    const [periodMode, setPeriodMode] = useState<'mensal' | 'trimestral' | 'anual'>('mensal');
+    const [selectedQuarter, setSelectedQuarter] = useState<1 | 2 | 3 | 4>(() => {
+        const q = Math.ceil((new Date().getMonth() + 1) / 3);
+        return (q >= 1 && q <= 4 ? q : 1) as 1 | 2 | 3 | 4;
+    });
+    const [selectedYear, setSelectedYear] = useState<number>(() => confirmedDate.getFullYear());
+
     const currentMonth = confirmedDate.getMonth() + 1;
     const currentYear = confirmedDate.getFullYear();
+    const targetYear = periodMode === 'mensal' ? currentYear : selectedYear;
+
+    const targetMonths = useMemo(() => {
+        if (periodMode === 'mensal') {
+            return [currentMonth];
+        }
+        if (periodMode === 'trimestral') {
+            const start = (selectedQuarter - 1) * 3 + 1;
+            return [start, start + 1, start + 2];
+        }
+        // anual: todos os 12 meses
+        return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    }, [periodMode, currentMonth, selectedQuarter]);
+
+    const periodLabel = useMemo(() => {
+        if (periodMode === 'mensal') {
+            return format(confirmedDate, "MMMM 'de' yyyy", { locale: ptBR });
+        }
+        if (periodMode === 'trimestral') {
+            const qLabels = [
+                "1º Trimestre (Jan - Mar)",
+                "2º Trimestre (Abr - Jun)",
+                "3º Trimestre (Jul - Set)",
+                "4º Trimestre (Out - Dez)"
+            ];
+            return `${qLabels[selectedQuarter - 1]} de ${targetYear}`;
+        }
+        return `Ano Completo de ${targetYear}`;
+    }, [periodMode, confirmedDate, selectedQuarter, targetYear]);
+
     const [filter, setFilter] = useState<string>("Todos");
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [isFixedFormOpen, setIsFixedFormOpen] = useState(false);
@@ -114,15 +153,17 @@ export default function FinancePage() {
 
     const filteredByDate = useMemo(() => {
         return transactions.filter(t => {
-            if (t.type === 'Apagado') return false;
-            return isTransactionInMonth(t.date, currentYear, currentMonth);
+            if (t.type === 'Apagado' || !t.date) return false;
+            const ym = getTransactionYearMonth(t.date);
+            if (!ym) return false;
+            return ym.year === targetYear && targetMonths.includes(ym.month);
         });
-    }, [transactions, currentMonth, currentYear]);
+    }, [transactions, targetYear, targetMonths]);
 
     const totals = useMemo(() => {
         // Encontra o menor ano e mês com registros na base
-        let minYear = currentYear;
-        let minMonth = currentMonth;
+        let minYear = targetYear;
+        let minMonth = targetMonths[0];
 
         for (const t of transactions) {
             if (t.type === 'Apagado' || !t.date) continue;
@@ -142,12 +183,14 @@ export default function FinancePage() {
             }
         }
 
-        // Itera mês a mês desde o primeiro registro até o mês imediatamente anterior
+        // Itera mês a mês desde o primeiro registro até o mês imediatamente anterior ao início do período
         let runningBalance = 0;
         let iterYear = minYear;
         let iterMonth = minMonth;
+        const periodStartYear = targetYear;
+        const periodStartMonth = targetMonths[0];
 
-        while (iterYear < currentYear || (iterYear === currentYear && iterMonth < currentMonth)) {
+        while (iterYear < periodStartYear || (iterYear === periodStartYear && iterMonth < periodStartMonth)) {
             const mIncome = transactions
                 .filter(t => t.type === 'Entrada' && isTransactionInMonth(t.date, iterYear, iterMonth))
                 .reduce((acc, t) => acc + (t.value || 0), 0);
@@ -172,7 +215,9 @@ export default function FinancePage() {
 
         const income = filteredByDate.filter(t => t.type === 'Entrada').reduce((acc, t) => acc + t.value, 0);
         const outcome = filteredByDate.filter(t => t.type === 'Saída').reduce((acc, t) => acc + t.value, 0);
-        const pendingFixed = activeFixedExpenses.filter(f => f.status === 'Pendente' && f.year === currentYear && f.month === currentMonth).reduce((acc, f) => acc + f.value, 0);
+        const pendingFixed = activeFixedExpenses
+            .filter(f => f.status === 'Pendente' && f.year === targetYear && targetMonths.includes(f.month))
+            .reduce((acc, f) => acc + (f.value || 0), 0);
 
         const initialBalance = runningBalance;
         const finalBalance = initialBalance + income - outcome - pendingFixed;
@@ -186,7 +231,14 @@ export default function FinancePage() {
             finalBalance,
             profit 
         };
-    }, [transactions, activeFixedExpenses, filteredByDate, currentYear, currentMonth]);
+    }, [transactions, activeFixedExpenses, filteredByDate, targetYear, targetMonths]);
+
+    const displayedFixedExpenses = useMemo(() => {
+        const periodSpecific = activeFixedExpenses.filter(f => f.year === targetYear && targetMonths.includes(f.month));
+        if (periodSpecific.length > 0) return periodSpecific;
+        if (periodMode === 'mensal') return activeFixedExpenses;
+        return periodSpecific;
+    }, [activeFixedExpenses, targetYear, targetMonths, periodMode]);
 
     const categoryTotals = useMemo(() => {
         let receitas = 0;
@@ -208,15 +260,20 @@ export default function FinancePage() {
     }, [filteredByDate]);
 
     const filteredTransactions = useMemo(() => {
-        if (filter === "Todos") return filteredByDate;
-        if (filter === "Entradas") return filteredByDate.filter(t => t.type === "Entrada");
-        if (filter === "Saídas") return filteredByDate.filter(t => t.type === "Saída");
-        if (filter === "Receitas") return filteredByDate.filter(t => normalizeTransactionCategory(t.category, t.type) === "Receita");
-        if (filter === "Custos") return filteredByDate.filter(t => normalizeTransactionCategory(t.category, t.type) === "Custo");
-        if (filter === "Despesas") return filteredByDate.filter(t => normalizeTransactionCategory(t.category, t.type) === "Despesa");
-        if (filter === "Investimentos") return filteredByDate.filter(t => normalizeTransactionCategory(t.category, t.type) === "Investimento");
-        if (filter === "Gastos") return filteredByDate.filter(t => normalizeTransactionCategory(t.category, t.type) === "Gasto");
-        return filteredByDate;
+        let list = filteredByDate;
+        if (filter === "Entradas") list = filteredByDate.filter(t => t.type === "Entrada");
+        else if (filter === "Saídas") list = filteredByDate.filter(t => t.type === "Saída");
+        else if (filter === "Receitas") list = filteredByDate.filter(t => normalizeTransactionCategory(t.category, t.type) === "Receita");
+        else if (filter === "Custos") list = filteredByDate.filter(t => normalizeTransactionCategory(t.category, t.type) === "Custo");
+        else if (filter === "Despesas") list = filteredByDate.filter(t => normalizeTransactionCategory(t.category, t.type) === "Despesa");
+        else if (filter === "Investimentos") list = filteredByDate.filter(t => normalizeTransactionCategory(t.category, t.type) === "Investimento");
+        else if (filter === "Gastos") list = filteredByDate.filter(t => normalizeTransactionCategory(t.category, t.type) === "Gasto");
+        
+        return [...list].sort((a, b) => {
+            const da = a.date ? new Date(a.date).getTime() : 0;
+            const db = b.date ? new Date(b.date).getTime() : 0;
+            return db - da;
+        });
     }, [filteredByDate, filter]);
 
     const renderCategoryBadge = (category?: string, type?: 'Entrada' | 'Saída' | string) => {
@@ -551,6 +608,78 @@ export default function FinancePage() {
         setIsReceiptOpen(true);
     };
 
+    const handleExportExcel = () => {
+        try {
+            const wb = XLSX.utils.book_new();
+
+            const totalSaidas = categoryTotals.custos + categoryTotals.despesas + categoryTotals.investimentos + categoryTotals.gastos;
+            const margemLiquida = categoryTotals.receitas > 0 ? ((categoryTotals.receitas - totalSaidas) / categoryTotals.receitas) * 100 : 0;
+            const indiceCobertura = totalSaidas > 0 ? (categoryTotals.receitas / totalSaidas) : 0;
+
+            // Aba 1: Resumo Gerencial Consolidado
+            const summaryData = [
+                { Indicador: "Escopo do Relatório", Valor: periodMode.toUpperCase() },
+                { Indicador: "Período Analisado", Valor: periodLabel },
+                { Indicador: "Saldo Inicial (Anterior)", Valor: totals.initialBalance },
+                { Indicador: "Entradas (Faturamento)", Valor: totals.income },
+                { Indicador: "Saídas Registradas", Valor: totals.outcome },
+                { Indicador: "Despesas Fixas Pendentes", Valor: totals.fixed },
+                { Indicador: "Resultado Líquido do Período", Valor: totals.profit },
+                { Indicador: "Saldo Final Projetado", Valor: totals.finalBalance },
+                { Indicador: "", Valor: "" },
+                { Indicador: "--- COMPOSIÇÃO DAS 5 CATEGORIAS ---", Valor: "" },
+                { Indicador: "1. Receitas", Valor: categoryTotals.receitas },
+                { Indicador: "2. Custos (Prolabore, Professores, Secretaria)", Valor: categoryTotals.custos },
+                { Indicador: "3. Despesas (Contador, Sistema, Aluguel, Luz, Marketing)", Valor: categoryTotals.despesas },
+                { Indicador: "4. Investimentos (Aplicações, Reformas, Equipamentos)", Valor: categoryTotals.investimentos },
+                { Indicador: "5. Gastos (Alimentação, Limpeza, Papelaria, etc)", Valor: categoryTotals.gastos },
+                { Indicador: "", Valor: "" },
+                { Indicador: "--- INDICADORES DE SAÚDE OPERACIONAL ---", Valor: "" },
+                { Indicador: "Margem Líquida Operacional (%)", Valor: `${margemLiquida.toFixed(2)}%` },
+                { Indicador: "Índice de Cobertura de Saídas", Valor: `${indiceCobertura.toFixed(2)}x` },
+            ];
+            const wsSummary = XLSX.utils.json_to_sheet(summaryData);
+            wsSummary['!cols'] = [{ wch: 45 }, { wch: 25 }];
+            XLSX.utils.book_append_sheet(wb, wsSummary, "Resumo Gerencial");
+
+            // Aba 2: Lançamentos Detalhados
+            const rows = filteredTransactions.map(t => ({
+                "Data": formatTransactionDate(t.date),
+                "Descrição": t.description || "",
+                "Favorecido / Aluno": t.name || "",
+                "Categoria": normalizeTransactionCategory(t.category, t.type),
+                "Tipo": t.type,
+                "Valor (R$)": t.value,
+                "Forma de Pagamento": t.paymentMethod || ""
+            }));
+            const wsTransactions = XLSX.utils.json_to_sheet(rows);
+            wsTransactions['!cols'] = [
+                { wch: 14 },
+                { wch: 35 },
+                { wch: 25 },
+                { wch: 15 },
+                { wch: 12 },
+                { wch: 15 },
+                { wch: 20 }
+            ];
+            XLSX.utils.book_append_sheet(wb, wsTransactions, "Lançamentos");
+
+            const cleanPeriodName = periodLabel.replace(/[^a-zA-Z0-9_-]/g, "_");
+            XLSX.writeFile(wb, `Relatorio_Financeiro_${cleanPeriodName}.xlsx`);
+
+            toast({
+                title: "Planilha Gerada com Sucesso!",
+                description: `Relatório exportado para Relatorio_Financeiro_${cleanPeriodName}.xlsx`
+            });
+        } catch (err: any) {
+            toast({
+                variant: "destructive",
+                title: "Erro ao exportar Excel",
+                description: err?.message || "Ocorreu um erro ao gerar a planilha."
+            });
+        }
+    };
+
     const handleBack = () => {
         handleLinkClick();
         router.back();
@@ -722,7 +851,7 @@ export default function FinancePage() {
                                 {formatCurrency(totals.initialBalance)}
                             </div>
                             <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5 truncate">
-                                Do mês anterior
+                                {periodMode === 'mensal' ? 'Do mês anterior' : periodMode === 'trimestral' ? 'Do trimestre anterior' : 'Do ano anterior'}
                             </p>
                         </CardContent>
                     </Card>
@@ -782,7 +911,7 @@ export default function FinancePage() {
                         <CardContent className="p-2 sm:p-3 pt-0">
                             <div className="text-sm sm:text-2xl font-black truncate">{formatCurrency(totals.fixed)}</div>
                             <p className="text-[9px] sm:text-[10px] text-muted-foreground mt-0.5 truncate">
-                                Pendentes do mês
+                                {periodMode === 'mensal' ? 'Pendentes do mês' : 'Pendentes no período'}
                             </p>
                         </CardContent>
                     </Card>
@@ -811,6 +940,13 @@ export default function FinancePage() {
                         </CardContent>
                     </Card>
                 </div>
+
+                {/* Infográfico Gerencial com Distribuição das 5 Categorias e Indicadores */}
+                <FinanceInfographic 
+                    categoryTotals={categoryTotals} 
+                    totals={totals} 
+                    periodLabel={periodLabel} 
+                />
 
                 {/* Divisão Gerencial: Receitas, Custos, Despesas, Investimentos, Gastos */}
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none no-print">
@@ -893,7 +1029,7 @@ export default function FinancePage() {
                                         {filter === 'Despesas Fixas' ? 'Despesas Fixas' : 'Transações'}
                                     </CardTitle>
                                     <CardDescription className="text-[10px] sm:text-xs capitalize print:text-[9px] print:text-slate-600">
-                                        Período: {format(confirmedDate, "MMMM 'de' yyyy", { locale: ptBR })}
+                                        Período: {periodLabel}
                                     </CardDescription>
                                 </div>
                                 {filter !== 'Todos' && (
@@ -903,6 +1039,41 @@ export default function FinancePage() {
                                 )}
                             </div>
                             <div className="flex flex-wrap items-center gap-1.5 no-print">
+                                {/* Seletor de Escopo de Período (Mensal / Trimestral / Anual) */}
+                                <div className="flex items-center p-0.5 bg-muted/60 rounded-xl border border-border/50 text-[10px] sm:text-xs font-medium">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPeriodMode('mensal')}
+                                        className={cn(
+                                            "px-2 sm:px-2.5 py-1 rounded-lg transition-all",
+                                            periodMode === 'mensal' ? "bg-background text-foreground font-bold shadow-xs" : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        Mensal
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPeriodMode('trimestral')}
+                                        className={cn(
+                                            "px-2 sm:px-2.5 py-1 rounded-lg transition-all",
+                                            periodMode === 'trimestral' ? "bg-background text-foreground font-bold shadow-xs" : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        Trimestral
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPeriodMode('anual')}
+                                        className={cn(
+                                            "px-2 sm:px-2.5 py-1 rounded-lg transition-all",
+                                            periodMode === 'anual' ? "bg-background text-foreground font-bold shadow-xs" : "text-muted-foreground hover:text-foreground"
+                                        )}
+                                    >
+                                        Anual
+                                    </button>
+                                </div>
+
+                                {periodMode === 'mensal' && (
                                 <Popover open={isCalendarOpen} onOpenChange={(open) => {
                                     setIsCalendarOpen(open);
                                     if (open) setTempDate(confirmedDate);
@@ -926,12 +1097,90 @@ export default function FinancePage() {
                                             onSelect={(d) => d && setTempDate(d)} 
                                             onOk={() => {
                                                 setConfirmedDate(tempDate);
+                                                setSelectedYear(tempDate.getFullYear());
+                                                setSelectedQuarter(Math.ceil((tempDate.getMonth() + 1) / 3) as 1 | 2 | 3 | 4);
                                                 setIsCalendarOpen(false);
                                             }}
                                             locale={ptBR} 
                                         />
                                     </PopoverContent>
                                 </Popover>
+                                )}
+
+                                {periodMode === 'trimestral' && (
+                                    <div className="flex items-center gap-1">
+                                        <Select 
+                                            value={String(selectedQuarter)} 
+                                            onValueChange={(val) => {
+                                                const q = Number(val) as 1 | 2 | 3 | 4;
+                                                setSelectedQuarter(q);
+                                                const startM = (q - 1) * 3;
+                                                setConfirmedDate(prev => new Date(prev.getFullYear(), startM, 1));
+                                            }}
+                                        >
+                                            <SelectTrigger className="h-8 text-[10px] sm:text-xs w-[115px] sm:w-[135px] rounded-xl border-accent/20">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="1">1ºT (Jan - Mar)</SelectItem>
+                                                <SelectItem value="2">2ºT (Abr - Jun)</SelectItem>
+                                                <SelectItem value="3">3ºT (Jul - Set)</SelectItem>
+                                                <SelectItem value="4">4ºT (Out - Dez)</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+
+                                        <Select 
+                                            value={String(targetYear)} 
+                                            onValueChange={(val) => {
+                                                const yr = Number(val);
+                                                setSelectedYear(yr);
+                                                setConfirmedDate(prev => new Date(yr, prev.getMonth(), 1));
+                                            }}
+                                        >
+                                            <SelectTrigger className="h-8 text-[10px] sm:text-xs w-[80px] rounded-xl border-accent/20">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {years.map(y => (
+                                                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                )}
+
+                                {periodMode === 'anual' && (
+                                    <Select 
+                                        value={String(targetYear)} 
+                                        onValueChange={(val) => {
+                                            const yr = Number(val);
+                                            setSelectedYear(yr);
+                                            setConfirmedDate(prev => new Date(yr, prev.getMonth(), 1));
+                                        }}
+                                    >
+                                        <SelectTrigger className="h-8 text-[10px] sm:text-xs w-[95px] rounded-xl border-accent/20">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {years.map(y => (
+                                                <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                )}
+
+                                {/* Exportar Relatório Excel */}
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="h-8 rounded-xl border-emerald-600/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 gap-1.5 text-[10px] sm:text-xs font-semibold shadow-xs"
+                                    onClick={handleExportExcel}
+                                    title="Exportar relatório consolidado deste período em Excel (.xlsx)"
+                                >
+                                    <Download className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+                                    <span className="hidden sm:inline">Exportar Excel</span>
+                                </Button>
+
                                 <Button variant="outline" size="icon" className="h-8 w-8 rounded-xl" onClick={() => window.print()}><Printer className="h-3.5 w-3.5" /></Button>
                             </div>
                         </div>
@@ -948,7 +1197,7 @@ export default function FinancePage() {
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                    {activeFixedExpenses.length > 0 ? activeFixedExpenses.map((f) => (
+                                    {displayedFixedExpenses.length > 0 ? displayedFixedExpenses.map((f) => (
                                         <TableRow key={f.id} className="print:border-b print:border-slate-200">
                                             <TableCell className="max-w-[180px] sm:max-w-[260px] p-2 sm:p-4 print:p-1 print:px-1.5">
                                                 <div className="font-bold text-[10px] sm:text-sm print:text-[9.5px] line-clamp-2 break-words" title={f.description}>{f.description}</div>
