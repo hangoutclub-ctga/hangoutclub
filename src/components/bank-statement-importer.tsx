@@ -162,62 +162,55 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
 
     const text = `${desc} ${complement}`.toUpperCase();
 
-    // 1. Tarifas bancárias, taxas, impostos e contas operacionais/fixas -> Sempre DESPESA
+    // 1. Aplicações Financeiras e Investimentos Patrimoniais -> Sempre INVESTIMENTO
+    // Ex: "Aplicação RDC", "RDC", "CDB", "LCI", "Fundo", reformas, móveis, tatames
     if (
-      text.includes("TARIFA") || 
-      text.includes("TAXA") || 
-      text.includes("COBRANCA") || 
-      text.includes("COBRANÇA") || 
-      text.includes("IOF") || 
-      text.includes("JUROS") || 
-      text.includes("ENERGIA") || 
-      text.includes("LUZ") || 
-      text.includes("CEMIG") || 
-      text.includes("COPASA") || 
-      text.includes("AGUA") || 
-      text.includes("ÁGUA") || 
-      text.includes("TELEFONE") || 
-      text.includes("INTERNET") || 
-      text.includes("ALUGUEL") || 
-      text.includes("CONDOM") || 
-      text.includes("SEGURO") ||
-      text.includes("CONTABIL") ||
-      text.includes("HONORARIO") ||
-      text.includes("SECRETARIA") ||
-      text.includes("LIMPEZA") ||
-      text.includes("SISTEMA") ||
-      text.includes("SOFTWARE") ||
-      text.includes("SALARIO") ||
-      text.includes("SALÁRIO") ||
-      text.includes("FGTS") ||
-      text.includes("SIMPLES") ||
-      text.includes("RECEITA") ||
-      text.includes("DARF") ||
-      text.includes("DAS ") ||
-      text.includes("INSS") ||
-      text.includes("IMPOSTO") ||
-      text.includes("TRIBUT")
+      text.includes("APLICACAO") ||
+      text.includes("APLICAÇÃO") ||
+      text.includes("RDC") ||
+      text.includes("CDB") ||
+      text.includes("LCI") ||
+      text.includes("LCA") ||
+      text.includes("INVESTIMENTO") ||
+      text.includes("REFORMA") ||
+      text.includes("EQUIPAMENTO") ||
+      text.includes("TATAME") ||
+      text.includes("COMPUTADOR") ||
+      text.includes("NOTEBOOK") ||
+      text.includes("AR CONDICIONADO") ||
+      text.includes("AR-CONDICIONADO") ||
+      text.includes("MOBILIA") ||
+      /\bM[OÓ]VEIS\b/.test(text) ||
+      /\bOBRAS?\b/.test(text) ||
+      text.includes("CONSTRUCAO") ||
+      text.includes("CONSTRUÇÃO") ||
+      text.includes("PATRIMONIO") ||
+      text.includes("PATRIMÔNIO")
+    ) {
+      return 'Investimento';
+    }
+
+    // 2. Pró-labore dos Sócios (Sidney Xisto / Patrícia Lara / Intercredis) -> Sempre DESPESA
+    // (Não entra como Custo de aula, mas sim como Despesa operacional de Pró-labore)
+    if (
+      text.includes("INTERCREDIS") ||
+      text.includes("SIDNEY") ||
+      text.includes("PATRICIA") ||
+      text.includes("PATRÍCIA") ||
+      text.includes("PROLABORE") ||
+      text.includes("PRO-LABORE") ||
+      text.includes("PRÓ-LABORE") ||
+      text.includes("PRO LABORE")
     ) {
       return 'Despesa';
     }
 
-    // 2. Colaboradores cadastrados (Professores -> Custo; Secretaria/Admin/Outros -> Despesa)
-    for (const u of (users || [])) {
-      const uName = (u.nickname || '').trim().toUpperCase();
-      if (!uName) continue;
-      // Checa nome completo ou primeiro nome
-      const firstName = uName.split(' ')[0];
-      if (firstName.length >= 3 && text.includes(firstName)) {
-        return u.role === 'Professor' ? 'Custo' : 'Despesa';
-      }
-      // Checa apelido "Gabi" se o texto tiver Gabriela, ou vice-versa
-      if (firstName === 'GABI' && text.includes('GABRIELA')) {
-        return u.role === 'Professor' ? 'Custo' : 'Despesa';
-      }
-    }
-
-    // 3. Custos diretos das aulas e atividades
+    // 3. Custos diretos das aulas e atividades (Professores e Lanches) -> CUSTO
     if (
+      text.includes("MAISA") ||
+      text.includes("MAÍSA") ||
+      text.includes("GABRIEL") ||
+      text.includes("GABI") ||
       text.includes("PROFESSOR") ||
       text.includes("INSTRUTOR") ||
       text.includes("LANCHE") ||
@@ -239,24 +232,64 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
       return 'Custo';
     }
 
-    // 3. Investimentos (reformas, equipamentos, novos bens, tatames, eletrônicos)
+    // 4. Outros colaboradores cadastrados (Professores restantes -> Custo; Secretaria/Admin -> Despesa)
+    for (const u of (users || [])) {
+      const uName = (u.nickname || '').trim().toUpperCase();
+      if (!uName) continue;
+      const firstName = uName.split(' ')[0];
+      if (firstName.length >= 3 && text.includes(firstName)) {
+        return u.role === 'Professor' ? 'Custo' : 'Despesa';
+      }
+    }
+
+    // 5. Pagamentos gerais, tarifas, impostos, contas e despesas operacionais -> DESPESA
+    // "tudo que tiver descrição de pagamento, e despesa Como pagamento do Contador"
     if (
-      text.includes("REFORMA") ||
-      text.includes("EQUIPAMENTO") ||
-      text.includes("TATAME") ||
-      text.includes("COMPUTADOR") ||
-      text.includes("NOTEBOOK") ||
-      text.includes("AR CONDICIONADO") ||
-      text.includes("AR-CONDICIONADO") ||
-      text.includes("MOBILIA") ||
-      /\bM[OÓ]VEIS\b/.test(text) ||
-      /\bOBRAS?\b/.test(text) ||
-      text.includes("CONSTRUCAO") ||
-      text.includes("CONSTRUÇÃO") ||
-      text.includes("PATRIMONIO") ||
-      text.includes("PATRIMÔNIO")
+      text.includes("PAGAMENTO") ||
+      text.includes("PGTO") ||
+      text.includes("PAGTO") ||
+      text.includes("CONTADOR") ||
+      text.includes("CONTABIL") ||
+      text.includes("HONORARIO") ||
+      text.includes("TARIFA") || 
+      text.includes("TAXA") || 
+      text.includes("COBRANCA") || 
+      text.includes("COBRANÇA") || 
+      text.includes("IOF") || 
+      text.includes("JUROS") || 
+      text.includes("ENERGIA") || 
+      text.includes("LUZ") || 
+      text.includes("CEMIG") || 
+      text.includes("COPASA") || 
+      text.includes("AGUA") || 
+      text.includes("ÁGUA") || 
+      text.includes("TELEFONE") || 
+      text.includes("INTERNET") || 
+      text.includes("ALUGUEL") || 
+      text.includes("CONDOM") || 
+      text.includes("SEGURO") ||
+      text.includes("SECRETARIA") ||
+      text.includes("CELIA") ||
+      text.includes("CÉLIA") ||
+      text.includes("LIMPEZA") ||
+      text.includes("SISTEMA") ||
+      text.includes("SOFTWARE") ||
+      text.includes("SALARIO") ||
+      text.includes("SALÁRIO") ||
+      text.includes("FGTS") ||
+      text.includes("SIMPLES") ||
+      text.includes("RECEITA") ||
+      text.includes("DARF") ||
+      text.includes("DAS ") ||
+      text.includes("INSS") ||
+      text.includes("IMPOSTO") ||
+      text.includes("TRIBUT") ||
+      text.includes("BOLETO") ||
+      text.includes("FATURA") ||
+      text.includes("TITULO") ||
+      text.includes("TÍTULO")
     ) {
-      return 'Investimento';
+      return 'Despesa';
     }
 
     return 'Gasto';
@@ -287,7 +320,48 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
       return complement || "Mensalidade / Aluno";
     }
 
-    // Para saídas: se tiver informações complementares (ex: CENTER PAO LTDA CARATINGA BRA), usa como favorecido/fornecedor
+    // Identificação inteligente de favorecidos para saídas:
+    if (text.includes("SIDNEY")) {
+      return "Pró-labore - Sidney Xisto";
+    }
+    if (text.includes("PATRICIA") || text.includes("PATRÍCIA")) {
+      return "Pró-labore - Patrícia Lara";
+    }
+    if (text.includes("INTERCREDIS") || text.includes("TRANSF POUPANCA") || text.includes("TRANSF POUPANÇA")) {
+      return "Pró-labore Sócios (Intercredis)";
+    }
+    if (text.includes("APLICACAO") || text.includes("APLICAÇÃO") || text.includes("RDC")) {
+      return "Aplicação Financeira (RDC)";
+    }
+    if (text.includes("CONTADOR") || text.includes("CONTABIL")) {
+      return "Contabilidade / Contador";
+    }
+    if (text.includes("FGTS")) {
+      return "FGTS";
+    }
+    if (text.includes("SIMPLES")) {
+      return "Simples Nacional";
+    }
+    if (text.includes("RECEITA") || text.includes("DARF")) {
+      return "Receita Federal (Tributos)";
+    }
+    if (text.includes("CELIA") || text.includes("CÉLIA")) {
+      return "Célia Xisto (Secretaria)";
+    }
+    if (text.includes("MAISA") || text.includes("MAÍSA")) {
+      return "Maísa Gabriele (Professora)";
+    }
+    if (text.includes("GABRIEL") || text.includes("GABI")) {
+      return "Gabriela (Professora)";
+    }
+    if (text.includes("CEMIG") || text.includes("LUZ") || text.includes("ENERGIA")) {
+      return "Cemig (Energia Elétrica)";
+    }
+    if (text.includes("COPASA") || text.includes("AGUA") || text.includes("ÁGUA")) {
+      return "Copasa (Água)";
+    }
+
+    // Para saídas gerais: se tiver informações complementares (ex: CENTER PAO LTDA CARATINGA BRA), usa como favorecido/fornecedor
     if (complement) {
       return complement;
     }
