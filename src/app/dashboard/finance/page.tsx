@@ -224,36 +224,36 @@ export default function FinancePage() {
         switch (cat) {
             case 'Receita':
                 return (
-                    <Badge variant="outline" className="text-[8px] h-3.5 py-0 px-1.5 font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 shrink-0">
+                    <Badge variant="outline" className="text-[8px] h-3.5 py-0 px-1.5 font-semibold bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 shrink-0 print:text-[7px] print:h-3 print:px-1 print:py-0 print:border-slate-300">
                         Receita
                     </Badge>
                 );
             case 'Custo':
                 return (
-                    <Badge variant="outline" className="text-[8px] h-3.5 py-0 px-1.5 font-semibold bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30 shrink-0">
+                    <Badge variant="outline" className="text-[8px] h-3.5 py-0 px-1.5 font-semibold bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30 shrink-0 print:text-[7px] print:h-3 print:px-1 print:py-0 print:border-slate-300">
                         Custo
                     </Badge>
                 );
             case 'Despesa':
                 return (
-                    <Badge variant="outline" className="text-[8px] h-3.5 py-0 px-1.5 font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 shrink-0">
+                    <Badge variant="outline" className="text-[8px] h-3.5 py-0 px-1.5 font-semibold bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30 shrink-0 print:text-[7px] print:h-3 print:px-1 print:py-0 print:border-slate-300">
                         Despesa
                     </Badge>
                 );
             case 'Investimento':
                 return (
-                    <Badge variant="outline" className="text-[8px] h-3.5 py-0 px-1.5 font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30 shrink-0">
+                    <Badge variant="outline" className="text-[8px] h-3.5 py-0 px-1.5 font-semibold bg-blue-500/10 text-blue-700 dark:text-blue-400 border-blue-500/30 shrink-0 print:text-[7px] print:h-3 print:px-1 print:py-0 print:border-slate-300">
                         Investimento
                     </Badge>
                 );
             case 'Gasto':
                 return (
-                    <Badge variant="outline" className="text-[8px] h-3.5 py-0 px-1.5 font-semibold bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30 shrink-0">
+                    <Badge variant="outline" className="text-[8px] h-3.5 py-0 px-1.5 font-semibold bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/30 shrink-0 print:text-[7px] print:h-3 print:px-1 print:py-0 print:border-slate-300">
                         Gasto
                     </Badge>
                 );
             default:
-                return <Badge variant="outline" className="text-[8px] h-3.5 py-0 px-1.5 font-semibold shrink-0">{cat}</Badge>;
+                return <Badge variant="outline" className="text-[8px] h-3.5 py-0 px-1.5 font-semibold shrink-0 print:text-[7px] print:h-3 print:px-1 print:py-0 print:border-slate-300">{cat}</Badge>;
         }
     };
 
@@ -707,7 +707,7 @@ export default function FinancePage() {
         </div>
       
         <div className="space-y-4 sm:space-y-8">
-                <div className="grid gap-2 sm:gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5">
+                <div className="grid gap-2 sm:gap-4 grid-cols-2 md:grid-cols-3 lg:grid-cols-5 finance-summary-grid">
                     {/* Card 1: Saldo Inicial */}
                     <Card className="card-print relative overflow-hidden bg-sky-500/[0.03] border-sky-500/20">
                         <CardHeader className="flex flex-row items-center justify-between space-y-0 p-2 sm:p-3 sm:pb-2">
@@ -884,20 +884,20 @@ export default function FinancePage() {
                     </Button>
                 </div>
 
-                <Card className="card-print">
-                    <CardHeader className="p-3 sm:p-6">
+                <Card className="card-print print:border-none print:shadow-none print:m-0">
+                    <CardHeader className="p-3 sm:p-6 print:p-2 print:pb-1">
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div className="flex items-center gap-2">
                                 <div>
-                                    <CardTitle className="text-sm sm:text-lg">
+                                    <CardTitle className="text-sm sm:text-lg print:text-base print:font-bold">
                                         {filter === 'Despesas Fixas' ? 'Despesas Fixas' : 'Transações'}
                                     </CardTitle>
-                                    <CardDescription className="text-[10px] sm:text-xs capitalize">
+                                    <CardDescription className="text-[10px] sm:text-xs capitalize print:text-[9px] print:text-slate-600">
                                         Período: {format(confirmedDate, "MMMM 'de' yyyy", { locale: ptBR })}
                                     </CardDescription>
                                 </div>
                                 {filter !== 'Todos' && (
-                                    <Button variant="ghost" size="sm" className="h-7 text-[9px] gap-1 px-1.5" onClick={() => setFilter('Todos')}>
+                                    <Button variant="ghost" size="sm" className="h-7 text-[9px] gap-1 px-1.5 no-print" onClick={() => setFilter('Todos')}>
                                         <FilterX className="h-3 w-3" /> Limpar
                                     </Button>
                                 )}
@@ -936,26 +936,26 @@ export default function FinancePage() {
                             </div>
                         </div>
                     </CardHeader>
-                    <CardContent className="p-0 sm:p-6 sm:pt-0">
+                    <CardContent className="p-0 sm:p-6 sm:pt-0 print:p-0">
                         {filter === 'Despesas Fixas' ? (
                             <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="text-[10px] sm:text-xs">Despesa</TableHead>
-                                        <TableHead className="text-[10px] sm:text-xs whitespace-nowrap w-[90px]">Vencimento</TableHead>
-                                        <TableHead className="text-right text-[10px] sm:text-xs whitespace-nowrap w-[100px]">Valor</TableHead>
+                                <TableHeader className="print:bg-slate-100">
+                                    <TableRow className="print:border-b print:border-slate-300">
+                                        <TableHead className="text-[10px] sm:text-xs print:text-[9px] print:py-1 print:px-1.5 print:font-bold">Despesa</TableHead>
+                                        <TableHead className="text-[10px] sm:text-xs whitespace-nowrap w-[90px] print:w-[70px] print:text-[9px] print:py-1 print:px-1.5 print:font-bold">Vencimento</TableHead>
+                                        <TableHead className="text-right text-[10px] sm:text-xs whitespace-nowrap w-[100px] print:w-[80px] print:text-[9px] print:py-1 print:px-1.5 print:font-bold">Valor</TableHead>
                                         <TableHead className="text-center no-print text-[10px] sm:text-xs whitespace-nowrap w-[110px]">Ações</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {activeFixedExpenses.length > 0 ? activeFixedExpenses.map((f) => (
-                                        <TableRow key={f.id}>
-                                            <TableCell className="max-w-[180px] sm:max-w-[260px] p-2 sm:p-4">
-                                                <div className="font-bold text-[10px] sm:text-sm line-clamp-2 break-words" title={f.description}>{f.description}</div>
-                                                {f.paymentMethod && <div className="text-[9px] text-muted-foreground flex items-center gap-1 mt-0.5"><CreditCard className="h-2.5 w-2.5 shrink-0" /> {f.paymentMethod}</div>}
+                                        <TableRow key={f.id} className="print:border-b print:border-slate-200">
+                                            <TableCell className="max-w-[180px] sm:max-w-[260px] p-2 sm:p-4 print:p-1 print:px-1.5">
+                                                <div className="font-bold text-[10px] sm:text-sm print:text-[9.5px] line-clamp-2 break-words" title={f.description}>{f.description}</div>
+                                                {f.paymentMethod && <div className="text-[9px] text-muted-foreground flex items-center gap-1 mt-0.5 print:text-[8px] print:mt-0"><CreditCard className="h-2.5 w-2.5 shrink-0 print:h-2 print:w-2" /> {f.paymentMethod}</div>}
                                             </TableCell>
-                                            <TableCell className="text-[10px] sm:text-xs whitespace-nowrap w-[90px]">Dia {f.dueDate}</TableCell>
-                                            <TableCell className="text-right font-mono font-bold text-[10px] sm:text-sm whitespace-nowrap w-[100px] p-2 sm:p-4">{formatCurrency(f.value)}</TableCell>
+                                            <TableCell className="text-[10px] sm:text-xs whitespace-nowrap w-[90px] print:w-[70px] print:p-1 print:px-1.5 print:text-[9px]">Dia {f.dueDate}</TableCell>
+                                            <TableCell className="text-right font-mono font-bold text-[10px] sm:text-sm whitespace-nowrap w-[100px] print:w-[80px] p-2 sm:p-4 print:p-1 print:px-1.5 print:text-[9.5px]">{formatCurrency(f.value)}</TableCell>
                                             <TableCell className="no-print p-1 sm:p-4 text-center whitespace-nowrap w-[110px]">
                                                 <div className="flex items-center justify-center gap-1">
                                                     {f.status === 'Pago' ? (
@@ -1012,32 +1012,32 @@ export default function FinancePage() {
                             </Table>
                         ) : (
                             <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead className="text-[10px] sm:text-xs">Descrição</TableHead>
-                                        <TableHead className="hidden sm:table-cell text-[10px] sm:text-xs w-[80px]">Tipo</TableHead>
-                                        <TableHead className="text-right text-[10px] sm:text-xs whitespace-nowrap w-[100px]">Valor</TableHead>
+                                <TableHeader className="print:bg-slate-100">
+                                    <TableRow className="print:border-b print:border-slate-300">
+                                        <TableHead className="text-[10px] sm:text-xs print:text-[9px] print:py-1 print:px-1.5 print:font-bold">Descrição</TableHead>
+                                        <TableHead className="hidden sm:table-cell print:table-cell text-[10px] sm:text-xs w-[80px] print:w-[60px] print:text-[9px] print:py-1 print:px-1.5 print:font-bold">Tipo</TableHead>
+                                        <TableHead className="text-right text-[10px] sm:text-xs whitespace-nowrap w-[100px] print:w-[80px] print:text-[9px] print:py-1 print:px-1.5 print:font-bold">Valor</TableHead>
                                         <TableHead className="text-center no-print text-[10px] sm:text-xs whitespace-nowrap w-[90px]">Ações</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {filteredTransactions.length > 0 ? filteredTransactions.map((t) => (
-                                        <TableRow key={t.id}>
-                                            <TableCell className="max-w-[160px] sm:max-w-[240px] md:max-w-[320px] p-2 sm:p-4">
-                                                <div className="flex items-start gap-1.5 min-w-0">
+                                        <TableRow key={t.id} className="print:border-b print:border-slate-200">
+                                            <TableCell className="max-w-[160px] sm:max-w-[240px] md:max-w-[320px] p-2 sm:p-4 print:p-1 print:px-1.5">
+                                                <div className="flex items-start gap-1.5 min-w-0 print:gap-1">
                                                     {t.type === 'Entrada' ? (
-                                                        <ArrowUpCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-500 shrink-0 mt-0.5" />
+                                                        <ArrowUpCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-500 shrink-0 mt-0.5 print:h-2.5 print:w-2.5 print:mt-0.5" />
                                                     ) : (
-                                                        <ArrowDownCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-500 shrink-0 mt-0.5" />
+                                                        <ArrowDownCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-500 shrink-0 mt-0.5 print:h-2.5 print:w-2.5 print:mt-0.5" />
                                                     )}
                                                     <div className="min-w-0 flex-1">
-                                                        <div className="font-bold text-[10px] sm:text-sm flex items-center gap-1.5 flex-wrap">
-                                                            <span className="truncate">{t.description}</span>
+                                                        <div className="font-bold text-[10px] sm:text-sm flex items-center gap-1.5 flex-wrap print:text-[9.5px] print:gap-1">
+                                                            <span className="truncate print:whitespace-normal">{t.description}</span>
                                                             {renderCategoryBadge(t.category, t.type)}
                                                         </div>
                                                         {t.name && (
                                                             <div 
-                                                                className="text-[9px] sm:text-xs text-muted-foreground line-clamp-2 break-words leading-tight mt-0.5" 
+                                                                className="text-[9px] sm:text-xs text-muted-foreground line-clamp-2 break-words leading-tight mt-0.5 print:text-[8px] print:mt-0 print:line-clamp-1" 
                                                                 title={t.name}
                                                             >
                                                                 {t.name}
@@ -1046,10 +1046,10 @@ export default function FinancePage() {
                                                     </div>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="hidden sm:table-cell whitespace-nowrap w-[80px]">
-                                                <Badge className={cn('text-[9px] h-5', t.type === 'Entrada' ? 'bg-green-500 text-white' : 'bg-red-500 text-white')}>{t.type}</Badge>
+                                            <TableCell className="hidden sm:table-cell print:table-cell whitespace-nowrap w-[80px] print:w-[60px] print:p-1 print:px-1.5">
+                                                <Badge className={cn('text-[9px] h-5 print:text-[8px] print:h-3.5 print:px-1 print:py-0', t.type === 'Entrada' ? 'bg-green-500 text-white' : 'bg-red-500 text-white')}>{t.type}</Badge>
                                             </TableCell>
-                                            <TableCell className="text-right font-mono font-bold text-[10px] sm:text-sm whitespace-nowrap w-[100px] p-2 sm:p-4">
+                                            <TableCell className="text-right font-mono font-bold text-[10px] sm:text-sm whitespace-nowrap w-[100px] print:w-[80px] p-2 sm:p-4 print:p-1 print:px-1.5 print:text-[9.5px]">
                                                 {formatCurrency(t.value)}
                                             </TableCell>
                                             <TableCell className="no-print p-1 sm:p-4 whitespace-nowrap w-[90px]">

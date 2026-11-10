@@ -236,12 +236,36 @@
     display: none !important;
   }
 
+  /* Reset html and body for full-height, multi-page print stream */
+  html,
+  body {
+    height: auto !important;
+    min-height: 100% !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  /* Release height and overflow constraints on all ancestors of .printable-area */
+  body:has(.printable-area),
+  body:has(.printable-area) div,
+  body:has(.printable-area) main {
+    height: auto !important;
+    max-height: none !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
   /* Expand main content when printing regular pages */
   main {
     margin-left: 0 !important;
     padding: 0 !important;
     border: none !important;
     width: 100% !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
   }
 
   .printable-content,
@@ -249,6 +273,33 @@
     width: 100% !important;
     padding: 0 !important;
     margin: 0 !important;
+    height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+    display: block !important;
+  }
+
+  /* Unclip table wrappers so table content flows across pages */
+  div:has(> table),
+  .overflow-auto:has(table),
+  div:has(table) {
+    overflow: visible !important;
+    height: auto !important;
+    max-height: none !important;
+    display: block !important;
+  }
+
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tbody {
+    display: table-row-group !important;
   }
 
   /* Page break rules for clean document printing */
@@ -262,15 +313,12 @@
     page-break-inside: avoid !important;
   }
 
-  thead {
-    display: table-header-group !important;
-  }
-
   /* Style cards for printing */
   .card-print {
     box-shadow: none !important;
     border: 1px solid #e2e8f0 !important;
     background: #ffffff !important;
+    break-inside: auto !important;
   }
   
   .card-print-no-border {
@@ -281,5 +329,67 @@
   /* Make grid layouts stack vertically for printing if requested */
   .print-stack-grid {
     grid-template-columns: 1fr !important;
+  }
+
+  /* High-density compressed rows for printable finance table */
+  .printable-area table th,
+  .printable-area table td {
+    padding: 3px 6px !important;
+    font-size: 10px !important;
+    line-height: 1.2 !important;
+    border-bottom: 1px solid #e2e8f0 !important;
+  }
+
+  .printable-area table th {
+    font-size: 9px !important;
+    text-transform: uppercase !important;
+    background-color: #f8fafc !important;
+    color: #475569 !important;
+    font-weight: 700 !important;
+  }
+
+  /* High-density compact cards strip for finance print summary */
+  .printable-area .finance-summary-grid {
+    display: grid !important;
+    grid-template-columns: repeat(5, minmax(0, 1fr)) !important;
+    gap: 4px !important;
+    margin-bottom: 8px !important;
+    width: 100% !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  .printable-area .finance-summary-grid .card-print {
+    padding: 4px 6px !important;
+    border-radius: 6px !important;
+    border: 1px solid #cbd5e1 !important;
+    background: #ffffff !important;
+  }
+
+  .printable-area .finance-summary-grid .card-print [class*="CardHeader"] {
+    padding: 0 !important;
+    margin-bottom: 2px !important;
+  }
+
+  .printable-area .finance-summary-grid .card-print [class*="CardTitle"] {
+    font-size: 8.5px !important;
+    font-weight: 700 !important;
+    color: #475569 !important;
+  }
+
+  .printable-area .finance-summary-grid .card-print [class*="CardContent"] {
+    padding: 0 !important;
+  }
+
+  .printable-area .finance-summary-grid .card-print div[class*="text-"] {
+    font-size: 11px !important;
+    font-weight: 800 !important;
+    line-height: 1.1 !important;
+  }
+
+  .printable-area .finance-summary-grid .card-print p {
+    font-size: 7.5px !important;
+    margin-top: 1px !important;
+    color: #64748b !important;
   }
 }
