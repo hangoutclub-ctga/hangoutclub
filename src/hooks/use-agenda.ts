@@ -74,7 +74,10 @@ export const useAgenda = (date: Date | undefined, user: User | null, viewType: '
                     owners: ['Sistema'],
                     recurrent: true,
                     date: day,
-                    completed: false
+                    completed: false,
+                    avatarUrl: s.avatarUrl,
+                    personName: s.name,
+                    studentId: s.id
                 }));
 
             const userBirthdays = users
@@ -88,7 +91,10 @@ export const useAgenda = (date: Date | undefined, user: User | null, viewType: '
                     owners: ['Sistema'],
                     recurrent: true,
                     date: day,
-                    completed: false
+                    completed: false,
+                    avatarUrl: u.avatar,
+                    personName: u.nickname,
+                    userId: u.id
                 }));
 
             allGeneratedEvents = [...allGeneratedEvents, ...manual, ...classEvents, ...studentBirthdays, ...userBirthdays];

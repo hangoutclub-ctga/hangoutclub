@@ -198,6 +198,10 @@ export type DisplayEvent = {
     date: Date;
     completed?: boolean;
     classId?: string;
+    avatarUrl?: string;
+    personName?: string;
+    studentId?: string;
+    userId?: string;
 };
 
 export type CommunicationTemplate = {

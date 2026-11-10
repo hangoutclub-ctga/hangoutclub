@@ -17,7 +17,8 @@ import { useAgenda } from "@/hooks/use-agenda";
 import { useData } from "@/hooks/use-data";
 import { ManualEvent, DisplayEvent } from "@/types";
 import { toast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
+import { cn, getDisplayAvatarUrl } from "@/lib/utils";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { useRouter } from "next/navigation";
 import { useLoading } from "@/hooks/use-loading";
 import { DeleteConfirmDialog } from "@/components/delete-confirm-dialog";
@@ -184,34 +185,63 @@ export default function AgendaPage() {
               return (
                 <div key={evt.id} className={cn(
                   "flex items-center gap-3 p-4 rounded-xl border hover:shadow-sm transition-all group",
-                  isBirthday ? "bg-accent/10 border-accent/20" : "bg-muted/20 border-border"
+                  isBirthday 
+                    ? "bg-amber-50/90 dark:bg-amber-950/30 border-l-4 border-l-amber-400 border-amber-200/80 dark:border-amber-900/40 hover:bg-amber-100/70 dark:hover:bg-amber-950/45 shadow-[inset_0_1px_0_rgba(251,191,36,0.15)]" 
+                    : "bg-muted/20 border-border"
                 )}>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    disabled={isBirthday}
-                    className={cn(
-                      "h-7 w-7 sm:h-8 sm:w-8 rounded-full border-2 transition-all",
-                      isCompleted ? "bg-green-500/10 border-green-500 text-green-600" : "bg-background text-muted-foreground",
-                      isBirthday && "border-accent text-accent bg-accent/10"
+                  <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                    {isBirthday ? (
+                      <Avatar className="h-9 w-9 sm:h-10 sm:w-10 border-2 border-amber-400 ring-2 ring-amber-400/20 shadow-xs">
+                        <AvatarImage 
+                          src={getDisplayAvatarUrl(evt.avatarUrl)} 
+                          alt={evt.personName || evt.task} 
+                          className="object-cover" 
+                        />
+                        <AvatarFallback className="bg-amber-200 text-amber-900 text-xs font-black font-headline">
+                          {evt.personName ? evt.personName.charAt(0).toUpperCase() : <Cake className="h-4 w-4 text-amber-700" />}
+                        </AvatarFallback>
+                      </Avatar>
+                    ) : (
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        disabled={isBirthday}
+                        className={cn(
+                          "h-7 w-7 sm:h-8 sm:w-8 rounded-full border-2 transition-all",
+                          isCompleted ? "bg-green-500/10 border-green-500 text-green-600" : "bg-background text-muted-foreground"
+                        )}
+                        onClick={() => handleToggleComplete(evt.id)}
+                      >
+                        {isCompleted ? <CheckCircle2 className="h-4 w-4" /> : <Square className="h-4 w-4" />}
+                      </Button>
                     )}
-                    onClick={() => handleToggleComplete(evt.id)}
-                  >
-                    {isBirthday ? <Cake className="h-4 w-4" /> : (isCompleted ? <CheckCircle2 className="h-4 w-4" /> : <Square className="h-4 w-4" />)}
-                  </Button>
+                  </div>
                   <div className={cn("flex-1 min-w-0 transition-all", isCompleted && "opacity-50")}>
                     <p className={cn(
                       "font-bold text-xs sm:text-sm tracking-tight truncate text-foreground", 
                       isCompleted && "line-through",
-                      isBirthday && "text-accent"
+                      isBirthday ? "text-amber-950 dark:text-amber-200 font-extrabold flex items-center gap-1.5" : ""
                     )}>
-                      {isBirthday ? `🎈 Aniversário` : `${getTypeLabel(evt.type)} - ${evt.task}`}
+                      {isBirthday ? (
+                        <>
+                          <span>🎈 Aniversário</span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-200/80 dark:bg-amber-800/50 text-amber-900 dark:text-amber-100 font-bold uppercase tracking-wider">Hoje</span>
+                        </>
+                      ) : (
+                        `${getTypeLabel(evt.type)} - ${evt.task}`
+                      )}
                     </p>
-                    <p className="text-[11px] sm:text-xs text-muted-foreground font-medium flex items-center gap-1 mt-0.5">
+                    <p className={cn(
+                      "text-[11px] sm:text-xs text-muted-foreground font-medium flex items-center gap-1 mt-0.5",
+                      isBirthday && "text-amber-800/80 dark:text-amber-300/80"
+                    )}>
                       {format(evt.date, "EEEE", { locale: ptBR })} • {evt.time} {ownersLabel && `• ${ownersLabel}`}
                     </p>
                     {evt.details && (
-                      <p className="text-[10px] sm:text-[11px] text-muted-foreground/70 italic mt-1 leading-tight line-clamp-1">
+                      <p className={cn(
+                        "text-[10px] sm:text-[11px] text-muted-foreground/70 italic mt-1 leading-tight line-clamp-1",
+                        isBirthday && "text-amber-950 dark:text-amber-100 font-medium not-italic"
+                      )}>
                         {evt.details}
                       </p>
                     )}

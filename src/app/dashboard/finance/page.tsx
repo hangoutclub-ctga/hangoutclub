@@ -905,13 +905,12 @@ export default function FinancePage() {
                                 </div>
                                 <Button 
                                     variant="outline" 
-                                    size="sm" 
-                                    className="h-8 px-2.5 rounded-xl border-accent/30 text-accent hover:bg-accent/10 gap-1.5 text-xs font-semibold no-print shadow-xs cursor-pointer"
+                                    size="icon" 
+                                    className="h-8 w-8 rounded-xl border-accent/30 text-accent hover:bg-accent/10 no-print shadow-xs cursor-pointer shrink-0"
                                     onClick={handlePrintInfographic}
                                     title="Imprimir Infográfico em Modo Paisagem"
                                 >
-                                    <Printer className="h-3.5 w-3.5" />
-                                    <span className="hidden sm:inline">Imprimir (Paisagem)</span>
+                                    <Printer className="h-4 w-4" />
                                 </Button>
                             </div>
                         </DialogHeader>
