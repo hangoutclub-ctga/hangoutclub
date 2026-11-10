@@ -55,7 +55,7 @@ interface BankStatementImporterProps {
 }
 
 export function BankStatementImporter({ isOpen, onClose, onImportComplete }: BankStatementImporterProps) {
-  const { transactions, addTransaction, students, fixedExpenses, updateFixedExpense } = useData();
+  const { transactions, addTransaction, students, fixedExpenses, updateFixedExpense, users } = useData();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -162,7 +162,7 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
 
     const text = `${desc} ${complement}`.toUpperCase();
 
-    // 1. Tarifas bancárias, taxas e contas operacionais/fixas -> Sempre DESPESA
+    // 1. Tarifas bancárias, taxas, impostos e contas operacionais/fixas -> Sempre DESPESA
     if (
       text.includes("TARIFA") || 
       text.includes("TAXA") || 
@@ -188,12 +188,35 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
       text.includes("SISTEMA") ||
       text.includes("SOFTWARE") ||
       text.includes("SALARIO") ||
-      text.includes("SALÁRIO")
+      text.includes("SALÁRIO") ||
+      text.includes("FGTS") ||
+      text.includes("SIMPLES") ||
+      text.includes("RECEITA") ||
+      text.includes("DARF") ||
+      text.includes("DAS ") ||
+      text.includes("INSS") ||
+      text.includes("IMPOSTO") ||
+      text.includes("TRIBUT")
     ) {
       return 'Despesa';
     }
 
-    // 2. Custos diretos das aulas e atividades
+    // 2. Colaboradores cadastrados (Professores -> Custo; Secretaria/Admin/Outros -> Despesa)
+    for (const u of (users || [])) {
+      const uName = (u.nickname || '').trim().toUpperCase();
+      if (!uName) continue;
+      // Checa nome completo ou primeiro nome
+      const firstName = uName.split(' ')[0];
+      if (firstName.length >= 3 && text.includes(firstName)) {
+        return u.role === 'Professor' ? 'Custo' : 'Despesa';
+      }
+      // Checa apelido "Gabi" se o texto tiver Gabriela, ou vice-versa
+      if (firstName === 'GABI' && text.includes('GABRIELA')) {
+        return u.role === 'Professor' ? 'Custo' : 'Despesa';
+      }
+    }
+
+    // 3. Custos diretos das aulas e atividades
     if (
       text.includes("PROFESSOR") ||
       text.includes("INSTRUTOR") ||
