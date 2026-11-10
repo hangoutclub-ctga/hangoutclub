@@ -83,6 +83,7 @@ export default function FinancePage() {
     const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
     const [fixedExpenseToDelete, setFixedExpenseToDelete] = useState<FixedExpense | null>(null);
     const [isImporterOpen, setIsImporterOpen] = useState(false);
+    const [isPendingModalOpen, setIsPendingModalOpen] = useState(false);
 
     const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
     const [viewingTransaction, setViewingTransaction] = useState<Transaction | null>(null);
@@ -518,6 +519,21 @@ export default function FinancePage() {
                 <Button 
                     size="icon" 
                     variant="outline" 
+                    className="relative h-10 w-10 border-amber-500/40 text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30 shadow-sm"
+                    onClick={() => setIsPendingModalOpen(true)}
+                    title={`Pendências Alunos (${pendingStudents.length})`}
+                >
+                    <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                    {pendingStudents.length > 0 && (
+                        <span className="absolute -top-1 -right-1 flex h-4 min-w-4 px-1 items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground shadow-sm">
+                            {pendingStudents.length}
+                        </span>
+                    )}
+                </Button>
+
+                <Button 
+                    size="icon" 
+                    variant="outline" 
                     className="h-10 w-10 border-emerald-600/30 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 shadow-sm" 
                     disabled={!canEdit} 
                     onClick={() => setIsImporterOpen(true)}
@@ -616,8 +632,7 @@ export default function FinancePage() {
              </div>
         </div>
       
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-8 print-stack-grid">
-            <div className="lg:col-span-2 space-y-4 sm:space-y-8">
+        <div className="space-y-4 sm:space-y-8">
                 <div className="grid gap-2 sm:gap-4 grid-cols-2 lg:grid-cols-4">
                     <Card 
                         className={cn(
@@ -964,88 +979,6 @@ export default function FinancePage() {
                         )}
                     </CardContent>
                 </Card>
-            </div>
-            <div className="lg:col-span-1">
-                 <Card className="card-print shadow-sm">
-                    <CardHeader className="p-3 sm:p-6 pb-2 sm:pb-3">
-                        <div className="flex items-center justify-between gap-1 flex-wrap">
-                            <div>
-                                <CardTitle className="flex items-center gap-2 text-sm sm:text-base font-bold">
-                                    <AlertCircle className="h-4 w-4 text-destructive shrink-0" /> 
-                                    Pendências Alunos
-                                </CardTitle>
-                                <p className="text-[9px] sm:text-xs text-muted-foreground mt-0.5">
-                                    {months.find(m => m.value === currentMonth)?.label} de {currentYear}
-                                </p>
-                            </div>
-                            <div className="flex items-center gap-1.5 shrink-0">
-                                {pendingStudents.length > 0 && (
-                                    <>
-                                        <Badge variant="secondary" className="text-[10px] font-semibold px-1.5 h-6">
-                                            {pendingStudents.length}
-                                        </Badge>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="h-7 text-[10px] px-2 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium gap-1"
-                                            disabled={!canEdit || isQuittingStudent}
-                                            onClick={() => setIsBatchSettleOpen(true)}
-                                            title="Dar baixa via Boleto em todos os alunos pendentes deste mês"
-                                        >
-                                            <CheckCheck className="h-3.5 w-3.5 text-emerald-600" />
-                                            <span className="hidden sm:inline">Quitar Todos</span>
-                                        </Button>
-                                    </>
-                                )}
-                            </div>
-                        </div>
-                    </CardHeader>
-                    <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
-                        {pendingStudents.length > 0 ? (
-                            <ScrollArea className="h-[490px] pr-2.5">
-                                <ul className="space-y-2">
-                                    {pendingStudents.map(student => (
-                                        <li key={student.id} className="flex items-center justify-start gap-2.5 sm:gap-4 p-2 sm:p-2.5 rounded-xl hover:bg-muted/50 border bg-card/60 transition-colors">
-                                            <div className="min-w-0 flex-1 max-w-[220px] sm:max-w-[280px]">
-                                                <p className="font-bold text-[10px] sm:text-sm truncate" title={student.name}>{student.name}</p>
-                                                <p className="text-[8px] sm:text-xs text-muted-foreground truncate">
-                                                    Vence dia {student.dueDate} {student.totalPaid > 0 ? `• Restante: ${formatCurrency(student.remaining)} (Pago: ${formatCurrency(student.totalPaid)})` : `• ${formatCurrency(student.monthlyFee)}`}
-                                                </p>
-                                            </div>
-                                            <div className="flex items-center gap-1 shrink-0">
-                                                <Button 
-                                                    size="sm" 
-                                                    className="h-7 text-[10px] px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium gap-1 shadow-sm rounded-lg" 
-                                                    onClick={() => handleSettleBoleto(student)} 
-                                                    disabled={!canEdit || isQuittingStudent}
-                                                    title="Quitar via Boleto Sicoob (Salva no perfil sem duplicar no fluxo de caixa)"
-                                                >
-                                                    <Check className="h-3 w-3" />
-                                                    Quitar
-                                                </Button>
-                                                <Button 
-                                                    variant="ghost" 
-                                                    size="icon" 
-                                                    className="h-7 w-7 text-muted-foreground hover:text-accent rounded-lg" 
-                                                    onClick={() => handleOpenForm(student)} 
-                                                    disabled={!canEdit}
-                                                    title="Lançar entrada manual no caixa (PIX / Dinheiro / Balcão)"
-                                                >
-                                                    <DollarSign className="h-3.5 w-3.5" />
-                                                </Button>
-                                            </div>
-                                        </li>
-                                    ))}
-                                </ul>
-                            </ScrollArea>
-                        ) : (
-                             <div className="text-center text-[10px] sm:text-sm text-muted-foreground py-6 sm:py-8">
-                                <CheckCircle className="h-6 w-6 sm:h-8 sm:w-8 mx-auto text-green-500 mb-2" /><p>Tudo em dia!</p>
-                            </div>
-                        )}
-                    </CardContent>
-                 </Card>
-            </div>
         </div>
 
         <Dialog open={!!viewingTransaction} onOpenChange={(open) => !open && setViewingTransaction(null)}>
@@ -1342,6 +1275,93 @@ export default function FinancePage() {
                 }
             }}
         />
+
+        {/* Modal / Popup de Pendências de Alunos */}
+        <Dialog open={isPendingModalOpen} onOpenChange={setIsPendingModalOpen}>
+            <DialogContent className="sm:max-w-xl max-h-[85vh] flex flex-col p-4 sm:p-6 rounded-2xl w-[94vw]">
+                <DialogHeader className="pb-3 border-b shrink-0">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div>
+                            <DialogTitle className="flex items-center gap-2 text-base sm:text-lg font-bold">
+                                <AlertCircle className="h-5 w-5 text-destructive shrink-0" /> 
+                                Pendências Alunos
+                            </DialogTitle>
+                            <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
+                                {months.find(m => m.value === currentMonth)?.label} de {currentYear} • Mensalidades em aberto
+                            </p>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                            {pendingStudents.length > 0 && (
+                                <>
+                                    <Badge variant="secondary" className="text-[10px] font-semibold px-2 h-6">
+                                        {pendingStudents.length} pendentes
+                                    </Badge>
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-7 text-[10px] sm:text-xs px-2.5 text-emerald-700 dark:text-emerald-400 border-emerald-500/30 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-medium gap-1"
+                                        disabled={!canEdit || isQuittingStudent}
+                                        onClick={() => setIsBatchSettleOpen(true)}
+                                        title="Dar baixa via Boleto em todos os alunos pendentes deste mês"
+                                    >
+                                        <CheckCheck className="h-3.5 w-3.5 text-emerald-600" />
+                                        <span>Quitar Todos</span>
+                                    </Button>
+                                </>
+                            )}
+                        </div>
+                    </div>
+                </DialogHeader>
+
+                <div className="flex-1 overflow-y-auto py-2 pr-1 min-h-0">
+                    {pendingStudents.length > 0 ? (
+                        <ul className="space-y-2">
+                            {pendingStudents.map(student => (
+                                <li key={student.id} className="flex items-center justify-between gap-2 sm:gap-4 p-2.5 sm:p-3 rounded-xl hover:bg-muted/50 border bg-card/60 transition-colors">
+                                    <div className="min-w-0 flex-1">
+                                        <p className="font-bold text-xs sm:text-sm truncate" title={student.name}>{student.name}</p>
+                                        <p className="text-[10px] sm:text-xs text-muted-foreground truncate">
+                                            Vence dia {student.dueDate} {student.totalPaid > 0 ? `• Restante: ${formatCurrency(student.remaining)} (Pago: ${formatCurrency(student.totalPaid)})` : `• Mensalidade: ${formatCurrency(student.monthlyFee)}`}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-1 shrink-0">
+                                        <Button 
+                                            size="sm" 
+                                            className="h-7 text-[10px] sm:text-xs px-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-medium gap-1 shadow-sm rounded-lg" 
+                                            onClick={() => handleSettleBoleto(student)} 
+                                            disabled={!canEdit || isQuittingStudent}
+                                            title="Quitar via Boleto Sicoob (Salva no perfil sem duplicar no fluxo de caixa)"
+                                        >
+                                            <Check className="h-3 w-3" />
+                                            Quitar
+                                        </Button>
+                                        <Button 
+                                            variant="ghost" 
+                                            size="icon" 
+                                            className="h-7 w-7 text-muted-foreground hover:text-accent rounded-lg" 
+                                            onClick={() => {
+                                                setIsPendingModalOpen(false);
+                                                handleOpenForm(student);
+                                            }} 
+                                            disabled={!canEdit}
+                                            title="Lançar entrada manual no caixa (PIX / Dinheiro / Balcão)"
+                                        >
+                                            <DollarSign className="h-3.5 w-3.5" />
+                                        </Button>
+                                    </div>
+                                </li>
+                            ))}
+                        </ul>
+                    ) : (
+                        <div className="text-center text-xs sm:text-sm text-muted-foreground py-12">
+                            <CheckCircle className="h-10 w-10 mx-auto text-green-500 mb-2" />
+                            <p className="font-semibold text-foreground">Tudo em dia!</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">Nenhum aluno com mensalidade pendente para este mês.</p>
+                        </div>
+                    )}
+                </div>
+            </DialogContent>
+        </Dialog>
 
         {/* Modal de Confirmação de Baixa em Lote via Boleto */}
         <Dialog open={isBatchSettleOpen} onOpenChange={setIsBatchSettleOpen}>
