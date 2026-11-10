@@ -174,4 +174,31 @@ export function isTransactionInMonth(dateStr: string | null | undefined, targetY
   return ym.year === targetYear && ym.month === targetMonth;
 }
 
+/**
+ * Formata a data da transação no padrão brasileiro DD/MM/AAAA de forma segura contra fusos horários.
+ */
+export function formatTransactionDate(dateStr?: string | null): string {
+  if (!dateStr) return "—";
+  const trimmed = dateStr.trim();
+  const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (match) {
+    const [_, year, month, day] = match;
+    return `${day}/${month}/${year}`;
+  }
+  if (/^\d{2}\/\d{2}\/\d{4}$/.test(trimmed)) {
+    return trimmed;
+  }
+  try {
+    const d = new Date(trimmed);
+    if (!isNaN(d.getTime())) {
+      const day = String(d.getUTCDate()).padStart(2, '0');
+      const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+      const year = d.getUTCFullYear();
+      return `${day}/${month}/${year}`;
+    }
+  } catch {}
+  return trimmed;
+}
+
+
 

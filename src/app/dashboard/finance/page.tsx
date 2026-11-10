@@ -38,7 +38,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "@/hooks/use-toast";
-import { cn, formatCurrency, getDisplayAvatarUrl, isTransactionInMonth, getTransactionYearMonth } from "@/lib/utils";
+import { cn, formatCurrency, getDisplayAvatarUrl, isTransactionInMonth, getTransactionYearMonth, formatTransactionDate } from "@/lib/utils";
 import { useData } from "@/hooks/use-data";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -1014,15 +1014,19 @@ export default function FinancePage() {
                             <Table>
                                 <TableHeader className="print:bg-slate-100">
                                     <TableRow className="print:border-b print:border-slate-300">
+                                        <TableHead className="text-[10px] sm:text-xs whitespace-nowrap w-[90px] sm:w-[105px] print:w-[75px] print:text-[9px] print:py-1 print:px-1.5 print:font-bold">Data</TableHead>
                                         <TableHead className="text-[10px] sm:text-xs print:text-[9px] print:py-1 print:px-1.5 print:font-bold">Descrição</TableHead>
-                                        <TableHead className="hidden sm:table-cell print:table-cell text-[10px] sm:text-xs w-[80px] print:w-[60px] print:text-[9px] print:py-1 print:px-1.5 print:font-bold">Tipo</TableHead>
                                         <TableHead className="text-right text-[10px] sm:text-xs whitespace-nowrap w-[100px] print:w-[80px] print:text-[9px] print:py-1 print:px-1.5 print:font-bold">Valor</TableHead>
+                                        <TableHead className="text-center whitespace-nowrap text-[10px] sm:text-xs w-[80px] print:w-[60px] print:text-[9px] print:py-1 print:px-1.5 print:font-bold">Tipo</TableHead>
                                         <TableHead className="text-center no-print text-[10px] sm:text-xs whitespace-nowrap w-[90px]">Ações</TableHead>
                                     </TableRow>
                                 </TableHeader>
                                 <TableBody>
                                     {filteredTransactions.length > 0 ? filteredTransactions.map((t) => (
                                         <TableRow key={t.id} className="print:border-b print:border-slate-200">
+                                            <TableCell className="whitespace-nowrap font-mono text-[10px] sm:text-xs text-muted-foreground print:text-foreground print:text-[9px] p-2 sm:p-4 print:p-1 print:px-1.5 w-[90px] sm:w-[105px] print:w-[75px]">
+                                                {formatTransactionDate(t.date)}
+                                            </TableCell>
                                             <TableCell className="max-w-[160px] sm:max-w-[240px] md:max-w-[320px] p-2 sm:p-4 print:p-1 print:px-1.5">
                                                 <div className="flex items-start gap-1.5 min-w-0 print:gap-1">
                                                     {t.type === 'Entrada' ? (
@@ -1046,11 +1050,11 @@ export default function FinancePage() {
                                                     </div>
                                                 </div>
                                             </TableCell>
-                                            <TableCell className="hidden sm:table-cell print:table-cell whitespace-nowrap w-[80px] print:w-[60px] print:p-1 print:px-1.5">
-                                                <Badge className={cn('text-[9px] h-5 print:text-[8px] print:h-3.5 print:px-1 print:py-0', t.type === 'Entrada' ? 'bg-green-500 text-white' : 'bg-red-500 text-white')}>{t.type}</Badge>
-                                            </TableCell>
                                             <TableCell className="text-right font-mono font-bold text-[10px] sm:text-sm whitespace-nowrap w-[100px] print:w-[80px] p-2 sm:p-4 print:p-1 print:px-1.5 print:text-[9.5px]">
                                                 {formatCurrency(t.value)}
+                                            </TableCell>
+                                            <TableCell className="text-center whitespace-nowrap w-[80px] print:w-[60px] p-2 sm:p-4 print:p-1 print:px-1.5">
+                                                <Badge className={cn('text-[9px] h-5 print:text-[8px] print:h-3.5 print:px-1 print:py-0', t.type === 'Entrada' ? 'bg-green-500 text-white' : 'bg-red-500 text-white')}>{t.type}</Badge>
                                             </TableCell>
                                             <TableCell className="no-print p-1 sm:p-4 whitespace-nowrap w-[90px]">
                                                 <div className="flex items-center justify-end gap-1">
@@ -1089,7 +1093,7 @@ export default function FinancePage() {
                                             </TableCell>
                                         </TableRow>
                                     )) : (
-                                        <TableRow><TableCell colSpan={4} className="text-center h-20 text-[10px] sm:text-xs italic text-muted-foreground">Sem registros para este período.</TableCell></TableRow>
+                                        <TableRow><TableCell colSpan={5} className="text-center h-20 text-[10px] sm:text-xs italic text-muted-foreground">Sem registros para este período.</TableCell></TableRow>
                                     )}
                                 </TableBody>
                             </Table>
