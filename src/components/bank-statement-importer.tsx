@@ -162,7 +162,38 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
 
     const text = `${desc} ${complement}`.toUpperCase();
 
-    // Custos diretos das aulas e atividades
+    // 1. Tarifas bancárias, taxas e contas operacionais/fixas -> Sempre DESPESA
+    if (
+      text.includes("TARIFA") || 
+      text.includes("TAXA") || 
+      text.includes("COBRANCA") || 
+      text.includes("COBRANÇA") || 
+      text.includes("IOF") || 
+      text.includes("JUROS") || 
+      text.includes("ENERGIA") || 
+      text.includes("LUZ") || 
+      text.includes("CEMIG") || 
+      text.includes("COPASA") || 
+      text.includes("AGUA") || 
+      text.includes("ÁGUA") || 
+      text.includes("TELEFONE") || 
+      text.includes("INTERNET") || 
+      text.includes("ALUGUEL") || 
+      text.includes("CONDOM") || 
+      text.includes("SEGURO") ||
+      text.includes("CONTABIL") ||
+      text.includes("HONORARIO") ||
+      text.includes("SECRETARIA") ||
+      text.includes("LIMPEZA") ||
+      text.includes("SISTEMA") ||
+      text.includes("SOFTWARE") ||
+      text.includes("SALARIO") ||
+      text.includes("SALÁRIO")
+    ) {
+      return 'Despesa';
+    }
+
+    // 2. Custos diretos das aulas e atividades
     if (
       text.includes("PROFESSOR") ||
       text.includes("INSTRUTOR") ||
@@ -185,7 +216,7 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
       return 'Custo';
     }
 
-    // Investimentos (reformas, equipamentos, novos bens, tatames, eletrônicos)
+    // 3. Investimentos (reformas, equipamentos, novos bens, tatames, eletrônicos)
     if (
       text.includes("REFORMA") ||
       text.includes("EQUIPAMENTO") ||
@@ -195,42 +226,14 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
       text.includes("AR CONDICIONADO") ||
       text.includes("AR-CONDICIONADO") ||
       text.includes("MOBILIA") ||
-      text.includes("MOVEIS") ||
-      text.includes("MÓVEIS") ||
-      text.includes("OBRA") ||
+      /\bM[OÓ]VEIS\b/.test(text) ||
+      /\bOBRAS?\b/.test(text) ||
       text.includes("CONSTRUCAO") ||
       text.includes("CONSTRUÇÃO") ||
       text.includes("PATRIMONIO") ||
       text.includes("PATRIMÔNIO")
     ) {
       return 'Investimento';
-    }
-    
-    // Despesas operacionais e fixas da estrutura
-    if (
-      text.includes("ENERGIA") || 
-      text.includes("LUZ") || 
-      text.includes("CEMIG") || 
-      text.includes("COPASA") || 
-      text.includes("AGUA") || 
-      text.includes("ÁGUA") || 
-      text.includes("TELEFONE") || 
-      text.includes("INTERNET") || 
-      text.includes("ALUGUEL") || 
-      text.includes("TARIFA") || 
-      text.includes("TAXA MANUT") || 
-      text.includes("CONDOM") || 
-      text.includes("SEGURO") ||
-      text.includes("SALARIO") ||
-      text.includes("SALÁRIO") ||
-      text.includes("CONTABIL") ||
-      text.includes("HONORARIO") ||
-      text.includes("SECRETARIA") ||
-      text.includes("LIMPEZA") ||
-      text.includes("SISTEMA") ||
-      text.includes("SOFTWARE")
-    ) {
-      return 'Despesa';
     }
 
     return 'Gasto';
