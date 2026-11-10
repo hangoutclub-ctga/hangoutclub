@@ -130,3 +130,48 @@ export function isBirthdayOnDay(dobStr: string | null | undefined, targetDay: Da
   return birthDay === targetDay.getDate() && birthMonth === targetDay.getMonth();
 }
 
+/**
+ * Extrai ano e mês (1 a 12) de uma data de transação (YYYY-MM-DD, ISO ou Date)
+ * de forma consistente e imune a desvios de fuso horário.
+ */
+export function getTransactionYearMonth(dateStr?: string | null): { year: number; month: number } | null {
+  if (!dateStr) return null;
+  const trimmed = dateStr.trim();
+  if (!trimmed) return null;
+
+  // YYYY-MM... (ex: "2026-09-18", "2026-09-01T00:00:00+00:00", "2026-11-10T14:00:00.000Z")
+  const match = trimmed.match(/^(\d{4})-(\d{2})/);
+  if (match) {
+    return {
+      year: parseInt(match[1], 10),
+      month: parseInt(match[2], 10) // 1 a 12
+    };
+  }
+
+  // DD/MM/YYYY
+  const dmyMatch = trimmed.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (dmyMatch) {
+    return {
+      year: parseInt(dmyMatch[3], 10),
+      month: parseInt(dmyMatch[2], 10) // 1 a 12
+    };
+  }
+
+  const d = new Date(trimmed);
+  if (isNaN(d.getTime())) return null;
+  return {
+    year: d.getFullYear(),
+    month: d.getMonth() + 1
+  };
+}
+
+/**
+ * Verifica se a data da transação pertence ao ano e mês desejados (mês de 1 a 12).
+ */
+export function isTransactionInMonth(dateStr: string | null | undefined, targetYear: number, targetMonth: number): boolean {
+  const ym = getTransactionYearMonth(dateStr);
+  if (!ym) return false;
+  return ym.year === targetYear && ym.month === targetMonth;
+}
+
+

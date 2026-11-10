@@ -37,7 +37,7 @@ import { Transaction, Student, FixedExpense, normalizeTransactionCategory, Trans
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "@/hooks/use-toast";
-import { cn, formatCurrency, getDisplayAvatarUrl } from "@/lib/utils";
+import { cn, formatCurrency, getDisplayAvatarUrl, isTransactionInMonth } from "@/lib/utils";
 import { useData } from "@/hooks/use-data";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
@@ -108,8 +108,7 @@ export default function FinancePage() {
     const filteredByDate = useMemo(() => {
         return transactions.filter(t => {
             if (t.type === 'Apagado') return false;
-            const d = new Date(t.date);
-            return d.getUTCMonth() + 1 === currentMonth && d.getUTCFullYear() === currentYear;
+            return isTransactionInMonth(t.date, currentYear, currentMonth);
         });
     }, [transactions, currentMonth, currentYear]);
 

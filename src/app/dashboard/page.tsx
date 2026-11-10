@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, isTransactionInMonth } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/hooks/use-auth";
@@ -78,26 +78,36 @@ export default function DashboardPage() {
   const enrolledActiveStudentsCount = useMemo(() => students.filter(s => s.status === 'Ativo').length, [students]);
   const activeClasses = useMemo(() => classes.filter(c => c.status === 'Ativa'), [classes]);
 
-  // Balanço financeiro dinâmico (mês atual ou acumulado)
+  // Resumo financeiro do mês atual (100% alinhado com a página de Finanças)
   const financialSummary = useMemo(() => {
     const now = new Date();
-    const curMonth = now.getMonth();
+    const curMonth = now.getMonth() + 1; // 1-12
     const curYear = now.getFullYear();
 
-    const curMonthTrx = transactions.filter(t => {
-      const d = new Date(t.date);
-      return d.getMonth() === curMonth && d.getFullYear() === curYear;
-    });
+    // Filtra apenas transações ativas (ignora as que estão na lixeira / apagadas)
+    const activeTransactions = transactions.filter(t => t.type !== 'Apagado');
 
-    const monthProfit = curMonthTrx.reduce((acc, t) => t.type === 'Entrada' ? acc + t.value : acc - t.value, 0);
-    const totalProfit = transactions.reduce((acc, t) => t.type === 'Entrada' ? acc + t.value : acc - t.value, 0);
+    const curMonthTrx = activeTransactions.filter(t => 
+      isTransactionInMonth(t.date, curYear, curMonth)
+    );
+
+    const income = curMonthTrx
+      .filter(t => t.type === 'Entrada')
+      .reduce((acc, t) => acc + t.value, 0);
+
+    const outcome = curMonthTrx
+      .filter(t => t.type === 'Saída')
+      .reduce((acc, t) => acc + t.value, 0);
+
+    const profit = income - outcome;
+    const monthName = format(now, "MMMM", { locale: ptBR });
 
     return {
-      hasCurrentMonth: curMonthTrx.length > 0,
-      monthProfit,
-      totalProfit,
-      displayProfit: curMonthTrx.length > 0 ? monthProfit : totalProfit,
-      label: curMonthTrx.length > 0 ? "Balanço deste mês" : "Saldo total"
+      income,
+      outcome,
+      profit,
+      monthName,
+      hasTransactions: curMonthTrx.length > 0
     };
   }, [transactions]);
 
@@ -117,8 +127,9 @@ export default function DashboardPage() {
     return {
       students: isTeacherOnly ? teacherStudentsCount : enrolledActiveStudentsCount,
       classes: isTeacherOnly ? teacherClasses.length : activeClasses.length,
-      profit: canViewFinance ? financialSummary.displayProfit : 0,
-      profitLabel: canViewFinance ? financialSummary.label : "Agenda"
+      revenue: canViewFinance ? financialSummary.income : 0,
+      profit: canViewFinance ? financialSummary.profit : 0,
+      monthName: financialSummary.monthName,
     };
   }, [isAdmin, user, enrolledActiveStudentsCount, activeClasses, activeStudents, financialSummary, canViewFinance]);
 
@@ -490,10 +501,19 @@ export default function DashboardPage() {
               )}
             </CardHeader>
             <CardContent className="px-2 pb-2 pt-0 sm:p-3 sm:pt-0">
-              <div className={cn("text-lg sm:text-3xl font-black truncate", canViewFinance && (stats.profit >= 0 ? "text-green-600" : "text-red-500"))}>
-                {canViewFinance ? formatCurrency(stats.profit) : events.length}
+              <div className={cn("text-lg sm:text-3xl font-black truncate", canViewFinance ? "text-emerald-600 dark:text-emerald-400" : "")}>
+                {canViewFinance ? formatCurrency(stats.revenue) : events.length}
               </div>
-              <p className="text-[9px] sm:text-xs text-muted-foreground mt-0">{canViewFinance ? stats.profitLabel : "Agendamentos hoje"}</p>
+              <p className="text-[9px] sm:text-xs text-muted-foreground mt-0">
+                {canViewFinance ? (
+                  <span className="flex items-center gap-1.5 flex-wrap">
+                    <span className="capitalize">{stats.monthName}:</span>
+                    <span className={cn("font-semibold", stats.profit >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500")}>
+                      {formatCurrency(stats.profit)} líq.
+                    </span>
+                  </span>
+                ) : "Agendamentos hoje"}
+              </p>
             </CardContent>
             <CardFooter className="p-2 pt-1 sm:p-3 border-t bg-muted/5 group-hover:bg-primary/5 transition-colors">
               <div className="flex items-center justify-between w-full text-[9px] sm:text-[10px] font-medium text-muted-foreground group-hover:text-primary transition-colors">
