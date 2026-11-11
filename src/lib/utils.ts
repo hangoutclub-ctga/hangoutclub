@@ -131,6 +131,37 @@ export function isBirthdayOnDay(dobStr: string | null | undefined, targetDay: Da
 }
 
 /**
+ * Compara dois nomes para identificar se correspondem à mesma pessoa física
+ * (ex: "Célia Maria Da Silva Xisto" e "Celia Xisto").
+ */
+export function areSamePerson(nameA?: string | null, nameB?: string | null): boolean {
+  const cleanA = (nameA || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  const cleanB = (nameB || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+  if (!cleanA || !cleanB) return false;
+  if (cleanA === cleanB) return true;
+  if (cleanA.includes(cleanB) || cleanB.includes(cleanA)) return true;
+
+  const stopWords = new Set(['de', 'da', 'do', 'das', 'dos', 'e']);
+  const wordsA = cleanA.split(/\s+/).filter(w => w.length > 1 && !stopWords.has(w));
+  const wordsB = cleanB.split(/\s+/).filter(w => w.length > 1 && !stopWords.has(w));
+
+  if (wordsA.length === 0 || wordsB.length === 0) return false;
+
+  const firstA = wordsA[0];
+  const lastA = wordsA[wordsA.length - 1];
+  const firstB = wordsB[0];
+  const lastB = wordsB[wordsB.length - 1];
+
+  if (firstA === firstB && lastA === lastB) return true;
+
+  const allBInA = wordsB.every(w => wordsA.includes(w));
+  const allAInB = wordsA.every(w => wordsB.includes(w));
+  if (allBInA || allAInB) return true;
+
+  return false;
+}
+
+/**
  * Extrai ano e mês (1 a 12) de uma data de transação (YYYY-MM-DD, ISO ou Date)
  * de forma consistente e imune a desvios de fuso horário.
  */

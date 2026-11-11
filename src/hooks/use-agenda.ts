@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import { format, getDay, startOfWeek, endOfWeek, eachDayOfInterval, isSameDay } from 'date-fns';
 import type { User, DisplayEvent } from '@/types';
 import { useData } from '@/hooks/use-data';
-import { isBirthdayOnDay } from '@/lib/utils';
+import { isBirthdayOnDay, areSamePerson } from '@/lib/utils';
 
 const dayOfWeekMap: { [key: string]: number } = {
     'seg': 1, 'ter': 2, 'qua': 3, 'qui': 4, 'sex': 5, 'sab': 6, 'dom': 0,
@@ -63,78 +63,133 @@ export const useAgenda = (date: Date | undefined, user: User | null, viewType: '
                     classId: c.id
                 }));
 
-            // Helper de normalização para casar nomes entre alunos e colaboradores
-            const normalizeName = (str: string) => 
-                (str || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+            // Aniversariantes do dia (com regra estrita: se for aluno e colaborador, exibe apenas UMA vez)
+            const birthdayEvents: DisplayEvent[] = [];
+            const handledStudentIds = new Set<string>();
+            const handledUserIds = new Set<string>();
 
-            const userBirthdays = users
+            // 1. Processa colaboradores cujo aniversário cai neste dia
+            users
                 .filter(u => u.role !== 'Apagado' && isBirthdayOnDay(u.dob, day))
-                .map(u => {
-                    const matchingStudent = students.find(s => {
-                        if (s.status === 'Apagado') return false;
-                        const sNorm = normalizeName(s.name);
-                        const uNorm = normalizeName(u.nickname);
-                        return sNorm === uNorm || sNorm.includes(uNorm) || uNorm.includes(sNorm);
-                    });
+                .forEach(u => {
+                    const matchingStudent = students.find(s => 
+                        s.status !== 'Apagado' && (
+                            areSamePerson(s.name, u.nickname) ||
+                            (Boolean(s.email) && Boolean(u.email) && s.email!.toLowerCase() === u.email!.toLowerCase())
+                        )
+                    );
+
+                    if (matchingStudent) {
+                        handledStudentIds.add(matchingStudent.id);
+                    }
+                    handledUserIds.add(u.id);
+
+                    const displayName = matchingStudent?.name || u.nickname;
                     const avatar = u.avatar || matchingStudent?.avatarUrl;
 
-                    return {
+                    birthdayEvents.push({
                         id: `BDAY-USER-${u.id}-${dateKey}`,
-                        task: `Aniversário: ${u.nickname}`,
+                        task: `Aniversário: ${displayName}`,
                         time: "00:00",
-                        details: `Hoje é o aniversário de ${u.nickname} (${u.role})!`,
+                        details: `Hoje é o aniversário de ${displayName} (${u.role})!`,
                         type: 'birthday' as const,
                         owners: ['Sistema'],
                         recurrent: true,
                         date: day,
                         completed: false,
                         avatarUrl: avatar,
-                        personName: u.nickname,
-                        userId: u.id
-                    };
+                        personName: displayName,
+                        userId: u.id,
+                        studentId: matchingStudent?.id
+                    });
                 });
 
-            const studentBirthdays = students
-                .filter(s => {
-                    if (s.status === 'Apagado' || !isBirthdayOnDay(s.dob, day)) return false;
-                    const sNorm = normalizeName(s.name);
-                    const alreadyInUsers = userBirthdays.some(ub => {
-                        const ubNorm = normalizeName(ub.personName);
-                        return sNorm === ubNorm || sNorm.includes(ubNorm) || ubNorm.includes(sNorm);
-                    });
-                    return !alreadyInUsers;
-                })
-                .map(s => {
-                    const matchingUser = users.find(u => {
-                        if (u.role === 'Apagado' || !u.avatar) return false;
-                        const sNorm = normalizeName(s.name);
-                        const uNorm = normalizeName(u.nickname);
-                        return sNorm === uNorm || sNorm.includes(uNorm) || uNorm.includes(sNorm);
-                    });
-                    const avatar = s.avatarUrl || matchingUser?.avatar;
+            // 2. Processa alunos cujo aniversário cai neste dia
+            students
+                .filter(s => s.status !== 'Apagado' && isBirthdayOnDay(s.dob, day))
+                .forEach(s => {
+                    // Se este aluno já foi incluído como colaborador acima, pula para não duplicar!
+                    if (handledStudentIds.has(s.id)) {
+                        return;
+                    }
 
-                    return {
+                    // Verifica se o aluno é também um colaborador
+                    const matchingUser = users.find(u => 
+                        u.role !== 'Apagado' && (
+                            areSamePerson(s.name, u.nickname) ||
+                            (Boolean(s.email) && Boolean(u.email) && s.email!.toLowerCase() === u.email!.toLowerCase())
+                        )
+                    );
+
+                    if (matchingUser) {
+                        // Se o colaborador já foi incluído, não duplica
+                        if (handledUserIds.has(matchingUser.id)) {
+                            return;
+                        }
+                        handledUserIds.add(matchingUser.id);
+                        handledStudentIds.add(s.id);
+
+                        const avatar = matchingUser.avatar || s.avatarUrl;
+                        birthdayEvents.push({
+                            id: `BDAY-USER-${matchingUser.id}-${dateKey}`,
+                            task: `Aniversário: ${s.name}`,
+                            time: "00:00",
+                            details: `Hoje é o aniversário de ${s.name} (${matchingUser.role})!`,
+                            type: 'birthday' as const,
+                            owners: ['Sistema'],
+                            recurrent: true,
+                            date: day,
+                            completed: false,
+                            avatarUrl: avatar,
+                            personName: s.name,
+                            userId: matchingUser.id,
+                            studentId: s.id
+                        });
+                        return;
+                    }
+
+                    // Aluno exclusivo (não é colaborador)
+                    handledStudentIds.add(s.id);
+                    birthdayEvents.push({
                         id: `BDAY-STUDENT-${s.id}-${dateKey}`,
                         task: `Aniversário: ${s.name}`,
                         time: "00:00",
-                        details: matchingUser 
-                            ? `Hoje é o aniversário de ${s.name} (${matchingUser.role})!` 
-                            : `Hoje é o aniversário de ${s.name}!`,
+                        details: `Hoje é o aniversário de ${s.name}!`,
                         type: 'birthday' as const,
                         owners: ['Sistema'],
                         recurrent: true,
                         date: day,
                         completed: false,
-                        avatarUrl: avatar,
+                        avatarUrl: s.avatarUrl,
                         personName: s.name,
                         studentId: s.id
-                    };
+                    });
                 });
 
-            allGeneratedEvents = [...allGeneratedEvents, ...manual, ...classEvents, ...studentBirthdays, ...userBirthdays];
+            allGeneratedEvents = [...allGeneratedEvents, ...manual, ...classEvents, ...birthdayEvents];
         });
 
         let filtered = allGeneratedEvents;
+
+        // Safeguard extra: garante que nenhuma pessoa física apareça duplicada como aniversariante no mesmo dia
+        const seenBirthdayKeys = new Set<string>();
+        filtered = filtered.filter(e => {
+            if (e.type !== 'birthday') return true;
+            const dateStr = format(e.date, 'yyyy-MM-dd');
+            const targetName = e.personName || e.task;
+
+            for (const existingKey of seenBirthdayKeys) {
+                const [existingDate, ...nameParts] = existingKey.split('_');
+                const existingName = nameParts.join('_');
+                if (existingDate === dateStr && areSamePerson(existingName, targetName)) {
+                    return false;
+                }
+            }
+
+            seenBirthdayKeys.add(`${dateStr}_${targetName}`);
+            return true;
+        });
+
         const canManageAgenda = user.role === 'Admin' || user.role === 'Secretaria';
 
         if (selectedOwner !== 'todos') {
