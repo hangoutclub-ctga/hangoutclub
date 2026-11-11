@@ -37,19 +37,22 @@ export function InventoryItemProfile({ item }: InventoryItemProfileProps) {
                             />
                         </div>
                     </DialogTrigger>
-                    <DialogContent className="sm:max-w-xs">
-                        <DialogHeader>
-                            <DialogTitle className="truncate">Foto de {item.name}</DialogTitle>
-                        </DialogHeader>
-                        <div className="flex justify-center items-center p-4">
-                            <div className="relative h-64 w-64 rounded-xl border overflow-hidden">
-                                <Image
-                                    src={getDisplayAvatarUrl(item.imageUrl)}
-                                    alt={item.name}
-                                    fill
-                                    className="object-cover"
+                    <DialogContent className="w-auto max-w-[90vw] sm:max-w-md p-3 sm:p-4 rounded-2xl flex flex-col items-center justify-center overflow-hidden border bg-card shadow-2xl [&>button]:bg-background/80 [&>button]:backdrop-blur-xs [&>button]:rounded-full [&>button]:p-1.5 [&>button]:shadow-md [&>button]:z-20 [&>button]:top-2 [&>button]:right-2 sm:[&>button]:top-3 sm:[&>button]:right-3">
+                        <DialogTitle className="sr-only">Foto de {item.name}</DialogTitle>
+                        <div className="relative w-[75vw] max-w-[320px] sm:max-w-[360px] aspect-square rounded-xl overflow-hidden bg-muted/40 flex items-center justify-center border shadow-inner">
+                            {item.imageUrl && !item.imageUrl.includes('placehold.co') ? (
+                                <img 
+                                    src={getDisplayAvatarUrl(item.imageUrl)} 
+                                    alt={item.name} 
+                                    className="w-full h-full object-cover" 
                                 />
-                            </div>
+                            ) : (
+                                <div className="flex flex-col items-center justify-center text-muted-foreground select-none">
+                                    <span className="text-5xl sm:text-6xl font-black font-headline text-primary/40">
+                                        {item.name ? item.name.substring(0, 2).toUpperCase() : 'IT'}
+                                    </span>
+                                </div>
+                            )}
                         </div>
                     </DialogContent>
                 </Dialog>

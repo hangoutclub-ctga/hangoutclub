@@ -572,14 +572,22 @@ const SystemManagementPanel = () => {
                                                 <img src={getDisplayAvatarUrl(user.avatar)} alt={user.nickname} className="h-full w-full object-cover" />
                                             </div>
                                         </DialogTrigger>
-                                        <DialogContent className="sm:max-w-xs">
-                                            <DialogHeader>
-                                                <DialogTitle className="truncate">Foto de {user.nickname || user.email}</DialogTitle>
-                                            </DialogHeader>
-                                            <div className="flex justify-center items-center p-4">
-                                                <div className="h-64 w-64 rounded-xl border bg-muted overflow-hidden flex items-center justify-center">
-                                                    <img src={getDisplayAvatarUrl(user.avatar)} alt={user.nickname} className="h-full w-full object-cover" />
-                                                </div>
+                                        <DialogContent className="w-auto max-w-[90vw] sm:max-w-md p-3 sm:p-4 rounded-2xl flex flex-col items-center justify-center overflow-hidden border bg-card shadow-2xl [&>button]:bg-background/80 [&>button]:backdrop-blur-xs [&>button]:rounded-full [&>button]:p-1.5 [&>button]:shadow-md [&>button]:z-20 [&>button]:top-2 [&>button]:right-2 sm:[&>button]:top-3 sm:[&>button]:right-3">
+                                            <DialogTitle className="sr-only">Foto de {user.nickname || user.email}</DialogTitle>
+                                            <div className="relative w-[75vw] max-w-[320px] sm:max-w-[360px] aspect-square rounded-xl overflow-hidden bg-muted/40 flex items-center justify-center border shadow-inner">
+                                                {user.avatar && !user.avatar.includes('placehold.co') ? (
+                                                    <img 
+                                                        src={getDisplayAvatarUrl(user.avatar)} 
+                                                        alt={user.nickname} 
+                                                        className="w-full h-full object-cover" 
+                                                    />
+                                                ) : (
+                                                    <div className="flex flex-col items-center justify-center text-muted-foreground select-none">
+                                                        <span className="text-5xl sm:text-6xl font-black font-headline text-primary/40">
+                                                            {(user.nickname || user.email || 'US').substring(0, 2).toUpperCase()}
+                                                        </span>
+                                                    </div>
+                                                )}
                                             </div>
                                         </DialogContent>
                                     </Dialog>
