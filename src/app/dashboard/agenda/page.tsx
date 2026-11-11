@@ -225,7 +225,9 @@ export default function AgendaPage() {
                       {isBirthday ? (
                         <>
                           <span>🎈 Aniversário</span>
-                          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-200/80 dark:bg-amber-800/50 text-amber-900 dark:text-amber-100 font-bold uppercase tracking-wider">Hoje</span>
+                          <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-amber-200/80 dark:bg-amber-800/50 text-amber-900 dark:text-amber-100 font-bold uppercase tracking-wider">
+                            {evt.isBirthdayToday ? "Hoje" : (evt.birthdayDateFormatted || format(evt.date, 'dd/MM'))}
+                          </span>
                         </>
                       ) : (
                         `${getTypeLabel(evt.type)} - ${evt.task}`

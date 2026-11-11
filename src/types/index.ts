@@ -202,6 +202,8 @@ export type DisplayEvent = {
     personName?: string;
     studentId?: string;
     userId?: string;
+    isBirthdayToday?: boolean;
+    birthdayDateFormatted?: string;
 };
 
 export type CommunicationTemplate = {

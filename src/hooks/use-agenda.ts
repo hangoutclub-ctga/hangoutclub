@@ -68,6 +68,10 @@ export const useAgenda = (date: Date | undefined, user: User | null, viewType: '
             const handledStudentIds = new Set<string>();
             const handledUserIds = new Set<string>();
 
+            const now = new Date();
+            const isToday = day.getDate() === now.getDate() && day.getMonth() === now.getMonth() && day.getFullYear() === now.getFullYear();
+            const bdayDateFormatted = format(day, 'dd/MM');
+
             // 1. Processa colaboradores cujo aniversário cai neste dia
             users
                 .filter(u => u.role !== 'Apagado' && isBirthdayOnDay(u.dob, day))
@@ -91,7 +95,9 @@ export const useAgenda = (date: Date | undefined, user: User | null, viewType: '
                         id: `BDAY-USER-${u.id}-${dateKey}`,
                         task: `Aniversário: ${displayName}`,
                         time: "00:00",
-                        details: `Hoje é o aniversário de ${displayName} (${u.role})!`,
+                        details: isToday 
+                            ? `Hoje é o aniversário de ${displayName} (${u.role})!` 
+                            : `Aniversário de ${displayName} (${u.role}) no dia ${bdayDateFormatted}!`,
                         type: 'birthday' as const,
                         owners: ['Sistema'],
                         recurrent: true,
@@ -100,7 +106,9 @@ export const useAgenda = (date: Date | undefined, user: User | null, viewType: '
                         avatarUrl: avatar,
                         personName: displayName,
                         userId: u.id,
-                        studentId: matchingStudent?.id
+                        studentId: matchingStudent?.id,
+                        isBirthdayToday: isToday,
+                        birthdayDateFormatted: bdayDateFormatted
                     });
                 });
 
@@ -134,7 +142,9 @@ export const useAgenda = (date: Date | undefined, user: User | null, viewType: '
                             id: `BDAY-USER-${matchingUser.id}-${dateKey}`,
                             task: `Aniversário: ${s.name}`,
                             time: "00:00",
-                            details: `Hoje é o aniversário de ${s.name} (${matchingUser.role})!`,
+                            details: isToday 
+                                ? `Hoje é o aniversário de ${s.name} (${matchingUser.role})!` 
+                                : `Aniversário de ${s.name} (${matchingUser.role}) no dia ${bdayDateFormatted}!`,
                             type: 'birthday' as const,
                             owners: ['Sistema'],
                             recurrent: true,
@@ -143,7 +153,9 @@ export const useAgenda = (date: Date | undefined, user: User | null, viewType: '
                             avatarUrl: avatar,
                             personName: s.name,
                             userId: matchingUser.id,
-                            studentId: s.id
+                            studentId: s.id,
+                            isBirthdayToday: isToday,
+                            birthdayDateFormatted: bdayDateFormatted
                         });
                         return;
                     }
@@ -154,7 +166,9 @@ export const useAgenda = (date: Date | undefined, user: User | null, viewType: '
                         id: `BDAY-STUDENT-${s.id}-${dateKey}`,
                         task: `Aniversário: ${s.name}`,
                         time: "00:00",
-                        details: `Hoje é o aniversário de ${s.name}!`,
+                        details: isToday 
+                            ? `Hoje é o aniversário de ${s.name}!` 
+                            : `Aniversário de ${s.name} no dia ${bdayDateFormatted}!`,
                         type: 'birthday' as const,
                         owners: ['Sistema'],
                         recurrent: true,
@@ -162,7 +176,9 @@ export const useAgenda = (date: Date | undefined, user: User | null, viewType: '
                         completed: false,
                         avatarUrl: s.avatarUrl,
                         personName: s.name,
-                        studentId: s.id
+                        studentId: s.id,
+                        isBirthdayToday: isToday,
+                        birthdayDateFormatted: bdayDateFormatted
                     });
                 });
 
