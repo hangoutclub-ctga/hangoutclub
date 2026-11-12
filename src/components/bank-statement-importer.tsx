@@ -16,7 +16,8 @@ import {
   Loader2, 
   HelpCircle,
   Sparkles,
-  Layers
+  Layers,
+  RefreshCw
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
@@ -26,7 +27,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
-import { cn, formatCurrency } from "@/lib/utils";
+import { cn, formatCurrency, formatTransactionDate } from "@/lib/utils";
 import { useData } from "@/hooks/use-data";
 import { Transaction, FixedExpense } from "@/types";
 import { uploadFileToStorage } from "@/lib/supabase/storage";
@@ -44,6 +45,7 @@ export interface ImportedCandidate {
   name: string;
   isDuplicate?: boolean;
   duplicateReason?: string;
+  existingTransactionId?: string; // ID da transação idêntica já cadastrada no sistema
   matchedFixedExpenseId?: string; // ID da despesa fixa vinculada para dar baixa
   originalFixedExpenseValue?: number; // Valor previsto cadastrado antes do extrato
 }
@@ -54,8 +56,18 @@ interface BankStatementImporterProps {
   onImportComplete?: () => void;
 }
 
+function normalizeDateOnly(dateStr?: string | null): string {
+  if (!dateStr) return '';
+  const trimmed = dateStr.trim();
+  const m = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  const dmy = trimmed.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})/);
+  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, '0')}-${dmy[1].padStart(2, '0')}`;
+  return trimmed.slice(0, 10);
+}
+
 export function BankStatementImporter({ isOpen, onClose, onImportComplete }: BankStatementImporterProps) {
-  const { transactions, addTransaction, students, fixedExpenses, updateFixedExpense, users } = useData();
+  const { transactions, addTransaction, updateTransaction, students, fixedExpenses, updateFixedExpense, users } = useData();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [isLoading, setIsLoading] = useState(false);
@@ -65,6 +77,7 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
   const [filterType, setFilterType] = useState<string>("todos");
   const [searchTerm, setSearchTerm] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [importMode, setImportMode] = useState<'only-missing' | 'replace-duplicates'>('only-missing');
 
   // Lista de despesas fixas pendentes no sistema para facilitar seleção de vínculo
   const pendingFixedExpenses = useMemo(() => {
@@ -79,6 +92,7 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
     setSearchTerm("");
     setIsLoading(false);
     setIsSaving(false);
+    setImportMode('only-missing');
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
@@ -693,18 +707,40 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
         return;
       }
 
-      // Cruzar com transações existentes no Supabase e Despesas Fixas para alertar duplicatas
-      const existingKeySet = new Set(
-        transactions
-          .filter(t => t.type !== 'Apagado')
-          .map(t => `${t.date}_${t.value.toFixed(2)}_${t.type}`)
-      );
+      // Cruzar com transações existentes no Supabase e Despesas Fixas para alertar duplicatas com precisão
+      const availableExisting = (transactions || [])
+        .filter(t => t.type !== 'Apagado' && t.date)
+        .map(t => ({
+          ...t,
+          normDate: normalizeDateOnly(t.date),
+          normVal: Number(t.value).toFixed(2),
+          matched: false
+        }));
 
       const flagged = candidates.map(c => {
-        const key = `${c.date}_${c.value.toFixed(2)}_${c.type}`;
-        const isTxDup = existingKeySet.has(key);
+        const cDate = normalizeDateOnly(c.date);
+        const cVal = Number(c.value).toFixed(2);
 
-        // Se tem despesa fixa vinculada
+        // 1. Procura transação idêntica já cadastrada (mesma data YYYY-MM-DD, mesmo valor e mesmo tipo)
+        const existingMatch = availableExisting.find(ex => 
+          !ex.matched &&
+          ex.normDate === cDate &&
+          ex.normVal === cVal &&
+          ex.type === c.type
+        );
+
+        if (existingMatch) {
+          existingMatch.matched = true;
+          return {
+            ...c,
+            isDuplicate: true,
+            existingTransactionId: existingMatch.id,
+            duplicateReason: `Já cadastrado no sistema (${formatTransactionDate(existingMatch.date)} - ${formatCurrency(existingMatch.value)})`,
+            selected: false // Por padrão, NÃO vem marcado para prevenir duplicações acidentais
+          };
+        }
+
+        // 2. Se for despesa fixa já quitada no mês
         if (c.matchedFixedExpenseId) {
           const fe = (fixedExpenses || []).find(f => f.id === c.matchedFixedExpenseId);
           if (fe && fe.status === 'Pago') {
@@ -720,13 +756,13 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
 
         return {
           ...c,
-          isDuplicate: isTxDup,
-          duplicateReason: isTxDup ? "Já existe transação idêntica no sistema." : undefined,
-          selected: !isTxDup
+          isDuplicate: false,
+          selected: true
         };
       });
 
       setParsedItems(flagged);
+      setImportMode('only-missing');
       toast({
         title: "Extrato processado com sucesso!",
         description: `${flagged.length} lançamentos encontrados no extrato.`
@@ -749,6 +785,22 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
 
   const toggleItem = (id: string) => {
     setParsedItems(prev => prev.map(item => item.id === id ? { ...item, selected: !item.selected } : item));
+  };
+
+  const handleSelectOnlyMissing = () => {
+    setImportMode('only-missing');
+    setParsedItems(prev => prev.map(item => ({
+      ...item,
+      selected: !item.isDuplicate
+    })));
+  };
+
+  const handleSelectAllAndReplace = () => {
+    setImportMode('replace-duplicates');
+    setParsedItems(prev => prev.map(item => ({
+      ...item,
+      selected: true
+    })));
   };
 
   const updateItemCategory = (id: string, category: 'Receita' | 'Custo' | 'Despesa' | 'Investimento' | 'Gasto') => {
@@ -835,6 +887,7 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
 
     setIsSaving(true);
     let successCount = 0;
+    let updatedCount = 0;
     let fixedUpdatedCount = 0;
     let statementFileUrl: string | undefined = undefined;
 
@@ -875,22 +928,43 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
           }
         }
 
-        await addTransaction({
-          date: item.date,
-          description: item.description,
-          type: item.type,
-          value: item.value,
-          category: item.category,
-          name: finalName,
-          receiptUrl: statementFileUrl || undefined, // Anexa o arquivo à transação
-          paymentMethod: 'Pix / Banco',
-        });
-        successCount++;
+        // Se for item duplicado e existir transação já cadastrada, e o usuário escolheu substituir/atualizar
+        if (item.isDuplicate && item.existingTransactionId && importMode === 'replace-duplicates') {
+          await updateTransaction(item.existingTransactionId, {
+            date: item.date,
+            description: item.description,
+            type: item.type,
+            value: item.value,
+            category: item.category,
+            name: finalName,
+            receiptUrl: statementFileUrl || undefined,
+            paymentMethod: 'Pix / Banco',
+          });
+          updatedCount++;
+        } else {
+          // Lançamento novo / faltante (ou inserção sem substituição)
+          await addTransaction({
+            date: item.date,
+            description: item.description,
+            type: item.type,
+            value: item.value,
+            category: item.category,
+            name: finalName,
+            receiptUrl: statementFileUrl || undefined, // Anexa o arquivo à transação
+            paymentMethod: 'Pix / Banco',
+          });
+          successCount++;
+        }
       }
+
+      const summaryDetails = [];
+      if (successCount > 0) summaryDetails.push(`${successCount} ${successCount === 1 ? 'novo lançamento adicionado' : 'novos lançamentos adicionados'}`);
+      if (updatedCount > 0) summaryDetails.push(`${updatedCount} ${updatedCount === 1 ? 'transação existente atualizada' : 'transações existentes atualizadas'}`);
+      if (fixedUpdatedCount > 0) summaryDetails.push(`${fixedUpdatedCount} ${fixedUpdatedCount === 1 ? 'despesa fixa baixada' : 'despesas fixas baixadas'}`);
 
       toast({
         title: "Importação concluída!",
-        description: `${successCount} transações adicionadas (${fixedUpdatedCount} despesas fixas baixadas/atualizadas).`
+        description: summaryDetails.join(", ") || "Nenhum item alterado."
       });
 
       onImportComplete?.();
@@ -899,7 +973,7 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
       toast({
         variant: "destructive",
         title: "Erro na importação",
-        description: `Importados ${successCount} itens antes da falha: ${err.message}`
+        description: `Processados ${successCount + updatedCount} itens antes da falha: ${err.message}`
       });
     } finally {
       setIsSaving(false);
@@ -1024,6 +1098,59 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
                 </div>
               </div>
 
+              {/* Banner de Ação para Duplicadas Encontradas */}
+              {summary.duplicateCount > 0 && (
+                <div className="p-3.5 sm:p-4 rounded-2xl border bg-amber-500/10 border-amber-500/30 dark:bg-amber-950/20 dark:border-amber-500/30 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="p-2 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5">
+                      <AlertTriangle className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <p className="text-xs sm:text-sm font-bold text-amber-800 dark:text-amber-300">
+                        {summary.duplicateCount} {summary.duplicateCount === 1 ? 'lançamento já cadastrado foi detectado' : 'lançamentos já cadastrados foram detectados'} no sistema
+                      </p>
+                      <p className="text-[11px] sm:text-xs text-amber-700/90 dark:text-amber-400/90 mt-0.5">
+                        Escolha se deseja importar apenas os faltantes ou também atualizar/substituir os lançamentos iguais:
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={importMode === 'only-missing' ? "default" : "outline"}
+                      onClick={handleSelectOnlyMissing}
+                      className={cn(
+                        "h-8 text-xs font-bold gap-1.5 transition-all",
+                        importMode === 'only-missing' 
+                          ? "bg-amber-600 hover:bg-amber-700 text-white shadow-sm" 
+                          : "border-amber-500/40 text-amber-800 dark:text-amber-300 hover:bg-amber-500/10"
+                      )}
+                    >
+                      <CheckCircle2 className="h-3.5 w-3.5" />
+                      Adicionar Apenas Faltantes ({parsedItems.length - summary.duplicateCount})
+                    </Button>
+
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant={importMode === 'replace-duplicates' ? "default" : "outline"}
+                      onClick={handleSelectAllAndReplace}
+                      className={cn(
+                        "h-8 text-xs font-bold gap-1.5 transition-all",
+                        importMode === 'replace-duplicates' 
+                          ? "bg-blue-600 hover:bg-blue-700 text-white shadow-sm" 
+                          : "border-blue-500/40 text-blue-800 dark:text-blue-300 hover:bg-blue-500/10"
+                      )}
+                    >
+                      <RefreshCw className="h-3.5 w-3.5" />
+                      Faltantes + Substituir Iguais
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               {/* Barra de Filtro e Busca */}
               <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2 pt-1">
                 <div className="flex items-center gap-2">
@@ -1125,10 +1252,17 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
                                 {item.isDuplicate && (
                                   <Badge 
                                     variant="outline" 
-                                    className="text-[9px] h-4 border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400 font-normal shrink-0"
+                                    className={cn(
+                                      "text-[9px] h-4 font-normal shrink-0 transition-colors",
+                                      item.selected && importMode === 'replace-duplicates'
+                                        ? "border-blue-500/50 bg-blue-500/10 text-blue-700 dark:text-blue-400 font-semibold"
+                                        : "border-amber-500/50 bg-amber-500/10 text-amber-700 dark:text-amber-400"
+                                    )}
                                     title={item.duplicateReason}
                                   >
-                                    {item.duplicateReason || "Já existe no sistema"}
+                                    {item.selected && importMode === 'replace-duplicates'
+                                      ? "Substituir / Atualizar"
+                                      : (item.duplicateReason || "Já existe no sistema")}
                                   </Badge>
                                 )}
                               </div>
@@ -1273,12 +1407,16 @@ export function BankStatementImporter({ isOpen, onClose, onImportComplete }: Ban
               {isSaving ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  <span>Importando ({summary.totalSelected})...</span>
+                  <span>Processando ({summary.totalSelected})...</span>
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="h-4 w-4" />
-                  <span>Confirmar Importação de {summary.totalSelected} itens</span>
+                  <span>
+                    {importMode === 'replace-duplicates' && summary.duplicateCount > 0
+                      ? `Confirmar (${summary.totalSelected} itens: Faltantes + Substituições)`
+                      : `Confirmar Importação (${summary.totalSelected} ${summary.totalSelected === 1 ? 'item' : 'itens'})`}
+                  </span>
                 </>
               )}
             </Button>
