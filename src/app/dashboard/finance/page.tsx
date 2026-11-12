@@ -51,6 +51,37 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import * as XLSX from "xlsx";
 import { FinanceInfographic } from "@/components/finance-infographic";
 
+function getBrasiliaDate(): Date {
+    try {
+        const now = new Date();
+        const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Sao_Paulo',
+            year: 'numeric',
+            month: 'numeric',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: 'numeric',
+            second: 'numeric',
+            hour12: false
+        });
+        const parts = formatter.formatToParts(now);
+        const map: Record<string, number> = {};
+        for (const p of parts) {
+            if (p.type !== 'literal') {
+                map[p.type] = parseInt(p.value, 10);
+            }
+        }
+        const year = Math.max(2026, map.year || 2026);
+        const month = (map.month || 1) - 1;
+        const day = map.day || 1;
+        return new Date(year, month, day);
+    } catch {
+        const fallback = new Date();
+        if (fallback.getFullYear() < 2026) fallback.setFullYear(2026);
+        return fallback;
+    }
+}
+
 export default function FinancePage() {
     const { hasPermission } = useAuth();
     const router = useRouter();
@@ -71,16 +102,14 @@ export default function FinancePage() {
     const [isQuittingStudent, setIsQuittingStudent] = useState(false);
     const [isBatchSettleOpen, setIsBatchSettleOpen] = useState(false);
 
-    const [confirmedDate, setConfirmedDate] = useState<Date>(new Date());
-    const [tempDate, setTempDate] = useState<Date>(new Date());
-    const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+    const [confirmedDate, setConfirmedDate] = useState<Date>(() => getBrasiliaDate());
 
     const [periodMode, setPeriodMode] = useState<'mensal' | 'trimestral' | 'anual'>('mensal');
     const [selectedQuarter, setSelectedQuarter] = useState<1 | 2 | 3 | 4>(() => {
-        const q = Math.ceil((new Date().getMonth() + 1) / 3);
+        const q = Math.ceil((getBrasiliaDate().getMonth() + 1) / 3);
         return (q >= 1 && q <= 4 ? q : 1) as 1 | 2 | 3 | 4;
     });
-    const [selectedYear, setSelectedYear] = useState<number>(() => confirmedDate.getFullYear());
+    const [selectedYear, setSelectedYear] = useState<number>(() => getBrasiliaDate().getFullYear());
 
     const currentMonth = confirmedDate.getMonth() + 1;
     const currentYear = confirmedDate.getFullYear();
@@ -151,11 +180,7 @@ export default function FinancePage() {
         { value: 10, label: 'Outubro' }, { value: 11, label: 'Novembro' }, { value: 12, label: 'Dezembro' }
     ];
 
-    const currentSystemYear = new Date().getFullYear();
-    const years = useMemo(() => {
-        const yearSet = new Set([2023, 2024, 2025, 2026, currentSystemYear, currentSystemYear + 1]);
-        return Array.from(yearSet).sort((a, b) => a - b);
-    }, [currentSystemYear]);
+    const years = [2026, 2027, 2028, 2029, 2030];
 
     const activeFixedExpenses = useMemo(() => {
         return fixedExpenses.filter(fe => fe.status !== 'Apagado');
@@ -171,35 +196,18 @@ export default function FinancePage() {
     }, [transactions, targetYear, targetMonths]);
 
     const totals = useMemo(() => {
-        // Encontra o menor ano e mês com registros na base
-        let minYear = targetYear;
-        let minMonth = targetMonths[0];
+        // Marco Zero Contábil: Janeiro de 2026 com Saldo Inicial de R$ 21.819,54
+        const BASE_START_YEAR = 2026;
+        const BASE_START_MONTH = 1;
+        const BASE_INITIAL_BALANCE = 21819.54;
 
-        for (const t of transactions) {
-            if (t.type === 'Apagado' || !t.date) continue;
-            const ym = getTransactionYearMonth(t.date);
-            if (ym) {
-                if (ym.year < minYear || (ym.year === minYear && ym.month < minMonth)) {
-                    minYear = ym.year;
-                    minMonth = ym.month;
-                }
-            }
-        }
-
-        for (const fe of activeFixedExpenses) {
-            if (fe.year < minYear || (fe.year === minYear && fe.month < minMonth)) {
-                minYear = fe.year;
-                minMonth = fe.month;
-            }
-        }
-
-        // Itera mês a mês desde o primeiro registro até o mês imediatamente anterior ao início do período
-        let runningBalance = 0;
-        let iterYear = minYear;
-        let iterMonth = minMonth;
+        let runningBalance = BASE_INITIAL_BALANCE;
+        let iterYear = BASE_START_YEAR;
+        let iterMonth = BASE_START_MONTH;
         const periodStartYear = targetYear;
         const periodStartMonth = targetMonths[0];
 
+        // Itera mês a mês desde Janeiro/2026 até o mês imediatamente anterior ao início do período selecionado
         while (iterYear < periodStartYear || (iterYear === periodStartYear && iterMonth < periodStartMonth)) {
             const mIncome = transactions
                 .filter(t => t.type === 'Entrada' && isTransactionInMonth(t.date, iterYear, iterMonth))
@@ -213,7 +221,7 @@ export default function FinancePage() {
                 .filter(f => f.status === 'Pendente' && f.year === iterYear && f.month === iterMonth)
                 .reduce((acc, f) => acc + (f.value || 0), 0);
 
-            // Fórmula cumulativa: Saldo final do mês = Saldo anterior + Entradas - Saídas - Despesas Fixas
+            // Fórmula cumulativa: Saldo final do mês = Saldo anterior + Entradas - Saídas - Despesas Fixas Pendentes
             runningBalance += (mIncome - mOutcome - mPendingFixed);
 
             iterMonth++;
@@ -1159,41 +1167,53 @@ export default function FinancePage() {
                                 </div>
 
                                 {periodMode === 'mensal' && (
-                                <Popover open={isCalendarOpen} onOpenChange={(open) => {
-                                    setIsCalendarOpen(open);
-                                    if (open) setTempDate(confirmedDate);
-                                }}>
-                                    <PopoverTrigger asChild>
-                                        <Button 
-                                            variant="outline" 
-                                            size="sm" 
-                                            className="h-8 border-accent/20 text-[10px] sm:text-xs px-2.5 sm:px-3 gap-1.5 rounded-xl hover:bg-accent/5 shadow-sm"
-                                        >
-                                            <CalendarIcon className="h-3.5 w-3.5 text-accent" />
-                                            <span className="capitalize font-medium">
-                                                {format(confirmedDate, "MMMM 'de' yyyy", { locale: ptBR })}
-                                            </span>
-                                        </Button>
-                                    </PopoverTrigger>
-                                    <PopoverContent className="w-auto p-0 rounded-2xl shadow-2xl border-none" align="end">
-                                        <Calendar 
-                                            mode="single" 
-                                            selected={tempDate} 
-                                            onSelect={(d) => d && setTempDate(d)} 
-                                            onOk={() => {
-                                                setConfirmedDate(tempDate);
-                                                setSelectedYear(tempDate.getFullYear());
-                                                setSelectedQuarter(Math.ceil((tempDate.getMonth() + 1) / 3) as 1 | 2 | 3 | 4);
-                                                setIsCalendarOpen(false);
+                                    <div className="flex items-center gap-1.5">
+                                        {/* 1º Botão: Opções dos 12 Meses */}
+                                        <Select
+                                            value={String(currentMonth)}
+                                            onValueChange={(val) => {
+                                                const m = Number(val);
+                                                setConfirmedDate(prev => new Date(prev.getFullYear(), m - 1, 1));
                                             }}
-                                            locale={ptBR} 
-                                        />
-                                    </PopoverContent>
-                                </Popover>
+                                        >
+                                            <SelectTrigger className="h-8 text-[10px] sm:text-xs min-w-[110px] sm:min-w-[125px] rounded-xl border-accent/20 font-medium capitalize shadow-2xs">
+                                                <CalendarIcon className="h-3.5 w-3.5 text-accent mr-1 shrink-0" />
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent className="rounded-xl shadow-xl">
+                                                {months.map(m => (
+                                                    <SelectItem key={m.value} value={String(m.value)} className="capitalize text-xs">
+                                                        {m.label}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+
+                                        {/* 2º Botão: Opções dos Anos 2026 a 2030 */}
+                                        <Select
+                                            value={String(targetYear)}
+                                            onValueChange={(val) => {
+                                                const yr = Number(val);
+                                                setSelectedYear(yr);
+                                                setConfirmedDate(prev => new Date(yr, prev.getMonth(), 1));
+                                            }}
+                                        >
+                                            <SelectTrigger className="h-8 text-[10px] sm:text-xs w-[75px] sm:w-[85px] rounded-xl border-accent/20 font-medium shadow-2xs">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent className="rounded-xl shadow-xl">
+                                                {years.map(y => (
+                                                    <SelectItem key={y} value={String(y)} className="text-xs">
+                                                        {y}
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                 )}
 
                                 {periodMode === 'trimestral' && (
-                                    <div className="flex items-center gap-1">
+                                    <div className="flex items-center gap-1.5">
                                         <Select 
                                             value={String(selectedQuarter)} 
                                             onValueChange={(val) => {
@@ -1203,7 +1223,7 @@ export default function FinancePage() {
                                                 setConfirmedDate(prev => new Date(prev.getFullYear(), startM, 1));
                                             }}
                                         >
-                                            <SelectTrigger className="h-8 text-[10px] sm:text-xs w-[115px] sm:w-[135px] rounded-xl border-accent/20">
+                                            <SelectTrigger className="h-8 text-[10px] sm:text-xs w-[115px] sm:w-[135px] rounded-xl border-accent/20 font-medium">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -1222,7 +1242,7 @@ export default function FinancePage() {
                                                 setConfirmedDate(prev => new Date(yr, prev.getMonth(), 1));
                                             }}
                                         >
-                                            <SelectTrigger className="h-8 text-[10px] sm:text-xs w-[80px] rounded-xl border-accent/20">
+                                            <SelectTrigger className="h-8 text-[10px] sm:text-xs w-[75px] sm:w-[85px] rounded-xl border-accent/20 font-medium">
                                                 <SelectValue />
                                             </SelectTrigger>
                                             <SelectContent>
@@ -1243,7 +1263,7 @@ export default function FinancePage() {
                                             setConfirmedDate(prev => new Date(yr, prev.getMonth(), 1));
                                         }}
                                     >
-                                        <SelectTrigger className="h-8 text-[10px] sm:text-xs w-[95px] rounded-xl border-accent/20">
+                                        <SelectTrigger className="h-8 text-[10px] sm:text-xs w-[85px] sm:w-[95px] rounded-xl border-accent/20 font-medium">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
