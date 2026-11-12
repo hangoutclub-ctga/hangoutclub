@@ -4,17 +4,36 @@ import { Transaction, FixedExpense } from '@/types';
 
 export async function fetchTransactions(): Promise<Transaction[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from('transactions')
-    .select('*')
-    .order('date', { ascending: false });
+  let allRows: any[] = [];
+  const pageSize = 1000;
+  let from = 0;
+  let hasMore = true;
 
-  if (error) {
-    console.error('Error fetching transactions:', error);
-    throw error;
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('*')
+      .order('date', { ascending: false })
+      .range(from, from + pageSize - 1);
+
+    if (error) {
+      console.error('Error fetching transactions:', error);
+      throw error;
+    }
+
+    if (data && data.length > 0) {
+      allRows = allRows.concat(data);
+      if (data.length < pageSize) {
+        hasMore = false;
+      } else {
+        from += pageSize;
+      }
+    } else {
+      hasMore = false;
+    }
   }
 
-  return (data || []).map(toTransaction);
+  return allRows.map(toTransaction);
 }
 
 export async function createTransaction(t: Partial<Transaction>): Promise<Transaction> {

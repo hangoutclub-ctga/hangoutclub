@@ -20,6 +20,7 @@ import {
 } from "@/components/ui/table";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -170,6 +171,15 @@ export default function FinancePage() {
     const [editingFixedExpense, setEditingFixedExpense] = useState<FixedExpense | null>(null);
     const [viewingFixedExpense, setViewingFixedExpense] = useState<FixedExpense | null>(null);
 
+    // Multi-seleção de transações para exclusão em massa
+    const [selectedTxIds, setSelectedTxIds] = useState<string[]>([]);
+    const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
+    const [isBulkDeleting, setIsBulkDeleting] = useState(false);
+
+    useEffect(() => {
+        setSelectedTxIds([]);
+    }, [confirmedDate, periodMode, filter, selectedYear, selectedQuarter]);
+
     const canEdit = hasPermission('finance:edit');
     const canView = hasPermission('nav:finance');
     
@@ -293,6 +303,23 @@ export default function FinancePage() {
             return db - da;
         });
     }, [filteredByDate, filter]);
+
+    const toggleSelectTx = (id: string) => {
+        setSelectedTxIds(prev => 
+            prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+        );
+    };
+
+    const toggleSelectAllFiltered = (checked: boolean) => {
+        if (checked) {
+            const allIds = filteredTransactions.map(t => t.id);
+            setSelectedTxIds(allIds);
+        } else {
+            setSelectedTxIds([]);
+        }
+    };
+
+    const isAllFilteredSelected = filteredTransactions.length > 0 && filteredTransactions.every(t => selectedTxIds.includes(t.id));
 
     const renderCategoryBadge = (category?: string, type?: 'Entrada' | 'Saída' | string) => {
         const cat = normalizeTransactionCategory(category, type);
@@ -1365,92 +1392,154 @@ export default function FinancePage() {
                                 </TableBody>
                             </Table>
                         ) : (
-                            <Table>
-                                <TableHeader className="print:bg-slate-100">
-                                    <TableRow className="print:border-b print:border-slate-300">
-                                        <TableHead className="text-[10px] sm:text-xs whitespace-nowrap w-[90px] sm:w-[105px] print:w-[75px] print:text-[9px] print:py-1 print:px-1.5 print:font-bold">Data</TableHead>
-                                        <TableHead className="text-[10px] sm:text-xs print:text-[9px] print:py-1 print:px-1.5 print:font-bold">Descrição</TableHead>
-                                        <TableHead className="text-right text-[10px] sm:text-xs whitespace-nowrap w-[100px] print:w-[80px] print:text-[9px] print:py-1 print:px-1.5 print:font-bold">Valor</TableHead>
-                                        <TableHead className="text-center whitespace-nowrap text-[10px] sm:text-xs w-[80px] print:w-[60px] print:text-[9px] print:py-1 print:px-1.5 print:font-bold">Tipo</TableHead>
-                                        <TableHead className="text-center no-print text-[10px] sm:text-xs whitespace-nowrap w-[90px]">Ações</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {filteredTransactions.length > 0 ? filteredTransactions.map((t) => (
-                                        <TableRow key={t.id} className="print:border-b print:border-slate-200">
-                                            <TableCell className="whitespace-nowrap font-mono text-[10px] sm:text-xs text-muted-foreground print:text-foreground print:text-[9px] p-2 sm:p-4 print:p-1 print:px-1.5 w-[90px] sm:w-[105px] print:w-[75px]">
-                                                {formatTransactionDate(t.date)}
-                                            </TableCell>
-                                            <TableCell className="max-w-[160px] sm:max-w-[240px] md:max-w-[320px] p-2 sm:p-4 print:p-1 print:px-1.5">
-                                                <div className="flex items-start gap-1.5 min-w-0 print:gap-1">
-                                                    {t.type === 'Entrada' ? (
-                                                        <ArrowUpCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-500 shrink-0 mt-0.5 print:h-2.5 print:w-2.5 print:mt-0.5" />
-                                                    ) : (
-                                                        <ArrowDownCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-500 shrink-0 mt-0.5 print:h-2.5 print:w-2.5 print:mt-0.5" />
-                                                    )}
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="font-bold text-[10px] sm:text-sm flex items-center gap-1.5 flex-wrap print:text-[9.5px] print:gap-1">
-                                                            <span className="truncate print:whitespace-normal">{t.description}</span>
-                                                            {renderCategoryBadge(t.category, t.type)}
-                                                        </div>
-                                                        {t.name && (
-                                                            <div 
-                                                                className="text-[9px] sm:text-xs text-muted-foreground line-clamp-2 break-words leading-tight mt-0.5 print:text-[8px] print:mt-0 print:line-clamp-1" 
-                                                                title={t.name}
-                                                            >
-                                                                {t.name}
+                            <>
+                                {canEdit && selectedTxIds.length > 0 && (
+                                    <div className="mx-2 sm:mx-0 mb-3 p-2.5 sm:p-3 rounded-xl bg-destructive/10 border border-destructive/20 flex items-center justify-between gap-3 no-print animate-in fade-in slide-in-from-top-1">
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="destructive" className="font-bold text-xs">
+                                                {selectedTxIds.length} {selectedTxIds.length === 1 ? 'selecionada' : 'selecionadas'}
+                                            </Badge>
+                                            <span className="text-xs text-muted-foreground hidden sm:inline">
+                                                de {filteredTransactions.length} transações exibidas
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => setSelectedTxIds([])}
+                                                className="h-7 text-xs text-muted-foreground hover:text-foreground"
+                                            >
+                                                Desmarcar todas
+                                            </Button>
+                                            <Button
+                                                variant="destructive"
+                                                size="sm"
+                                                onClick={() => setIsBulkDeleteOpen(true)}
+                                                disabled={isBulkDeleting}
+                                                className="h-7 text-xs font-bold gap-1.5 shadow-sm"
+                                            >
+                                                {isBulkDeleting ? (
+                                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                ) : (
+                                                    <Trash2 className="h-3.5 w-3.5" />
+                                                )}
+                                                Excluir selecionadas ({selectedTxIds.length})
+                                            </Button>
+                                        </div>
+                                    </div>
+                                )}
+                                <Table>
+                                    <TableHeader className="print:bg-slate-100">
+                                        <TableRow className="print:border-b print:border-slate-300">
+                                            {canEdit && (
+                                                <TableHead className="w-10 text-center no-print p-2">
+                                                    <Checkbox 
+                                                        checked={isAllFilteredSelected} 
+                                                        onCheckedChange={(checked) => toggleSelectAllFiltered(!!checked)}
+                                                        aria-label="Selecionar todas as transações"
+                                                    />
+                                                </TableHead>
+                                            )}
+                                            <TableHead className="text-[10px] sm:text-xs whitespace-nowrap w-[90px] sm:w-[105px] print:w-[75px] print:text-[9px] print:py-1 print:px-1.5 print:font-bold">Data</TableHead>
+                                            <TableHead className="text-[10px] sm:text-xs print:text-[9px] print:py-1 print:px-1.5 print:font-bold">Descrição</TableHead>
+                                            <TableHead className="text-right text-[10px] sm:text-xs whitespace-nowrap w-[100px] print:w-[80px] print:text-[9px] print:py-1 print:px-1.5 print:font-bold">Valor</TableHead>
+                                            <TableHead className="text-center whitespace-nowrap text-[10px] sm:text-xs w-[80px] print:w-[60px] print:text-[9px] print:py-1 print:px-1.5 print:font-bold">Tipo</TableHead>
+                                            <TableHead className="text-center no-print text-[10px] sm:text-xs whitespace-nowrap w-[90px]">Ações</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {filteredTransactions.length > 0 ? filteredTransactions.map((t) => (
+                                            <TableRow 
+                                                key={t.id} 
+                                                className={cn(
+                                                    "print:border-b print:border-slate-200 transition-colors",
+                                                    selectedTxIds.includes(t.id) && "bg-destructive/5 dark:bg-destructive/10"
+                                                )}
+                                            >
+                                                {canEdit && (
+                                                    <TableCell className="text-center no-print p-2 w-10">
+                                                        <Checkbox 
+                                                            checked={selectedTxIds.includes(t.id)} 
+                                                            onCheckedChange={() => toggleSelectTx(t.id)}
+                                                            aria-label={`Selecionar transação ${t.description}`}
+                                                        />
+                                                    </TableCell>
+                                                )}
+                                                <TableCell className="whitespace-nowrap font-mono text-[10px] sm:text-xs text-muted-foreground print:text-foreground print:text-[9px] p-2 sm:p-4 print:p-1 print:px-1.5 w-[90px] sm:w-[105px] print:w-[75px]">
+                                                    {formatTransactionDate(t.date)}
+                                                </TableCell>
+                                                <TableCell className="max-w-[160px] sm:max-w-[240px] md:max-w-[320px] p-2 sm:p-4 print:p-1 print:px-1.5">
+                                                    <div className="flex items-start gap-1.5 min-w-0 print:gap-1">
+                                                        {t.type === 'Entrada' ? (
+                                                            <ArrowUpCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-green-500 shrink-0 mt-0.5 print:h-2.5 print:w-2.5 print:mt-0.5" />
+                                                        ) : (
+                                                            <ArrowDownCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-red-500 shrink-0 mt-0.5 print:h-2.5 print:w-2.5 print:mt-0.5" />
+                                                        )}
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="font-bold text-[10px] sm:text-sm flex items-center gap-1.5 flex-wrap print:text-[9.5px] print:gap-1">
+                                                                <span className="truncate print:whitespace-normal">{t.description}</span>
+                                                                {renderCategoryBadge(t.category, t.type)}
                                                             </div>
+                                                            {t.name && (
+                                                                <div 
+                                                                    className="text-[9px] sm:text-xs text-muted-foreground line-clamp-2 break-words leading-tight mt-0.5 print:text-[8px] print:mt-0 print:line-clamp-1" 
+                                                                    title={t.name}
+                                                                >
+                                                                    {t.name}
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell className="text-right font-mono font-bold text-[10px] sm:text-sm whitespace-nowrap w-[100px] print:w-[80px] p-2 sm:p-4 print:p-1 print:px-1.5 print:text-[9.5px]">
+                                                    {formatCurrency(t.value)}
+                                                </TableCell>
+                                                <TableCell className="text-center whitespace-nowrap w-[80px] print:w-[60px] p-2 sm:p-4 print:p-1 print:px-1.5">
+                                                    <Badge className={cn('text-[9px] h-5 print:text-[8px] print:h-3.5 print:px-1 print:py-0', t.type === 'Entrada' ? 'bg-green-500 text-white' : 'bg-red-500 text-white')}>{t.type}</Badge>
+                                                </TableCell>
+                                                <TableCell className="no-print p-1 sm:p-4 whitespace-nowrap w-[90px]">
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        <Button 
+                                                            variant="ghost" 
+                                                            size="icon" 
+                                                            className="text-muted-foreground hover:text-accent h-7 w-7" 
+                                                            title="Visualizar detalhes"
+                                                            onClick={() => setViewingTransaction(t)}
+                                                        >
+                                                            <Eye className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                        {canEdit && (
+                                                            <Button 
+                                                                variant="ghost" 
+                                                                size="icon" 
+                                                                className="text-muted-foreground hover:text-primary h-7 w-7" 
+                                                                title="Editar transação"
+                                                                onClick={() => handleOpenEditTransaction(t)}
+                                                            >
+                                                                <Pencil className="h-3.5 w-3.5" />
+                                                            </Button>
+                                                        )}
+                                                        {canEdit && (
+                                                            <Button 
+                                                                variant="ghost" 
+                                                                size="icon" 
+                                                                className="text-destructive hover:bg-destructive/10 h-7 w-7" 
+                                                                title="Excluir transação"
+                                                                onClick={() => setTransactionToDelete(t)}
+                                                            >
+                                                                <Trash2 className="h-3.5 w-3.5" />
+                                                            </Button>
                                                         )}
                                                     </div>
-                                                </div>
-                                            </TableCell>
-                                            <TableCell className="text-right font-mono font-bold text-[10px] sm:text-sm whitespace-nowrap w-[100px] print:w-[80px] p-2 sm:p-4 print:p-1 print:px-1.5 print:text-[9.5px]">
-                                                {formatCurrency(t.value)}
-                                            </TableCell>
-                                            <TableCell className="text-center whitespace-nowrap w-[80px] print:w-[60px] p-2 sm:p-4 print:p-1 print:px-1.5">
-                                                <Badge className={cn('text-[9px] h-5 print:text-[8px] print:h-3.5 print:px-1 print:py-0', t.type === 'Entrada' ? 'bg-green-500 text-white' : 'bg-red-500 text-white')}>{t.type}</Badge>
-                                            </TableCell>
-                                            <TableCell className="no-print p-1 sm:p-4 whitespace-nowrap w-[90px]">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        size="icon" 
-                                                        className="text-muted-foreground hover:text-accent h-7 w-7" 
-                                                        title="Visualizar detalhes"
-                                                        onClick={() => setViewingTransaction(t)}
-                                                    >
-                                                        <Eye className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                    {canEdit && (
-                                                        <Button 
-                                                            variant="ghost" 
-                                                            size="icon" 
-                                                            className="text-muted-foreground hover:text-primary h-7 w-7" 
-                                                            title="Editar transação"
-                                                            onClick={() => handleOpenEditTransaction(t)}
-                                                        >
-                                                            <Pencil className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                    )}
-                                                    {canEdit && (
-                                                        <Button 
-                                                            variant="ghost" 
-                                                            size="icon" 
-                                                            className="text-destructive hover:bg-destructive/10 h-7 w-7" 
-                                                            title="Excluir transação"
-                                                            onClick={() => setTransactionToDelete(t)}
-                                                        >
-                                                            <Trash2 className="h-3.5 w-3.5" />
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            </TableCell>
-                                        </TableRow>
-                                    )) : (
-                                        <TableRow><TableCell colSpan={5} className="text-center h-20 text-[10px] sm:text-xs italic text-muted-foreground">Sem registros para este período.</TableCell></TableRow>
-                                    )}
-                                </TableBody>
-                            </Table>
+                                                </TableCell>
+                                            </TableRow>
+                                        )) : (
+                                            <TableRow><TableCell colSpan={canEdit ? 6 : 5} className="text-center h-20 text-[10px] sm:text-xs italic text-muted-foreground">Sem registros para este período.</TableCell></TableRow>
+                                        )}
+                                    </TableBody>
+                                </Table>
+                            </>
                         )}
                     </CardContent>
                 </Card>
@@ -1729,6 +1818,35 @@ export default function FinancePage() {
                     setTransactionToDelete(null);
                 } catch (err: any) {
                     toast({ variant: 'destructive', title: "Erro ao remover", description: err.message });
+                }
+            }}
+        />
+
+        <DeleteConfirmDialog
+            open={isBulkDeleteOpen}
+            onOpenChange={setIsBulkDeleteOpen}
+            itemName={`${selectedTxIds.length} ${selectedTxIds.length === 1 ? 'transação selecionada' : 'transações selecionadas'}`}
+            itemType="os lançamentos selecionados"
+            title={`Confirmar Exclusão de ${selectedTxIds.length} Transações`}
+            description={`Você está prestes a mover ${selectedTxIds.length} transações para a lixeira. Esta ação pode ser revertida na Lixeira.`}
+            onConfirm={async (audit) => {
+                try {
+                    setIsBulkDeleting(true);
+                    let count = 0;
+                    for (const id of selectedTxIds) {
+                        await deleteTransaction(id, true, audit);
+                        count++;
+                    }
+                    toast({
+                        title: "Exclusão em massa concluída",
+                        description: `${count} transações foram movidas para a Lixeira com sucesso.`
+                    });
+                    setSelectedTxIds([]);
+                    setIsBulkDeleteOpen(false);
+                } catch (err: any) {
+                    toast({ variant: 'destructive', title: "Erro ao excluir em massa", description: err.message });
+                } finally {
+                    setIsBulkDeleting(false);
                 }
             }}
         />
